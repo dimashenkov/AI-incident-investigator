@@ -1,12 +1,57 @@
-.claude/settings.local.json
+# ── тайни ────────────────────────────────────────────────────────────
 .env
+.env.local
 *.key
 *.pem
+*credentials*.json
+.claude/settings.local.json
+
+# ── работни файлове: изход, не източник ──────────────────────────────
+# Всичко тук се преправя от кода. Ако файл трябва да оцелее clone,
+# значи не му е мястото тук.
+scratch/
+tmp/
+.tmp/
+out/
+build/
+dist/
+coverage/
+*.tmp
+*.bak
+*.orig
+*.rej
+*~
+
+# ── логове и отчети ──────────────────────────────────────────────────
+*.log
+logs/
+runs/
+executions/
+test-results/
+.pytest_cache/
+.vitest/
+
+# ── n8n изход ────────────────────────────────────────────────────────
+# Суровият export носи id-та и credential референции на instance-а.
+# Version-controlled е само нормализираният.
+workflows/*.raw.json
+workflows/.exports/
+
+# ── Codex ────────────────────────────────────────────────────────────
+# Нито подканите, нито отсъдите влизат в repo-то (CLAUDE.md §6).
+# Съдържанието им влиза в PROGRESS.md като изречение.
+codex/
+*.codex.md
+review-*.txt
+
+# ── зависимости ──────────────────────────────────────────────────────
+node_modules/
 __pycache__/
 .venv/
-node_modules/
-dist/
-*.log
+venv/
+
+# ── машина и редактор ────────────────────────────────────────────────
 .DS_Store
-# n8n exports могат да носят credential id-та — минават през нормализация
-workflows/*.raw.json
+.idea/
+.vscode/
+*.swp
