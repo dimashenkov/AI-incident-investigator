@@ -1,0 +1,231 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-sre-mvp/schemas/agent-result.schema.json",
+  "title": "AgentResult",
+  "description": "What every specialist agent returns. One shape, so the Root Cause Agent never has to guess a format.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "agent",
+    "status",
+    "findings",
+    "hypotheses",
+    "confidence"
+  ],
+  "properties": {
+    "agent": {
+      "type": "string",
+      "enum": [
+        "kubernetes",
+        "logs",
+        "metrics",
+        "root_cause"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "no_data",
+        "error"
+      ],
+      "description": "Three states, not two. no_data means the agent ran and found nothing to report; error means it could not run. Merging them turns could-not-check into checked-and-clean."
+    },
+    "error": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Required in words when status is error. A silent error is the defect this whole schema exists to prevent."
+    },
+    "findings": {
+      "type": "array",
+      "description": "Observed facts, not interpretations. A finding must be traceable to a specific field of the observation it came from.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fact",
+          "source_ref"
+        ],
+        "properties": {
+          "fact": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_ref": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Where in the observation this came from, e.g. pods[0].containerStatuses[0].lastState.terminated.reason. A finding with no ref is an opinion."
+          },
+          "severity": {
+            "$ref": "https://ai-sre-mvp/schemas/common.schema.json#/$defs/severity"
+          }
+        }
+      }
+    },
+    "hypotheses": {
+      "type": "array",
+      "description": "What the agent thinks might be going on. Deliberately separate from findings so the Root Cause Agent can weigh them differently.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "statement",
+          "supported_by"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "CONTAINER_OOM",
+              "APPLICATION_STARTUP_FAILURE",
+              "IMAGE_PULL_FAILURE",
+              "READINESS_PROBE_FAILURE",
+              "DEPLOYMENT_REGRESSION"
+            ]
+          },
+          "statement": {
+            "type": "string",
+            "minLength": 1
+          },
+          "supported_by": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Which findings back this. Each entry must be a non-empty source_ref: minItems alone was satisfied by a list holding one empty string, which is support by nothing wearing the shape of support."
+          },
+          "contradicted_by": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Recorded, not dropped. Confidence scoring reads this and lowers the score. Each entry is a non-empty source_ref and is traced back to a finding exactly like supported_by: Codex, chunk 0 round 11 — only the supporting side was checked, so a hypothesis could be weakened by contradictions that no finding reports, or by an empty string."
+          }
+        }
+      }
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "How much this agent trusts its own hypotheses. 0.0 is a legitimate answer."
+    }
+  },
+  "allOf": [
+    {
+      "description": "An agent that errored must say why, and must not smuggle findings out alongside the error.",
+      "if": {
+        "properties": {
+          "status": {
+            "const": "error"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "type": "object"
+      },
+      "then": {
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "minLength": 1
+          },
+          "findings": {
+            "maxItems": 0,
+            "type": "array"
+          },
+          "hypotheses": {
+            "maxItems": 0,
+            "type": "array"
+          },
+          "confidence": {
+            "const": 0
+          }
+        },
+        "type": "object"
+      }
+    },
+    {
+      "description": "no_data means nothing was found. Findings alongside no_data is a contradiction.",
+      "if": {
+        "properties": {
+          "status": {
+            "const": "no_data"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "type": "object"
+      },
+      "then": {
+        "properties": {
+          "findings": {
+            "maxItems": 0,
+            "type": "array"
+          },
+          "confidence": {
+            "const": 0
+          }
+        },
+        "type": "object"
+      }
+    },
+    {
+      "description": "A hypothesis without a finding cannot exist: the agent must have observed something first.",
+      "if": {
+        "properties": {
+          "hypotheses": {
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "hypotheses"
+        ],
+        "type": "object"
+      },
+      "then": {
+        "properties": {
+          "findings": {
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "type": "object"
+      }
+    },
+    {
+      "description": "status ok must not carry an error text. Otherwise a failed agent reports findings and an error at once, and readers pick whichever they prefer.",
+      "if": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "const": "ok"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "type": "object",
+        "not": {
+          "required": [
+            "error"
+          ]
+        }
+      }
+    }
+  ]
+}

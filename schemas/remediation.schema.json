@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-sre-mvp/schemas/remediation.schema.json",
+  "title": "RecommendedAction",
+  "description": "A recommendation, never an execution. The MVP is read-only: nothing here is ever run.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "type",
+    "risk",
+    "requires_approval",
+    "rationale",
+    "executed"
+  ],
+  "properties": {
+    "type": {
+      "description": "Composed from the two categories rather than listed again. Codex, chunk 0 round 5: a third copy of the six state-changing values lived here, so a new action could be added to this list, be missing from the category, and then require neither approval nor a target while every test stayed green. Adding a type now means choosing which category it belongs to — there is no list left to forget.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/stateChangingType"
+        },
+        {
+          "$ref": "#/$defs/nonStateChangingType"
+        }
+      ]
+    },
+    "risk": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "requires_approval": {
+      "type": "boolean",
+      "description": "Must be true for anything that changes cluster state. Enforced below, not left to the model."
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Why this action, tied to the root cause. An action with no reason is noise in an incident channel."
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "Deployment",
+            "Pod",
+            "ConfigMap",
+            "Service"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "namespace"
+      ],
+      "description": "What the action would touch. Every field is required: a target object with nothing in it named nothing, and a recommendation that names nothing cannot be reviewed, approved, or refused."
+    },
+    "executed": {
+      "const": false,
+      "description": "Required and always false in the MVP. A field that can only hold one value is a tripwire: the day something sets it to true, every validator fails loudly. It is required, not optional, because an absent field would read as read-only compliance that nobody ever stated — the exact silence this schema exists to refuse."
+    }
+  },
+  "allOf": [
+    {
+      "description": "Every state-changing action requires approval. The model does not get to decide this.",
+      "if": {
+        "properties": {
+          "type": {
+            "$ref": "#/$defs/stateChangingType"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "type": "object"
+      },
+      "then": {
+        "properties": {
+          "requires_approval": {
+            "const": true
+          }
+        },
+        "type": "object"
+      }
+    },
+    {
+      "description": "no_action changes nothing, so it cannot carry a risk above low or demand approval.",
+      "if": {
+        "properties": {
+          "type": {
+            "const": "no_action"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "type": "object"
+      },
+      "then": {
+        "properties": {
+          "risk": {
+            "const": "low"
+          },
+          "requires_approval": {
+            "const": false
+          }
+        },
+        "type": "object"
+      }
+    },
+    {
+      "description": "A state-changing action must say what it would change. Approval on an unnamed target is approval of nothing.",
+      "if": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "$ref": "#/$defs/stateChangingType"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "type": "object",
+        "required": [
+          "target"
+        ],
+        "properties": {
+          "target": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "stateChangingType": {
+      "description": "The actions that would change the cluster. Codex, chunk 0 round 4: this list existed three times — twice inline and once with an action type that does not exist at all — so a rule written for every state-changing action silently covered only some of them. One carrier now; anything that must ask about state change refers here.",
+      "enum": [
+        "increase_memory_limit",
+        "increase_cpu_limit",
+        "restart_deployment",
+        "rollback_deployment",
+        "fix_image_reference",
+        "adjust_readiness_probe"
+      ]
+    },
+    "nonStateChangingType": {
+      "description": "Actions that touch nothing: they need no target and no approval.",
+      "enum": [
+        "investigate_application_code",
+        "no_action"
+      ]
+    }
+  }
+}

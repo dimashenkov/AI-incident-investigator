@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-sre-mvp/schemas/conversation.schema.json",
+  "title": "Conversation",
+  "description": "The incident's message thread. thread_id is the session identifier and points at exactly one incident.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "provider",
+    "channel_id",
+    "thread_id",
+    "incident_id",
+    "messages"
+  ],
+  "properties": {
+    "provider": {
+      "type": "string",
+      "enum": [
+        "fake-slack",
+        "slack"
+      ]
+    },
+    "channel_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "thread_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^thread-INC-[0-9]{4}-[0-9]{4}$",
+      "description": "Derived from the incident id on purpose. A mismatch between the two is detectable by pattern alone, not only by looking it up in the index."
+    },
+    "incident_id": {
+      "type": "string",
+      "pattern": "^INC-[0-9]{4}-[0-9]{4}$",
+      "description": "Carried inside the conversation as well as outside it. Redundant by design: it is the only way a leaked conversation can be caught at the object level. Never null — a thread whose incident is unstated passed every guard here, because every guard was written to fire on a string."
+    },
+    "messages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "text",
+          "ts",
+          "incident_id"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "system",
+              "user",
+              "agent"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ts": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "incident_id": {
+            "type": "string",
+            "pattern": "^INC-[0-9]{4}-[0-9]{4}$",
+            "description": "Stamped on every single message, not only on the thread. A message carrying another incident's id is the leak, visible without running a model."
+          },
+          "cited_evidence": {
+            "type": "array",
+            "description": "Which evidence entries this answer leaned on. Lets a test assert the answer used this incident's evidence and no other.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "source",
+                "fact"
+              ],
+              "properties": {
+                "source": {
+                  "$ref": "https://ai-sre-mvp/schemas/common.schema.json#/$defs/evidenceSource"
+                },
+                "fact": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "minItems": 1
+          }
+        },
+        "allOf": [
+          {
+            "description": "An agent's answer must say which evidence it leaned on. Without this the citation check passes on messages that cite nothing.",
+            "if": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "const": "agent"
+                }
+              },
+              "required": [
+                "role"
+              ]
+            },
+            "then": {
+              "type": "object",
+              "required": [
+                "cited_evidence"
+              ],
+              "properties": {
+                "cited_evidence": {
+                  "type": "array",
+                  "minItems": 1
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "allOf": [
+    {
+      "description": "Once a thread exists it must know which incident and channel it belongs to. The null branch used to be the hole: thread_id null skipped this guard entirely, so a conversation naming no incident validated.",
+      "if": {
+        "properties": {
+          "thread_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "thread_id"
+        ],
+        "type": "object"
+      },
+      "then": {
+        "properties": {
+          "incident_id": {
+            "type": "string"
+          },
+          "channel_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "incident_id",
+          "channel_id"
+        ],
+        "type": "object"
+      }
+    }
+  ]
+}

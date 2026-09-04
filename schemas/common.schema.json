@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-sre-mvp/schemas/common.schema.json",
+  "title": "Shared definitions",
+  "description": "Values that more than one schema needs, in one place.\\n\\nCodex, chunk 0 round 6: these lived inside incident.schema.json and were referenced from the other files by absolute id. Every ref resolved in production, because the validator registers all schemas together — but it made two formerly independent files silently depend on the incident schema, and an absolute $ref is only a name: nothing fetches the file it points at.\\n\\nThe schemas are a package, not four separate documents. Nothing here compiles alone, and a test checks that every cross-file reference points at a schema the validator actually registers.",
+  "$defs": {
+    "evidenceSource": {
+      "description": "Where a fact came from. One carrier: this list also governs what a chat answer may cite, and the two drifting apart would let a message cite a source no evidence can have.",
+      "type": "string",
+      "enum": [
+        "kubernetes",
+        "logs",
+        "metrics",
+        "datadog"
+      ]
+    },
+    "severity": {
+      "description": "One carrier for how bad something is, shared by an incoming alert and by an agent's finding.",
+      "type": "string",
+      "enum": [
+        "info",
+        "warning",
+        "critical"
+      ]
+    }
+  }
+}
