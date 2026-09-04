@@ -176,6 +176,25 @@ export const MUTATIONS = [
     mustFail: "refuses a scenario with no number rather than inventing one at call time",
   },
   {
+    // The stronger question the gate asks now: a name in a file is not a test
+    // that ran. Codex, chunk 2: "A comment or inert string containing it(...)
+    // satisfies it… This proves only that matching text exists."
+    id: "dod-names-a-test-that-never-runs",
+    file: "scripts/definition-of-done.mjs",
+    from: '"opens a thread and links it durably, not merely returns it",',
+    to: '"a name that appears nowhere in any suite",',
+    mustFail: "names, for every covered item, tests that actually exist",
+  },
+  {
+    // Counting an item as covered while its tests do not exist is how a list of
+    // ten turns into a statistic nobody checks.
+    id: "dod-item-claims-a-test-that-does-not-exist",
+    file: "scripts/definition-of-done.mjs",
+    from: '"refuses executed: true, so the day something runs an action every check fails loudly",',
+    to: '"a test nobody ever wrote",',
+    mustFail: "names, for every covered item, tests that actually exist",
+  },
+  {
     id: "provenance-check-becomes-a-pattern-match",
     file: "src/agents/context.ts",
     from: "  const paths = deepDiffPaths(expected, result.payload);",

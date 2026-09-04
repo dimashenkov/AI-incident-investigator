@@ -330,7 +330,80 @@ export const CHECKS = [
   { id: "promised-checks-due", describe: "every mechanically decidable check that has come due is written", run: checkDebt },
   { id: "mutations-still-caught", describe: "reintroducing a fixed defect still fails the test written for it", run: checkMutations },
   { id: "no-drift-from-baseline", describe: "the generated workflow still matches the recorded deployment", run: checkDrift },
+  { id: "definition-of-done", describe: "every Definition-of-Done item is covered or says what it waits for", run: checkDefinitionOfDone },
 ];
+
+/**
+ * Read how much of the Definition of Done is actually covered.
+ *
+ * The list lived in PROGRESS.md as prose for a whole chunk. Prose cannot say
+ * whether an item is still covered after a test is renamed, and a document
+ * claiming ten items are handled while three wait on things that do not exist
+ * is the kind of statement this gate exists to refuse.
+ */
+const DOD_PROBE = `
+import("./scripts/definition-of-done.mjs").then((m) => {
+  console.log(JSON.stringify(m.DEFINITION_OF_DONE));
+}).catch((e) => { console.log("probe failed: " + (e && e.message)); process.exit(1); });
+`;
+
+function checkDefinitionOfDone() {
+  const file = resolve(ROOT, "scripts/definition-of-done.mjs");
+  if (!existsSync(file)) return unknown("scripts/definition-of-done.mjs is missing; coverage of the ten is unestablished", "read DoD");
+
+  const r = run("node", ["-e", DOD_PROBE]);
+  if (!r.ran) return unknown(`could not read the Definition-of-Done list: ${r.error ?? "no exit code"}`, r.line);
+  const out = (r.stdout + r.stderr).trim();
+
+  let list;
+  try {
+    list = JSON.parse(out);
+  } catch {
+    return unknown(`the Definition-of-Done probe said: ${out.slice(0, 200)}`, r.line);
+  }
+  if (!Array.isArray(list) || list.length !== 10) {
+    return unknown(`the list holds ${Array.isArray(list) ? list.length : "no"} items, not the ten that were recorded`, "read DoD");
+  }
+
+  /*
+   * Every named test must have RUN AND PASSED, not merely appear in a file.
+   *
+   * Codex, chunk 2: "Coverage is established with a regex over source text. A
+   * comment or inert string containing it(\"claimed name\" satisfies it… This
+   * proves only that matching text exists, not that the test executes."
+   *
+   * The gate already has the vitest report from its own run, so it can ask the
+   * stronger question: did this test execute, and did it pass.
+   */
+  const report = resolve(ROOT, "out/vitest-report.json");
+  if (!existsSync(report)) {
+    return unknown("no vitest report; cannot establish that the named tests actually ran", "read DoD");
+  }
+  let passedTitles;
+  try {
+    const json = JSON.parse(readFileSync(report, "utf8"));
+    passedTitles = new Set(
+      (json.testResults ?? []).flatMap((f) => (f.assertionResults ?? []).filter((t) => t.status === "passed").map((t) => t.title)),
+    );
+  } catch (e) {
+    return unknown(`vitest report unreadable: ${e instanceof Error ? e.message : String(e)}`, "read DoD");
+  }
+  if (passedTitles.size === 0) return unknown("the vitest report lists no passing tests; coverage cannot be established from it", "read DoD");
+
+  const missing = [];
+  for (const item of list) {
+    if (!item.covered) continue;
+    for (const name of item.by) if (!passedTitles.has(name)) missing.push(`item ${item.n}: "${name}"`);
+  }
+  if (missing.length > 0) {
+    return fail(`named as covering a Definition-of-Done item but did not run and pass: ${missing.slice(0, 3).join("; ")}`, "read DoD");
+  }
+
+  const covered = list.filter((i) => i.covered).length;
+  const outstanding = list.length - covered;
+  if (outstanding === 0) return pass("all ten covered by tests that ran and passed", "read DoD");
+  return pass(`${covered} of ${list.length} covered by tests that ran and passed; ${outstanding} wait on dependencies that do not exist yet`, "read DoD");
+}
 
 /**
  * Compare the generated workflow against the recorded deployment baseline.
@@ -518,7 +591,19 @@ export const LIMITATIONS = [
 ];
 
 export const DEBT = [
-  { claim: "each of the ten uncovered Definition-of-Done items has a test behind it", dueFromChunk: 5 },
+  {
+    // Deliberately carries no count, and neither does this comment.
+    //
+    // It used to name a number. The list moved and the sentence did not, which
+    // is the second-carrier defect inside the file whose job is refusing claims
+    // larger than their evidence. Rewriting it to explain the old number kept
+    // the number, so the explanation went too.
+    //
+    // scripts/definition-of-done.mjs holds the state; the `definition-of-done`
+    // check reports it from there.
+    claim: "the Definition-of-Done items still uncovered — see the definition-of-done check for which, and what each waits on",
+    dueFromChunk: 5,
+  },
 ];
 
 /**
