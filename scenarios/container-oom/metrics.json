@@ -1,0 +1,28 @@
+{
+  "collected_at": "2026-09-04T10:30:16Z",
+  "window": { "from": "2026-09-04T10:20:00Z", "to": "2026-09-04T10:30:00Z" },
+  "series": [
+    {
+      "name": "container_memory_working_set_bytes",
+      "unit": "bytes",
+      "container": "payment-api",
+      "points": [
+        { "ts": "2026-09-04T10:22:00Z", "value": 201326592 },
+        { "ts": "2026-09-04T10:24:00Z", "value": 310378496 },
+        { "ts": "2026-09-04T10:26:00Z", "value": 421527552 },
+        { "ts": "2026-09-04T10:28:00Z", "value": 530579456 }
+      ]
+    },
+    {
+      "name": "container_cpu_usage_seconds_total",
+      "unit": "seconds",
+      "container": "payment-api",
+      "points": [
+        { "ts": "2026-09-04T10:22:00Z", "value": 41.2 },
+        { "ts": "2026-09-04T10:24:00Z", "value": 44.8 },
+        { "ts": "2026-09-04T10:26:00Z", "value": 47.1 },
+        { "ts": "2026-09-04T10:28:00Z", "value": 49.6 }
+      ]
+    }
+  ]
+}

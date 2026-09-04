@@ -1,0 +1,8 @@
+{
+  "root_cause_code": "CONTAINER_OOM",
+  "note": "What this scenario is FOR, not what any model produced. A run that reaches a different code has either found something or gone wrong, and either way the difference is the finding.",
+  "must_cite": [
+    "pods[0].containers[0].last_state.terminated.reason",
+    "pods[0].containers[0].limits.memory"
+  ]
+}

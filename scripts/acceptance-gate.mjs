@@ -329,7 +329,53 @@ export const CHECKS = [
   { id: "no-secrets-near-commit", describe: "no secret-shaped file is tracked or waiting untracked", run: checkNoSecretsNearTheCommit },
   { id: "promised-checks-due", describe: "every mechanically decidable check that has come due is written", run: checkDebt },
   { id: "mutations-still-caught", describe: "reintroducing a fixed defect still fails the test written for it", run: checkMutations },
+  { id: "no-drift-from-baseline", describe: "the generated workflow still matches the recorded deployment", run: checkDrift },
 ];
+
+/**
+ * Compare the generated workflow against the recorded deployment baseline.
+ *
+ * This is the local half of drift detection. It costs nothing and needs no
+ * network: the baseline is a real export, recorded once, and re-exported only
+ * when the deployment is deliberately changed. The live half — export the
+ * running instance and compare again — belongs to release, not to every check,
+ * because a gate that needs the network fails for reasons that have nothing to
+ * do with the code.
+ *
+ * A missing baseline is `unknown`, never `pass`: nothing to compare against is
+ * not agreement.
+ */
+function checkDrift() {
+  const fixture = resolve(ROOT, "tests/fixtures/deployed-export.json");
+  if (!existsSync(fixture)) {
+    return unknown("no recorded deployment baseline; nothing to compare the generated workflow against", "read baseline");
+  }
+
+  // Asserting the baseline merely EXISTS would be a check that establishes
+  // nothing — the defect this whole project keeps finding. It runs the
+  // comparison.
+  const r = run("node", ["-e", DRIFT_PROBE]);
+  if (!r.ran) return unknown(`drift probe did not run: ${r.error ?? "no exit code"}`, r.line);
+  const out = (r.stdout + r.stderr).trim();
+  if (r.status === 0 && out.startsWith("same")) return pass("generated workflow matches the recorded deployment baseline", "drift probe");
+  if (out.startsWith("drifted")) return fail(out.slice(0, 300), "drift probe");
+  return unknown(out.length > 0 ? out.slice(0, 300) : `drift probe exited ${r.status} silently`, "drift probe");
+}
+
+/** Run in a child so a throwing generator cannot take the whole gate down. */
+const DRIFT_PROBE = `
+import("./scripts/generate-workflow.mjs").then(async (g) => {
+  const d = await import("./scripts/drift.mjs");
+  const fs = await import("node:fs");
+  const { workflow } = g.generate();
+  const raw = JSON.parse(fs.readFileSync("tests/fixtures/deployed-export.json", "utf8"));
+  delete raw._fixture_note;
+  const r = d.compareWorkflows(workflow, raw);
+  if (r.state === "same") { console.log("same"); process.exit(0); }
+  if (r.state === "drifted") { console.log("drifted: " + r.differences.slice(0, 3).map((x) => x.path).join(", ")); process.exit(1); }
+  console.log("unchecked: " + r.reason); process.exit(2);
+}).catch((e) => { console.log("probe failed: " + (e && e.message)); process.exit(2); });
+`;
 
 /**
  * The artifact the n8n Code node would run must actually assemble.
@@ -472,17 +518,15 @@ export const LIMITATIONS = [
 ];
 
 export const DEBT = [
-  { claim: "each of the ten uncovered Definition-of-Done items has a test behind it", dueFromChunk: 5 },
-  { claim: "the deployed n8n workflow matches the generated one (drift detection)", dueFromChunk: 1 },
   {
-    // Found 2026-09-04 while checking what the incident schema embeds: the three
-    // observation slots were unconstrained objects. The {} loophole was closed
-    // immediately with minProperties, since refusing an empty collection does
-    // not require knowing what a provider returns. The rest of the shape does,
-    // and that is chunk 1.
-    claim: "each observation slot has a full shape, not merely a non-empty one",
-    dueFromChunk: 1,
+    // Codex, chunk 1 part 3: removing this was unjustified. The local check
+    // compares generated code against a RECORDED export; it establishes nothing
+    // about what is running in the instance right now. Only a fresh export can,
+    // and that belongs to release rather than to every test run.
+    claim: "a fresh export from the live instance matches the generated workflow (the live half of drift detection)",
+    dueFromChunk: 2,
   },
+  { claim: "each of the ten uncovered Definition-of-Done items has a test behind it", dueFromChunk: 5 },
 ];
 
 /**

@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-sre-mvp/schemas/observations.schema.json",
+  "title": "Observation fixture contracts",
+  "description": "What each provider slot may contain.\n\nThese are FIXTURE CONTRACTS, not the shape of a real provider response. They were derived from the scenario fixtures in this repository, and Codex was explicit about the difference: a schema inferred from today's fixtures would claim to describe a provider while covering only the sample. Calling them fixture contracts keeps the claim the size of the evidence.\n\nWhen a real provider is introduced, its responses are recorded first and these are widened to match what was observed — not the other way round.",
+  "$defs": {
+    "kubernetes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["collected_at", "pods", "events", "deployment"],
+      "description": "Every key required. A collection that silently omitted pods would read as a cluster with no pods, which is a finding, not an absence.",
+      "properties": {
+        "collected_at": { "type": "string", "format": "date-time" },
+        "pods": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "namespace", "phase", "restart_count", "containers"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "namespace": { "type": "string", "minLength": 1 },
+              "phase": { "type": "string", "enum": ["Pending", "Running", "Succeeded", "Failed", "Unknown"] },
+              "restart_count": { "type": "integer", "minimum": 0 },
+              "containers": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["name", "ready", "restart_count", "limits", "requests"],
+                  "properties": {
+                    "name": { "type": "string", "minLength": 1 },
+                    "ready": { "type": "boolean" },
+                    "restart_count": { "type": "integer", "minimum": 0 },
+                    "limits": { "$ref": "#/$defs/resources" },
+                    "requests": { "$ref": "#/$defs/resources" },
+                    "last_state": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "description": "Absent when the container has never terminated. Present means it did, and then the reason is required — a termination with no reason is the silence this project refuses.",
+                      "properties": {
+                        "terminated": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["reason", "exit_code", "started_at", "finished_at"],
+                          "properties": {
+                            "reason": { "type": "string", "minLength": 1 },
+                            "exit_code": { "type": "integer" },
+                            "started_at": { "type": "string", "format": "date-time" },
+                            "finished_at": { "type": "string", "format": "date-time" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "reason", "message", "count", "last_seen", "involved_object"],
+            "properties": {
+              "type": { "type": "string", "enum": ["Normal", "Warning"] },
+              "reason": { "type": "string", "minLength": 1 },
+              "message": { "type": "string", "minLength": 1 },
+              "count": { "type": "integer", "minimum": 1 },
+              "last_seen": { "type": "string", "format": "date-time" },
+              "involved_object": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "deployment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "namespace", "replicas", "image"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "namespace": { "type": "string", "minLength": 1 },
+            "image": { "type": "string", "minLength": 1 },
+            "replicas": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["desired", "ready", "available"],
+              "properties": {
+                "desired": { "type": "integer", "minimum": 0 },
+                "ready": { "type": "integer", "minimum": 0 },
+                "available": { "type": "integer", "minimum": 0 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "logs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["collected_at", "window", "truncated", "lines"],
+      "properties": {
+        "collected_at": { "type": "string", "format": "date-time" },
+        "window": { "$ref": "#/$defs/window" },
+        "truncated": {
+          "type": "boolean",
+          "description": "Required, because a truncated log that does not say so makes an incomplete read look like a complete one — and an agent would then reason from an absence that was never established."
+        },
+        "lines": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["ts", "level", "container", "message"],
+            "properties": {
+              "ts": { "type": "string", "format": "date-time" },
+              "level": { "type": "string", "enum": ["debug", "info", "warn", "error", "fatal"] },
+              "container": { "type": "string", "minLength": 1 },
+              "message": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["collected_at", "window", "series"],
+      "properties": {
+        "collected_at": { "type": "string", "format": "date-time" },
+        "window": { "$ref": "#/$defs/window" },
+        "series": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "unit", "container", "points"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "unit": { "type": "string", "minLength": 1 },
+              "container": { "type": "string", "minLength": 1 },
+              "points": {
+                "type": "array",
+                "minItems": 1,
+                "description": "A series with no points is not a series. An empty one would let a conclusion rest on a metric nobody actually read.",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["ts", "value"],
+                  "properties": {
+                    "ts": { "type": "string", "format": "date-time" },
+                    "value": { "type": "number" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to"],
+      "description": "Which stretch of time was actually read. Without it, finding nothing is indistinguishable from looking at the wrong minutes.",
+      "properties": {
+        "from": { "type": "string", "format": "date-time" },
+        "to": { "type": "string", "format": "date-time" }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["memory", "cpu"],
+      "properties": {
+        "memory": { "type": "string", "minLength": 1 },
+        "cpu": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "id": "DevSUSG4SepZgm6L",
+  "name": "AI SRE — incident validation",
+  "description": null,
+  "active": false,
+  "activeVersionId": null,
+  "createdAt": "2026-09-04T13:23:40.457Z",
+  "updatedAt": "2026-09-04T13:23:40.457Z",
+  "isArchived": false,
+  "versionId": "70205365-433e-47f4-bd72-8cd3b686e6d8",
+  "versionCounter": 1,
+  "sourceWorkflowId": null,
+  "triggerCount": 0,
+  "nodes": [
+    {
+      "id": "incident-webhook",
+      "name": "Incident Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "path": "ai-sre-incident",
+        "httpMethod": "POST",
+        "responseMode": "lastNode"
+      },
+      "webhookId": "367cb825-9842-434d-93de-176945b5c6d1"
+    },
+    {
+      "id": "validate-core",
+      "name": "Validate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "mode": "runOnceForAllItems",
+        "jsCode": {
+          "__sha256": "8a633d5b58aabdb35adb9337e2507060b8973c30e4bb5fb3d3af52c86fd484a3",
+          "__bytes": 214927
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Incident Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodeGroups": [],
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": null,
+  "meta": null,
+  "tags": [],
+  "activeVersion": null,
+  "_fixture_note": "A real export from n8n Cloud, with each large code payload replaced by the sha256 of what the DEPLOYMENT returned — not by the generated code. Re-record with scripts/record-baseline.mjs whenever the deployment is deliberately changed."
+}

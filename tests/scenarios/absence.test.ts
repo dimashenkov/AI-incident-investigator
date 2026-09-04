@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { validate } from "../../src/schema/validate.js";
+import { readFileSync } from "node:fs";
 import remediationSchema from "../../schemas/remediation.schema.json" with { type: "json" };
 
 const CONV = { provider: "fake-slack", channel_id: "fake-prod-incidents", thread_id: "thread-INC-2026-0001", incident_id: "INC-2026-0001", messages: [] };
@@ -215,7 +216,11 @@ describe("absence is not consent — cases that used to pass", () => {
       source: { provider: "fake-datadog", alert: { id: "a-1", title: "t", triggered_at: "2026-09-04T10:29:00Z" } },
     };
     expect(validate("incident", base).state, JSON.stringify(validate("incident", base))).toBe("valid");
-    const withData = { ...base, observations: { kubernetes: { pods: [] }, logs: null, metrics: null } };
+    // A collected observation now has to have the shape its fixture contract
+    // declares. `{ pods: [] }` used to pass here, which meant "collected" could
+    // be claimed by an object that said nothing.
+    const collected = JSON.parse(readFileSync(new URL("../../scenarios/container-oom/kubernetes.json", import.meta.url).pathname, "utf8"));
+    const withData = { ...base, observations: { kubernetes: collected, logs: null, metrics: null } };
     expect(validate("incident", withData).state, JSON.stringify(validate("incident", withData))).toBe("valid");
   });
 });

@@ -84,6 +84,34 @@ export const MUTATIONS = [
     mustFail: "matches the committed file exactly, so a hand edit fails here",
   },
   {
+    // The failure Codex named: normalisation that erases drift rather than
+    // reporting it. Dropping credentials wholesale looks tidy and silently
+    // hides a node rewired to somebody else's account.
+    id: "normalisation-erases-credential-drift",
+    file: "scripts/drift.mjs",
+    from: '    if (key === "credentials" && isObject(v)) {',
+    to: "    if (key === \"credentials\") { continue; } if (false) {",
+    mustFail: "keeps the credential name, so a node pointed at a different account is drift",
+  },
+  {
+    // A fixture contract that stops refusing is a contract in name only. The
+    // termination reason is what the whole container-oom scenario turns on.
+    id: "termination-reason-becomes-optional",
+    file: "schemas/observations.schema.json",
+    from: '"required": ["reason", "exit_code", "started_at", "finished_at"]',
+    to: '"required": ["exit_code", "started_at", "finished_at"]',
+    mustFail: "refuses a termination that does not say why",
+  },
+  {
+    // The defect this project produces most often, here in the function written
+    // to prevent it: a missing file reported as "the provider found nothing".
+    id: "missing-fixture-reads-as-nothing",
+    file: "src/providers/fixtures.ts",
+    from: '  if (!existsSync(root)) return { state: "failed", slot, reason: `no scenario root at ${root}` };',
+    to: '  if (!existsSync(root)) return { state: "nothing", slot };',
+    mustFail: "reports failure, not nothing, when the scenario root does not exist",
+  },
+  {
     id: "executed-becomes-optional-again",
     file: "schemas/remediation.schema.json",
     from: '    "rationale",\n    "executed"',

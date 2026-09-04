@@ -121,31 +121,40 @@
         "logs",
         "metrics"
       ],
-      "description": "Each key is either a collected object or explicitly null. A missing key is a schema error, not an empty observation, and an empty object is not a collection.",
+      "description": "Each key is either a collected object or explicitly null. A missing key is a schema error, not an empty observation; an empty object is not a collection; and a collected observation now has to have the shape its provider actually returns, rather than being any object at all.",
       "properties": {
         "kubernetes": {
-          "type": [
-            "object",
-            "null"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "https://ai-sre-mvp/schemas/observations.schema.json#/$defs/kubernetes"
+            }
           ],
-          "minProperties": 1,
-          "description": "Either null — nothing was collected — or a non-empty object. Codex, chunk 0 round 13: an empty object used to pass as 'collected, and here is what we found', which is the same silence null already says honestly. The full shape waits for the providers and is recorded as chunk-1 debt; refusing {} does not need to know it."
+          "description": "null means nothing was collected. Anything else must match the fixture contract for this slot — see schemas/observations.schema.json, which is derived from the scenario fixtures and is named a contract, not a provider shape, because that is the size of the evidence behind it."
         },
         "logs": {
-          "type": [
-            "object",
-            "null"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "https://ai-sre-mvp/schemas/observations.schema.json#/$defs/logs"
+            }
           ],
-          "minProperties": 1,
-          "description": "Either null — nothing was collected — or a non-empty object. Codex, chunk 0 round 13: an empty object used to pass as 'collected, and here is what we found', which is the same silence null already says honestly. The full shape waits for the providers and is recorded as chunk-1 debt; refusing {} does not need to know it."
+          "description": "null means nothing was collected. Anything else must match the fixture contract for this slot — see schemas/observations.schema.json, which is derived from the scenario fixtures and is named a contract, not a provider shape, because that is the size of the evidence behind it."
         },
         "metrics": {
-          "type": [
-            "object",
-            "null"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "https://ai-sre-mvp/schemas/observations.schema.json#/$defs/metrics"
+            }
           ],
-          "minProperties": 1,
-          "description": "Either null — nothing was collected — or a non-empty object. Codex, chunk 0 round 13: an empty object used to pass as 'collected, and here is what we found', which is the same silence null already says honestly. The full shape waits for the providers and is recorded as chunk-1 debt; refusing {} does not need to know it."
+          "description": "null means nothing was collected. Anything else must match the fixture contract for this slot — see schemas/observations.schema.json, which is derived from the scenario fixtures and is named a contract, not a provider shape, because that is the size of the evidence behind it."
         }
       }
     },

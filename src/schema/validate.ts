@@ -14,6 +14,7 @@ import agentResultSchema from "../../schemas/agent-result.schema.json" with { ty
 import conversationSchema from "../../schemas/conversation.schema.json" with { type: "json" };
 import remediationSchema from "../../schemas/remediation.schema.json" with { type: "json" };
 import commonSchema from "../../schemas/common.schema.json" with { type: "json" };
+import observationsSchema from "../../schemas/observations.schema.json" with { type: "json" };
 
 export type SchemaName = "incident" | "agent-result" | "conversation" | "remediation";
 
@@ -29,7 +30,7 @@ export type SchemaName = "incident" | "agent-result" | "conversation" | "remedia
  */
 export const REGISTERED_IDS: readonly string[] = [
   incidentSchema.$id, agentResultSchema.$id, conversationSchema.$id,
-  remediationSchema.$id, commonSchema.$id,
+  remediationSchema.$id, commonSchema.$id, observationsSchema.$id,
 ];
 
 /**
@@ -75,6 +76,7 @@ function compileAll(): void {
     addFormats(ajv);
     // Added by $id so the $ref between incident and its parts resolves.
     ajv.addSchema(commonSchema);
+    ajv.addSchema(observationsSchema);
     for (const schema of Object.values(SCHEMAS)) ajv.addSchema(schema);
 
     const map = new Map<SchemaName, ValidateFunction>();

@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "gate": "node scripts/acceptance-gate.mjs",
     "build": "node scripts/build-core.mjs",
-    "generate": "node scripts/generate-workflow.mjs"
+    "generate": "node scripts/generate-workflow.mjs",
+    "record-baseline": "node scripts/record-baseline.mjs"
   },
   "devDependencies": {
     "ajv": "^8.17.1",
