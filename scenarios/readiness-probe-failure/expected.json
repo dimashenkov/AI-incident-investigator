@@ -1,0 +1,3 @@
+{ "root_cause_code": "READINESS_PROBE_FAILURE",
+  "note": "The logs are TRUNCATED. Any statement of the form 'there is no error in the logs' is unfounded here, and an agent that makes one has ignored the flag it was given.",
+  "must_cite": ["events[0].message", "lines[1].message"] }

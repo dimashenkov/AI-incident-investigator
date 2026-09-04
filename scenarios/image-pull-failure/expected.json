@@ -1,0 +1,3 @@
+{ "root_cause_code": "IMAGE_PULL_FAILURE",
+  "note": "What this scenario is FOR. Logs are empty with a valid window — the container never ran — and metrics say nothing explicitly. An agent that concludes from log silence rather than from the events has reasoned from the wrong absence.",
+  "must_cite": ["events[0].message", "deployment.image"] }

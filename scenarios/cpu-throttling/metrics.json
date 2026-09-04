@@ -1,0 +1,6 @@
+{ "collected_at": "2026-09-04T18:41:15Z", "window": { "from": "2026-09-04T18:30:00Z", "to": "2026-09-04T18:41:00Z" },
+  "series": [
+    { "name": "container_cpu_cfs_throttled_seconds_total", "unit": "seconds", "container": "report-worker",
+      "points": [{ "ts": "2026-09-04T18:32:00Z", "value": 0.4 }, { "ts": "2026-09-04T18:35:00Z", "value": 12.8 }, { "ts": "2026-09-04T18:38:00Z", "value": 41.2 }, { "ts": "2026-09-04T18:41:00Z", "value": 78.9 }] },
+    { "name": "container_memory_working_set_bytes", "unit": "bytes", "container": "report-worker",
+      "points": [{ "ts": "2026-09-04T18:32:00Z", "value": 310378496 }, { "ts": "2026-09-04T18:38:00Z", "value": 318767104 }] }] }

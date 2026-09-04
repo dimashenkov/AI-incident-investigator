@@ -1,0 +1,2 @@
+{ "id": "alert-0a17", "title": "elevated error rate on notify-api", "triggered_at": "2026-09-04T21:15:00Z",
+  "severity": "warning", "monitor_id": "mon-6612", "tags": ["service:notify-api", "env:production"] }

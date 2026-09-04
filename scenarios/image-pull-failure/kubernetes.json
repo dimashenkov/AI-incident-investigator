@@ -1,0 +1,8 @@
+{ "collected_at": "2026-09-04T14:03:20Z",
+  "pods": [{ "name": "checkout-api-6c9f77b4d-lp8kz", "namespace": "production", "phase": "Pending", "restart_count": 0,
+    "containers": [{ "name": "checkout-api", "ready": false, "restart_count": 0,
+      "limits": { "memory": "1Gi", "cpu": "1000m" }, "requests": { "memory": "512Mi", "cpu": "500m" } }] }],
+  "events": [
+    { "type": "Warning", "reason": "Failed", "message": "Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found", "count": 4, "last_seen": "2026-09-04T14:02:51Z", "involved_object": "pod/checkout-api-6c9f77b4d-lp8kz" },
+    { "type": "Warning", "reason": "ImagePullBackOff", "message": "Back-off pulling image", "count": 3, "last_seen": "2026-09-04T14:03:10Z", "involved_object": "pod/checkout-api-6c9f77b4d-lp8kz" }],
+  "deployment": { "name": "checkout-api", "namespace": "production", "replicas": { "desired": 3, "ready": 0, "available": 0 }, "image": "registry.internal/checkout-api:2.9.1" } }

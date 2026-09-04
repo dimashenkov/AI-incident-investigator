@@ -1,0 +1,6 @@
+{ "collected_at": "2026-09-04T09:13:05Z",
+  "pods": [{ "name": "search-api-58d9c7f6b-t4wqz", "namespace": "production", "phase": "Running", "restart_count": 0,
+    "containers": [{ "name": "search-api", "ready": false, "restart_count": 0,
+      "limits": { "memory": "2Gi", "cpu": "2000m" }, "requests": { "memory": "1Gi", "cpu": "1000m" } }] }],
+  "events": [{ "type": "Warning", "reason": "Unhealthy", "message": "Readiness probe failed: HTTP probe failed with statuscode: 503", "count": 27, "last_seen": "2026-09-04T09:12:58Z", "involved_object": "pod/search-api-58d9c7f6b-t4wqz" }],
+  "deployment": { "name": "search-api", "namespace": "production", "replicas": { "desired": 4, "ready": 1, "available": 1 }, "image": "registry.internal/search-api:5.2.0" } }

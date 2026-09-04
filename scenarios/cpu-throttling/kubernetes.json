@@ -1,0 +1,6 @@
+{ "collected_at": "2026-09-04T18:41:11Z",
+  "pods": [{ "name": "report-worker-79fd5c8bb-2xkvn", "namespace": "production", "phase": "Running", "restart_count": 0,
+    "containers": [{ "name": "report-worker", "ready": true, "restart_count": 0,
+      "limits": { "memory": "1Gi", "cpu": "250m" }, "requests": { "memory": "512Mi", "cpu": "250m" } }] }],
+  "events": [],
+  "deployment": { "name": "report-worker", "namespace": "production", "replicas": { "desired": 2, "ready": 2, "available": 2 }, "image": "registry.internal/report-worker:1.8.3" } }

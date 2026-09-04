@@ -187,8 +187,10 @@
             "READINESS_PROBE_FAILURE",
             "DEPLOYMENT_REGRESSION",
             "INSUFFICIENT_EVIDENCE",
+            "CPU_THROTTLING",
             null
-          ]
+          ],
+          "description": "The causes this system can name. A scenario whose correct answer is not in this list cannot be answered correctly at all — found 2026-09-04, when the cpu-throttling scenario expected a code the schema refused. tests/scenarios/expected.test.ts now requires every scenario's expected code to be here."
         },
         "root_cause": {
           "type": [

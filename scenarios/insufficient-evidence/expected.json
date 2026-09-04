@@ -1,0 +1,3 @@
+{ "root_cause_code": "INSUFFICIENT_EVIDENCE",
+  "note": "The correct answer is that there is not enough to tell. Cluster state is healthy, one error line points outside the system, the log window is two minutes and truncated, and metrics are absent. An agent that names a cause here is confidently wrong, and that is the failure this scenario exists to catch.",
+  "must_cite": ["lines[0].message"] }

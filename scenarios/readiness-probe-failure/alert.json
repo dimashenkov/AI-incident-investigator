@@ -1,0 +1,2 @@
+{ "id": "alert-7b20", "title": "search-api removed from load balancer", "triggered_at": "2026-09-04T09:12:00Z",
+  "severity": "warning", "monitor_id": "mon-2210", "tags": ["service:search-api", "env:production"] }

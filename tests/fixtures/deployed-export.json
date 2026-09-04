@@ -5,10 +5,10 @@
   "active": false,
   "activeVersionId": null,
   "createdAt": "2026-09-04T13:44:43.103Z",
-  "updatedAt": "2026-09-04T13:44:43.103Z",
+  "updatedAt": "2026-09-04T14:48:21.086Z",
   "isArchived": false,
-  "versionId": "44fe27a5-cfdf-4383-a35e-274481d4147d",
-  "versionCounter": 1,
+  "versionId": "47f55990-4d91-4dbc-8531-33dfce178678",
+  "versionCounter": 2,
   "sourceWorkflowId": null,
   "triggerCount": 0,
   "nodes": [
@@ -26,7 +26,7 @@
         "httpMethod": "POST",
         "responseMode": "lastNode"
       },
-      "webhookId": "6d9fb202-5538-4772-90d8-131d82910cd2"
+      "webhookId": "19d6bb65-27fd-4214-83b7-796d0cc1a7f9"
     },
     {
       "id": "validate-core",
@@ -41,8 +41,8 @@
         "language": "javaScript",
         "mode": "runOnceForAllItems",
         "jsCode": {
-          "__sha256": "8a633d5b58aabdb35adb9337e2507060b8973c30e4bb5fb3d3af52c86fd484a3",
-          "__bytes": 214927
+          "__sha256": "9282cbbbe2ea26ef05ced97f12d216d783a9c9e4e194cf4be9aabd046d91917b",
+          "__bytes": 215296
         }
       }
     }

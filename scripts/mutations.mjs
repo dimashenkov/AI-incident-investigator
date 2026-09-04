@@ -138,6 +138,44 @@ export const MUTATIONS = [
     mustFail: "reads the configured deployment when there is one",
   },
   {
+    // An invalid agent result inside a valid incident passes the incident check
+    // and poisons everything downstream of it.
+    id: "agent-result-attached-unchecked",
+    file: "src/core/assemble.ts",
+    from: '  const r = validate("agent-result", result);',
+    to: '  const r = { state: "valid" };',
+    mustFail: "says the result was invalid, not that attaching broke the incident",
+  },
+  {
+    // Every slot failing is a scenario that could not be read, not an incident
+    // with three established absences.
+    id: "total-provider-failure-builds-an-incident",
+    file: "src/core/assemble.ts",
+    from: "  if (failures.length === SLOTS.length) {",
+    to: "  if (false) {",
+    mustFail: "refuses to build an incident when every observation failed",
+  },
+  {
+    // A scenario whose correct answer the schema refuses can never be answered
+    // correctly. Found on 2026-09-04: cpu-throttling expected CPU_THROTTLING and
+    // the enum did not have it, so the right diagnosis would have been invalid.
+    id: "expected-cause-code-not-in-the-schema",
+    file: "scenarios/cpu-throttling/expected.json",
+    from: '"root_cause_code": "CPU_THROTTLING"',
+    to: '"root_cause_code": "MYSTERY"',
+    mustFail: "names a cause code the incident schema permits",
+  },
+  {
+    // Ignoring the scenario made two scenarios share an incident id, a thread
+    // id and a conversation, while the distinctness test varied both arguments
+    // and never asked whether the scenario mattered.
+    id: "unregistered-scenario-gets-a-number-invented",
+    file: "src/core/assemble.ts",
+    from: "    throw new Error(`scenario ${JSON.stringify(scenario)} has no number in scenarios/registry.json; add one at next_free`);",
+    to: "    return `INC-2026-${String(sequence).padStart(4, \"0\")}`;",
+    mustFail: "refuses a scenario with no number rather than inventing one at call time",
+  },
+  {
     id: "provenance-check-becomes-a-pattern-match",
     file: "src/agents/context.ts",
     from: "  const paths = deepDiffPaths(expected, result.payload);",

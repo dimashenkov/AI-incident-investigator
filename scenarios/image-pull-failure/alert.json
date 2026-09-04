@@ -1,0 +1,2 @@
+{ "id": "alert-3d81", "title": "checkout-api pods not starting after deploy", "triggered_at": "2026-09-04T14:02:00Z",
+  "severity": "critical", "monitor_id": "mon-4471", "tags": ["service:checkout-api", "env:production"] }

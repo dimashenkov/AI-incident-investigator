@@ -1,0 +1,2 @@
+{ "id": "alert-5c44", "title": "report-worker latency above threshold", "triggered_at": "2026-09-04T18:40:00Z",
+  "severity": "warning", "monitor_id": "mon-9003", "tags": ["service:report-worker", "env:production"] }

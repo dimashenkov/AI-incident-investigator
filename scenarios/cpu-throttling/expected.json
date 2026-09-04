@@ -1,0 +1,3 @@
+{ "root_cause_code": "CPU_THROTTLING",
+  "note": "Kubernetes shows nothing wrong — no events, pod ready, no restarts. The answer is only in the metrics, and the memory series is deliberately flat so that an agent reaching for OOM has to ignore its own numbers.",
+  "must_cite": ["series[0].points[3]", "pods[0].containers[0].limits.cpu"] }
