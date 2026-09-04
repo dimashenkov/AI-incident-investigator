@@ -138,6 +138,38 @@ export const MUTATIONS = [
     mustFail: "reads the configured deployment when there is one",
   },
   {
+    id: "provenance-check-becomes-a-pattern-match",
+    file: "src/agents/context.ts",
+    from: "  const paths = deepDiffPaths(expected, result.payload);",
+    to: "  const paths = [];",
+    mustFail: "catches foreign content that looks like nothing we know",
+  },
+  {
+    id: "prompt-rule-disappears",
+    file: "prompts/root-cause-agent.md",
+    from: "**Only cite what the agents reported.**",
+    to: "**Cite whatever seems right.**",
+    mustFail: "requires the root cause agent to cite only what agents reported",
+  },
+  {
+    // The leak this system is built to prevent, in the function built to prevent
+    // it: copying the whole incident instead of the one slot the agent reads.
+    id: "agent-context-copies-the-whole-incident",
+    file: "src/agents/context.ts",
+    from: "    payload: { incident_id: incidentId, observation: snapshot(observation) },",
+    to: "    payload: { incident_id: incidentId, observation: snapshot(observation), ...incident },",
+    mustFail: "copies only what was asked for, so an unknown field cannot ride along",
+  },
+  {
+    // Reporting clean for a context that was never assembled would mean the
+    // isolation check passes hardest exactly when it inspected nothing.
+    id: "unassembled-context-reads-as-clean",
+    file: "src/agents/context.ts",
+    from: '  if (result.state !== "assembled") return { state: "unchecked", reason: result.reason };',
+    to: '  if (result.state !== "assembled") return { state: "clean" };',
+    mustFail: "reports unchecked, not clean, when the context could not be assembled",
+  },
+  {
     id: "executed-becomes-optional-again",
     file: "schemas/remediation.schema.json",
     from: '    "rationale",\n    "executed"',
