@@ -23,6 +23,9 @@ Chunk-ът се затваря, когато acceptance gate-ът мине И Co
 | 0 | 13 | и двете посоки на доказателството | 124/124 ✓ | PASS · exit 0 | — | — |
 | 0 | 14 | 5 находки от втори субагент | 126/126 ✓ | PASS · exit 0 | **commit** | — |
 | spike | 1 | n8n Code node — какво наистина може | 2 изпълнения на живо · workflow изтрит | — | **commit** | ✅ c9fce55 |
+| 1 | 1 | част 1: сглобяване · `build-core.mjs` | 138/138 ✓ | exit 2 | **3 дефекта · do not commit** | — |
+| 1 | 2 | част 2: генератор · `generate-workflow.mjs` | 154/154 ✓ | exit 2 | **1 блокиращ · do not commit** | — |
+| 1 | 3 | сглобяване в паметта, поведенчески тестове | **161/161 ✓** · 10 мутации | **exit 2** · 7 проверки | **commit** | ✅ |
 | spike | 2 | ajv standalone в Code node | **16/16 съвпадение върху избраните fixtures** + 1 изпълнение | — | *(предстои)* | *(предстои)* |
 | 0 | 15 | `minProperties` на наблюденията | **128/128 ✓** · `tsc` 0 грешки | **PASS · exit 0** · 6 проверки · 8 мутации | **commit** | ✅ |
 
@@ -53,6 +56,90 @@ Chunk-ът се затваря, когато acceptance gate-ът мине И Co
 **Следва:** chunk 1. В `DEBT` чакат drift detection и формата на наблюденията,
 и двете с падеж chunk 1 — от следващия chunk нататък gate-ът ще излиза 2, докато
 не бъдат написани.
+
+---
+
+## Chunk 1 — обхватът, отсъден на 2026-09-04
+
+Концепцията беше дадена на Codex преди да се пише код. Той поправи три неща и
+поправките са приети.
+
+### Частите
+
+```
+   schemas/ + src/                    източникът на истината
+        │
+        │  1. СГЛОБЯВАНЕ
+        ▼
+   out/core.js                        126 KB, нула зависимости
+        │
+        │  2. ГЕНЕРИРАНЕ
+        ▼
+   workflows/incident.json            производен артефакт, влиза в git
+        │
+        │  качва се в n8n
+        ▼
+   deployed workflow  ─── 3. DRIFT ──▶ различно = провал
+        ▲
+        │  4. ПРОВАЙДЪРИ (стеснени)
+   scenarios/ fixture данни
+```
+
+| Част | Какво прави |
+|---|---|
+| 1. сглобяване | схеми + ядро → един самодостатъчен JS файл |
+| 2. генериране | артефактът → workflow JSON |
+| 3. drift | export → нормализация → сравнение; разлика е провал, не предупреждение |
+| 4. провайдъри | **стеснено**: по една fake реализация, fixture-и от сценарии, изрични схеми за трите observation слота |
+
+### Трите поправки на Codex
+
+| Предложих | Отсъдата, дословно |
+|---|---|
+| част 4 → отделен chunk | *„Keep part 4 in chunk 1, but narrow it to the minimum contract-closing slice… Moving all of part 4 would leave due chunk-1 debt unresolved and make the chunk boundary contradict the recorded commitment."* |
+| workflow JSON е източникът на истината | *„The checked-in workflow cannot itself be the single source of truth. The generator, schemas, deterministic core, and workflow template are authoritative; the workflow JSON is a reproducible derived artifact."* |
+| gate прави drift при всяко пускане | *„The gate should establish locally… generated workflow and a saved normalized deployment export compare equal… A fresh live check is required for release or intentional deployment changes, not every test run."* |
+
+### Какво затваря chunk 1
+
+`gate exit 0` **и** една записана безплатна жива проверка. Gate-ът установява
+локално:
+
+* пресглобяването не дава разлика;
+* точно една замяна на `ucs2length` и нула останали `require`;
+* диференциалните тестове между локалния и генерирания validator минават;
+* изходът на всеки fake провайдър минава срещу схемата на своя слот;
+* генерираният workflow и **записан нормализиран export** съвпадат.
+
+Живата проверка — качване, изпълнение на сценарий само от fixture-и, повторен
+export, доказано съвпадение след нормализация — се прави при release или нарочна
+промяна на deployment-а, **не** при всяко пускане. Записът ѝ прави обикновените
+проверки възпроизводими локално.
+
+### Къде се чупи първо
+
+**Drift detection.** *„'Normalize instance-specific IDs and credential
+references' is exactly a rule over a category likely to be enforced through a
+partial list. A newly introduced ID-bearing field, nested credential reference,
+node metadata field, or order-sensitive array will create either false drift
+or—worse—erase meaningful drift."*
+
+Оттам две изисквания:
+
+* нормализацията е **structural path-based allowlist**; непозната разлика е
+  провал, не мълчание;
+* credential референции **не се махат изцяло** — нормализира се само
+  непрозрачното id, а типът, наличието и мястото се сравняват.
+
+**Второ по риск: част 4.** Схема, изведена само от днешните fixture-и, твърди
+„формата на провайдъра", покривайки извадката. Наричат се **fixture договори**,
+докато не са установени истинските варианти на отговорите.
+
+### Записана несигурност
+
+Codex: *„I am uncertain whether n8n import/export itself consumes a relevant
+quota; the spikes establish execution cost, not that administrative API
+operations are free."* Не се предполага, че е безплатно.
 
 ---
 
@@ -90,6 +177,58 @@ validator, не два"). Следващият spike проверява **ajv st
 **Цена:** 2 изпълнения от квотата на плана. Workflow-ът беше активен около една
 минута с webhook на случаен път, после деактивиран и изтрит; инстанцията е
 проверена и е празна.
+
+### Chunk 1 · части 1–2 · 2026-09-04 · Codex, 3 кръга
+
+**Кръг 1 — три дефекта.** Най-важният има последица, която не бях видял:
+
+*„`buildCore()` runs during module collection. If it throws, no `it(...)` cases
+are registered… the mutation gate cannot prove its required named test caught the
+defect; `namedTestFailed()` sees no assertion and calls the mutation 'survived'."*
+
+Тоест счупен build не просто скриваше кой инвариант е паднал — караше
+мутационната машинария да **докладва обратното на истината**. Сега build-ът се
+вика лениво, вътре в тестовете, и провалът е именуван тест.
+
+Другите две: броят на замените доказва само че търсеният низ се е срещнал N пъти
+— грешен модул или обвивка дават същия брой; и „нула `require`" твърдеше повече,
+отколкото regex-ът проверява.
+
+**Проверката за `require` веднага произведе фалшив положителен.** Разширих я до
+всяко споменаване на думата, и build-ът отказа добър артефакт — защото описание
+на схема в това repo съдържа английската дума „require" в изречение. Стеснена до
+синтаксис на извикване: дума, следвана от отваряща скоба, каквото и да стои
+между тях. Тестове покриват интервал, коментар и template literal, и че думата в
+изречение **не** пали.
+
+**Кръг 2 — блокиращ дефект в част 2.**
+
+*„`generate()` reads the existing `out/core.js` without rebuilding it. The
+comparison test therefore proves only: committed workflow == workflow generated
+from whatever core happens to be in `out/`. A schema change can leave both the
+committed workflow and `out/core.js` stale, and the test still passes."*
+
+Плюс: gate-ът пускаше тестовете **преди** build-а, тоест можеше да провери стария
+workflow и после да обнови артефакта.
+
+Поправено в корена: `generate()` сглобява **в паметта**, така че между
+източника и workflow-а няма файл, който да остарее. Редът в gate-а също е
+обърнат — сглобяване, после тестове.
+
+**И вторият му отговор беше дефект.** `$input.first().json.body` хвърля при нула
+елемента и **мълчаливо изхвърля всички след първия**, в нод, настроен да работи
+върху *всички* елементи. Сега нодът обхожда всички, връща по един резултат с
+индекс, а празен вход дава празен изход — празно пускане не е нито грешка, нито
+успех.
+
+**Най-полезната му забележка беше за тестовете:** *„tests assert code substrings
+and static shape, not executable zero/multi-item behavior"*. Тест, който чете
+код, не е тест, който го пуска. Сега `runNode` изпълнява генерирания нод с
+подставен `$input`, и шест теста проверяват поведение: по един резултат на
+елемент, празен вход, непозната схема, липсващо тяло, пренесени грешки, и че
+един провалил се елемент не скрива останалите.
+
+**Кръг 3: commit.**
 
 ### Spike 2 · ajv standalone · 2026-09-04 · 1 изпълнение
 

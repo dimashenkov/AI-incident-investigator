@@ -318,6 +318,11 @@ function checkNoSecretsNearTheCommit() {
 }
 
 export const CHECKS = [
+  // Assembly comes first. Codex, chunk 1 parts 1-2: with the build last, the
+  // gate could validate an old workflow and then refresh the artifact, and
+  // report both as clean. Generation now builds in memory so the chain cannot
+  // break that way, but the order still says what depends on what.
+  { id: "core-builds-clean", describe: "the deployable artifact assembles with no dependency left behind", run: checkCoreBuild },
   { id: "tests", describe: "the declared test suite passes and is not empty", run: checkTests },
   { id: "typecheck", describe: "tsc --noEmit is clean", run: checkTypecheck },
   { id: "declared-scripts-exist", describe: "every declared node script points at a real file", run: checkDeclaredScriptsExist },
@@ -325,6 +330,38 @@ export const CHECKS = [
   { id: "promised-checks-due", describe: "every mechanically decidable check that has come due is written", run: checkDebt },
   { id: "mutations-still-caught", describe: "reintroducing a fixed defect still fails the test written for it", run: checkMutations },
 ];
+
+/**
+ * The artifact the n8n Code node would run must actually assemble.
+ *
+ * A build that fails only when someone happens to run it by hand is a build
+ * nobody runs. The three conditions it enforces — exact substitution counts,
+ * zero remaining requires, unchanged format semantics — are the ones measured
+ * to fail silently otherwise.
+ */
+function checkCoreBuild() {
+  const script = resolve(ROOT, "scripts/build-core.mjs");
+  if (!existsSync(script)) return unknown("scripts/build-core.mjs is missing", "build core");
+
+  const r = run("node", [script]);
+  if (!r.ran) return unknown(`build did not run: ${r.error ?? "no exit code"}`, r.line);
+  if (r.status !== 0) {
+    const first = (r.stdout + r.stderr).split("\n").find((l) => l.includes("Error")) ?? `exit ${r.status}`;
+    return fail(first.trim(), r.line);
+  }
+
+  const manifestPath = resolve(ROOT, "out/core.manifest.json");
+  if (!existsSync(manifestPath)) return unknown("build exited 0 but wrote no manifest", r.line);
+  let m;
+  try {
+    m = JSON.parse(readFileSync(manifestPath, "utf8"));
+  } catch (e) {
+    return unknown(`manifest unreadable: ${e instanceof Error ? e.message : String(e)}`, r.line);
+  }
+  if (m.requiresRemaining !== 0) return fail(`${m.requiresRemaining} require call(s) remain in the artifact`, r.line);
+  if (!Array.isArray(m.exports) || m.exports.length === 0) return fail("artifact exports no validators", r.line);
+  return pass(`${m.bytes} bytes, ${m.exports.length} validators, 0 requires`, r.line);
+}
 
 /**
  * Reintroduce each known defect, run the suite, require the named test to fail.

@@ -4,11 +4,15 @@
   "private": true,
   "type": "module",
   "description": "AI SRE — Kubernetes incident debugging MVP. Deterministic core, shared by local tests and n8n Code nodes.",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "gate": "node scripts/acceptance-gate.mjs"
+    "gate": "node scripts/acceptance-gate.mjs",
+    "build": "node scripts/build-core.mjs",
+    "generate": "node scripts/generate-workflow.mjs"
   },
   "devDependencies": {
     "ajv": "^8.17.1",

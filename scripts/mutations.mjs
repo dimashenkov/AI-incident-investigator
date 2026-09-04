@@ -64,6 +64,26 @@ export const MUTATIONS = [
     mustFail: "traces contradicting evidence back to a finding, not only supporting evidence",
   },
   {
+    // Passes every build assertion — the require text is unchanged — and only
+    // the differential corpus notices. Measured 2026-09-04: without it, fast
+    // mode shipped and the artifact accepted month 13 and February 30th.
+    id: "date-time-semantics-drift-to-fast-mode",
+    file: "scripts/build-core.mjs",
+    from: "  addFormats(ajv);",
+    to: '  addFormats(ajv, { mode: "fast" });',
+    mustFail: "agrees on every date-time in the corpus that once split the two",
+  },
+  {
+    // The committed workflow must stay derived. If the generator's output can
+    // change while the file on disk does not, the drift comparison proves
+    // nothing about the generator — only that two hand-maintained files agree.
+    id: "generated-workflow-drifts-from-committed",
+    file: "scripts/generate-workflow.mjs",
+    from: 'export const WEBHOOK_PATH = "ai-sre-incident";',
+    to: 'export const WEBHOOK_PATH = "ai-sre-incident-changed";',
+    mustFail: "matches the committed file exactly, so a hand edit fails here",
+  },
+  {
     id: "executed-becomes-optional-again",
     file: "schemas/remediation.schema.json",
     from: '    "rationale",\n    "executed"',
