@@ -1,0 +1,12 @@
+.claude/settings.local.json
+.env
+*.key
+*.pem
+__pycache__/
+.venv/
+node_modules/
+dist/
+*.log
+.DS_Store
+# n8n exports могат да носят credential id-та — минават през нормализация
+workflows/*.raw.json

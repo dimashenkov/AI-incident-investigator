@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-sre-mvp/schemas/incident.schema.json",
+  "title": "Incident",
+  "description": "The one canonical incident object. Every part of the system reads and writes this shape.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "incident_id", "status", "service", "namespace", "cluster",
+    "started_at", "source", "observations", "analysis", "remediation", "conversation"
+  ],
+  "properties": {
+    "incident_id": {
+      "type": "string",
+      "pattern": "^INC-[0-9]{4}-[0-9]{4}$",
+      "description": "INC-YYYY-NNNN"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["investigating", "diagnosed", "insufficient_evidence", "failed", "closed"],
+      "description": "failed and insufficient_evidence are distinct: could-not-determine is not the same as no-cause-found."
+    },
+    "service":   { "type": "string", "minLength": 1 },
+    "namespace": { "type": "string", "minLength": 1 },
+    "cluster":   { "type": "string", "minLength": 1 },
+    "started_at":  { "type": "string", "format": "date-time" },
+    "scenario": {
+      "type": "string",
+      "description": "Which fixture produced this incident. Null once providers are real.",
+      "minLength": 1
+    },
+
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "alert"],
+      "properties": {
+        "provider": { "type": "string", "enum": ["fake-datadog", "datadog"] },
+        "alert":    { "type": "object" }
+      }
+    },
+
+    "observations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kubernetes", "logs", "metrics"],
+      "description": "Each key is either a collected object or explicitly null. A missing key is a schema error, not an empty observation.",
+      "properties": {
+        "kubernetes": { "type": ["object", "null"] },
+        "logs":       { "type": ["object", "null"] },
+        "metrics":    { "type": ["object", "null"] }
+      }
+    },
+
+    "analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agents", "root_cause_code", "root_cause", "confidence", "evidence"],
+      "properties": {
+        "agents": {
+          "type": "array",
+          "items": { "$ref": "agent-result.schema.json" }
+        },
+        "root_cause_code": {
+          "type": ["string", "null"],
+          "enum": [
+            "CONTAINER_OOM",
+            "APPLICATION_STARTUP_FAILURE",
+            "IMAGE_PULL_FAILURE",
+            "READINESS_PROBE_FAILURE",
+            "DEPLOYMENT_REGRESSION",
+            "INSUFFICIENT_EVIDENCE",
+            null
+          ]
+        },
+        "root_cause": { "type": ["string", "null"] },
+        "confidence": {
+          "type": ["number", "null"],
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source", "fact"],
+            "properties": {
+              "source": { "type": "string", "enum": ["kubernetes", "logs", "metrics", "datadog"] },
+              "fact":   { "type": "string", "minLength": 1 },
+              "supports": {
+                "type": "string",
+                "enum": ["for", "against"],
+                "description": "Contradicting evidence is recorded, not dropped. Confidence scoring reads this."
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "remediation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recommended_actions"],
+      "properties": {
+        "recommended_actions": {
+          "type": "array",
+          "items": { "$ref": "remediation.schema.json" }
+        }
+      }
+    },
+
+    "conversation": { "$ref": "conversation.schema.json" }
+  },
+
+  "allOf": [
+    {
+      "description": "A diagnosed incident must carry a code, a confidence and at least one piece of evidence. Absence is not a diagnosis.",
+      "if":   { "properties": { "status": { "const": "diagnosed" } }, "required": ["status"] },
+      "then": {
+        "properties": {
+          "analysis": {
+            "required": ["root_cause_code", "confidence", "evidence"],
+            "properties": {
+              "root_cause_code": { "type": "string", "not": { "const": "INSUFFICIENT_EVIDENCE" } },
+              "root_cause":      { "type": "string", "minLength": 1 },
+              "confidence":      { "type": "number" },
+              "evidence":        { "type": "array", "minItems": 1 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "insufficient_evidence must say so in the code, so the two states cannot silently merge.",
+      "if":   { "properties": { "status": { "const": "insufficient_evidence" } }, "required": ["status"] },
+      "then": {
+        "properties": {
+          "analysis": {
+            "properties": { "root_cause_code": { "const": "INSUFFICIENT_EVIDENCE" } },
+            "required": ["root_cause_code"]
+          }
+        }
+      }
+    }
+  ]
+}
