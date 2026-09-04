@@ -29,7 +29,10 @@ Chunk-ът се затваря, когато acceptance gate-ът мине И Co
 | 1 | 4 | част 3: drift detection | 175/175 ✓ | exit 2 | **1 блокиращ** | — |
 | 1 | 5 | хеш от deployment-а, не от генерирания | 183/183 ✓ | exit 2 | **2 дефекта** | — |
 | 1 | 6 | част 4: fixture договори и провайдъри | 201/201 ✓ | **exit 0** | **1 блокиращ** | — |
-| 1 | 7 | „нищо" се заявява, не се извежда от липса | **204/204 ✓** · 13 мутации | **PASS · exit 0** · 8 проверки | **commit** | ✅ |
+| 1 | 7 | „нищо" се заявява, не се извежда от липса | 204/204 ✓ | PASS · exit 0 | **commit** | ✅ c658072 |
+| 2 | 1 | жива drift проверка | 209/209 ✓ | exit 0 | **1 блокиращ** | — |
+| 2 | 2 | release верига, идентификация по id | 219/219 ✓ | exit 0 | **2 дефекта** | — |
+| 2 | 3 | GET по id, baseline от deployment-а | **222/222 ✓** · 16 мутации | **PASS · exit 0** | **commit** | ✅ |
 | spike | 2 | ajv standalone в Code node | **16/16 съвпадение върху избраните fixtures** + 1 изпълнение | — | *(предстои)* | *(предстои)* |
 | 0 | 15 | `minProperties` на наблюденията | **128/128 ✓** · `tsc` 0 грешки | **PASS · exit 0** · 6 проверки · 8 мутации | **commit** | ✅ |
 
@@ -178,6 +181,48 @@ validator, не два"). Следващият spike проверява **ajv st
 **Цена:** 2 изпълнения от квотата на плана. Workflow-ът беше активен около една
 минута с webhook на случаен път, после деактивиран и изтрит; инстанцията е
 проверена и е празна.
+
+### Chunk 2 · живата половина на drift · 2026-09-04 · Codex, 3 кръга
+
+Дългът, който Codex настоя да остане отворен, когато локалната половина беше
+готова. Затварянето му отне три кръга и всеки намери нещо различно.
+
+**Кръг 1 — скрипт, който никой не вика, не затваря дупка.**
+
+*„the live check is not part of any release/deployment workflow. It exists only
+as an optional package script; nothing invokes it. Therefore a deployment can
+drift indefinitely while every mandatory check exits 0."*
+
+Бях написал проверката и обявих дълга за платен. Но проверка, която съществува и
+не се пуска, е точно същото като липсваща — само че изглежда като свършена
+работа. Оттам `scripts/release.mjs`: сглоби → генерирай → gate → deploy →
+**провери deployment-а** → презапиши baseline, и всяка ненулева стъпка спира
+веригата.
+
+**Кръг 2 — два дефекта, и вторият беше мое невярно твърдение.**
+
+*„`N8N_WORKFLOW_ID` is not truly authoritative: verification lists only the first
+`/workflows` page, then searches locally. A configured workflow outside that page
+is incorrectly reported absent."*
+
+И по-лошото: *„'re-record from the deployment it just verified' is untrue.
+record-baseline.mjs creates a separate temporary workflow, exports it, then
+deletes it. The test checks ordering only and cannot establish its stated
+claim."*
+
+Тестът проверяваше **реда** на две стъпки и от това аз твърдях какво прави
+втората. Сега решението е чиста функция `chooseSource`, тествана директно: при
+зададен id baseline-ът идва от **самия deployment**; без id — от временно
+качване, и резултатът сам казва, че е по-слабият източник.
+
+**Пуснато на живо, цялата верига.** Създаде workflow `49T3pwFvfumqTdo7`,
+проверката отговори `same`, `N8N_WORKFLOW_ID` беше зададен, проверката по id
+отново `same`, и baseline-ът беше записан от този deployment, не от копие.
+
+**Кръг 3: commit.** Дългът е затворен — вече не защото кодът съществува, а
+защото release веригата го изисква и ненулевият изход я спира.
+
+**Остава един дълг:** десетте DoD неща, падеж chunk 5.
 
 ### Chunk 1 · части 3–4 · 2026-09-04 · Codex, 4 кръга
 

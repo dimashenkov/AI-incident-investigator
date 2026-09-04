@@ -1,13 +1,13 @@
 {
-  "id": "DevSUSG4SepZgm6L",
+  "id": "49T3pwFvfumqTdo7",
   "name": "AI SRE — incident validation",
   "description": null,
   "active": false,
   "activeVersionId": null,
-  "createdAt": "2026-09-04T13:23:40.457Z",
-  "updatedAt": "2026-09-04T13:23:40.457Z",
+  "createdAt": "2026-09-04T13:44:43.103Z",
+  "updatedAt": "2026-09-04T13:44:43.103Z",
   "isArchived": false,
-  "versionId": "70205365-433e-47f4-bd72-8cd3b686e6d8",
+  "versionId": "44fe27a5-cfdf-4383-a35e-274481d4147d",
   "versionCounter": 1,
   "sourceWorkflowId": null,
   "triggerCount": 0,
@@ -26,7 +26,7 @@
         "httpMethod": "POST",
         "responseMode": "lastNode"
       },
-      "webhookId": "367cb825-9842-434d-93de-176945b5c6d1"
+      "webhookId": "6d9fb202-5538-4772-90d8-131d82910cd2"
     },
     {
       "id": "validate-core",
@@ -69,5 +69,5 @@
   "meta": null,
   "tags": [],
   "activeVersion": null,
-  "_fixture_note": "A real export from n8n Cloud, with each large code payload replaced by the sha256 of what the DEPLOYMENT returned — not by the generated code. Re-record with scripts/record-baseline.mjs whenever the deployment is deliberately changed."
+  "_fixture_note": "A real export from the DEPLOYED workflow, with each large code payload replaced by the sha256 of what the deployment returned. Re-record with scripts/record-baseline.mjs after a deliberate change."
 }

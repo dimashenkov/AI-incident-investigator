@@ -112,6 +112,32 @@ export const MUTATIONS = [
     mustFail: "reports failure, not nothing, when the scenario root does not exist",
   },
   {
+    // Two workflows sharing a name is a deployment nobody can reason about:
+    // picking either yields a verdict about a workflow that may not be live.
+    id: "ambiguous-deployment-picked-anyway",
+    file: "scripts/verify-deployment.mjs",
+    from: '  if (matches.length > 1) return { state: "ambiguous", ids: matches.map((w) => w.id) };',
+    to: "  if (false) { return null; }",
+    mustFail: "treats two workflows sharing the name as drift, not as a choice to make",
+  },
+  {
+    // The hole Codex named: a release that deploys without checking afterwards
+    // proves the same nothing the gate proves, and drift lives on indefinitely.
+    id: "release-skips-the-live-check",
+    file: "scripts/release.mjs",
+    from: '  step("verify the deployment", "node", ["scripts/verify-deployment.mjs"]);',
+    to: "  // skipped",
+    mustFail: "runs verify-deployment as part of the chain",
+  },
+  {
+    // Recording from a fresh copy while claiming to record from the deployment.
+    id: "baseline-recorded-from-a-copy-not-the-deployment",
+    file: "scripts/record-baseline.mjs",
+    from: '  if (id !== undefined && id !== null && id !== "") return { mode: "existing", id };',
+    to: "  if (false) { return null; }",
+    mustFail: "reads the configured deployment when there is one",
+  },
+  {
     id: "executed-becomes-optional-again",
     file: "schemas/remediation.schema.json",
     from: '    "rationale",\n    "executed"',

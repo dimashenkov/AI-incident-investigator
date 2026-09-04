@@ -518,14 +518,6 @@ export const LIMITATIONS = [
 ];
 
 export const DEBT = [
-  {
-    // Codex, chunk 1 part 3: removing this was unjustified. The local check
-    // compares generated code against a RECORDED export; it establishes nothing
-    // about what is running in the instance right now. Only a fresh export can,
-    // and that belongs to release rather than to every test run.
-    claim: "a fresh export from the live instance matches the generated workflow (the live half of drift detection)",
-    dueFromChunk: 2,
-  },
   { claim: "each of the ten uncovered Definition-of-Done items has a test behind it", dueFromChunk: 5 },
 ];
 

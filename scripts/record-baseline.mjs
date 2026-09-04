@@ -44,14 +44,60 @@ export function recordFrom(exported, { note }) {
   return out;
 }
 
+/**
+ * Which workflow the baseline is taken from.
+ *
+ * Codex, chunk 2 debt: this always created a separate temporary workflow,
+ * exported that, and deleted it — so a release that claimed to "re-record from
+ * the deployment it just verified" recorded something else entirely, and the
+ * ordering test could not have noticed.
+ *
+ * With an id configured, the baseline comes from THAT deployment. Without one,
+ * a temporary copy is still the only option, and the result says so rather than
+ * letting the weaker source pass for the stronger.
+ */
+export function chooseSource(env) {
+  const id = env.N8N_WORKFLOW_ID;
+  if (id !== undefined && id !== null && id !== "") return { mode: "existing", id };
+  return {
+    mode: "temporary",
+    why: "N8N_WORKFLOW_ID is not set, so the baseline is taken from a temporary upload rather than from the deployment itself",
+  };
+}
+
 async function main() {
   if (!API || !KEY) {
     process.stderr.write("N8N_API_URL and N8N_API_KEY must be set. Source ~/.config/ai-sre/n8n.env first.\n");
     process.exit(2);
   }
   const headers = { "X-N8N-API-KEY": KEY, "Content-Type": "application/json" };
-  const body = readFileSync(resolve(ROOT, "workflows/incident.json"), "utf8");
+  const source = chooseSource(process.env);
 
+  if (source.mode === "existing") {
+    const res = await fetch(`${API}/workflows/${source.id}`, { headers });
+    if (!res.ok) {
+      process.stderr.write(`could not export ${source.id}: HTTP ${res.status}\n`);
+      process.exit(2);
+    }
+    const exported = await res.json();
+    writeFileSync(
+      FIXTURE,
+      JSON.stringify(
+        recordFrom(exported, {
+          note:
+            "A real export from the DEPLOYED workflow, with each large code payload replaced by the sha256 of " +
+            "what the deployment returned. Re-record with scripts/record-baseline.mjs after a deliberate change.",
+        }),
+        null,
+        2,
+      ) + "\n",
+    );
+    process.stdout.write(`baseline recorded from the deployed workflow ${source.id}\n`);
+    return;
+  }
+
+  process.stdout.write(`${source.why}\n`);
+  const body = readFileSync(resolve(ROOT, "workflows/incident.json"), "utf8");
   const created = await (await fetch(`${API}/workflows`, { method: "POST", headers, body })).json();
   if (!created.id) {
     process.stderr.write(`upload failed: ${JSON.stringify(created).slice(0, 200)}\n`);

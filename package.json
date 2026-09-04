@@ -13,7 +13,9 @@
     "gate": "node scripts/acceptance-gate.mjs",
     "build": "node scripts/build-core.mjs",
     "generate": "node scripts/generate-workflow.mjs",
-    "record-baseline": "node scripts/record-baseline.mjs"
+    "record-baseline": "node scripts/record-baseline.mjs",
+    "verify-deployment": "node scripts/verify-deployment.mjs",
+    "release": "node scripts/release.mjs"
   },
   "devDependencies": {
     "ajv": "^8.17.1",
