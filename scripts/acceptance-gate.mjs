@@ -585,6 +585,15 @@ export function namedTestFailed(report, name) {
  * files on disk? If yes it is debt, and debt has a due date.
  */
 export const LIMITATIONS = [
+  // Moved here from DEBT on 2026-09-05. Codex: "the DEBT trigger is not
+  // checkable — it describes an external permission condition while enforcement
+  // is an unrelated dueFromChunk. Nothing detects the second pusher arriving."
+  //
+  // He is right, and a debt whose due date nobody will notice is a debt that
+  // quietly never comes due. It belongs among the things this gate cannot
+  // decide, printed every run, until repository-visible ownership metadata
+  // exists to check it against.
+  "that deployment goes through a chain nobody can skip — true while one person deploys by hand, unchecked and unenforced the moment a second can push",
   "that every diff went through external review before commit",
   "that each review objection was recorded verbatim rather than paraphrased",
   "that memory was written after each step",
@@ -592,18 +601,23 @@ export const LIMITATIONS = [
 
 export const DEBT = [
   {
-    // Not "someday" — it has a trigger. While one person deploys, the manual
-    // `npm run release` does everything an automated push would, and does it
-    // with the verification step that makes deployment mean anything. The day a
-    // second person can push, the manual step becomes something a human can
-    // forget, and forgetting it is invisible until drift is found later.
+    // Asked by the owner on 2026-09-05: is there a reviewer reaction in the
+    // thread, recorded somewhere, so the agent can be improved from it?
     //
-    // If it is automated, it runs the whole chain — gate, deploy, verify, and a
-    // refusal on mismatch — never deploy alone. Deploying without verifying
-    // afterwards is the hole this project already closed once.
-    claim: "deployment happens through a chain nobody can skip, once more than one person can push",
-    dueFromChunk: 99,
+    // There is not. The thread is one-way: the system speaks and nobody
+    // answers. The only quality signal today is the schema, which says whether
+    // an answer is well FORMED, never whether it is RIGHT. Human judgement is
+    // the only thing that can say the second.
+    //
+    // Two things must be settled before any code: a reaction has to name the
+    // prompt version it is about, or it becomes an opinion about something that
+    // no longer exists; and it has to say whether it judges the ANSWER or the
+    // OUTCOME, because an agent can reason correctly from bad data, and mixing
+    // the two means fixing prompts for provider problems.
+    claim: "a reviewer's reaction in the thread is recorded against the prompt version it judges, and says whether it judges the answer or the outcome",
+    dueFromChunk: 4,
   },
+
   {
     // Codex, 2026-09-05, naming the question neither content check can answer:
     // "Does this observation come from the trusted collection request that

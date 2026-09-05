@@ -214,6 +214,22 @@ export const MUTATIONS = [
     mustFail: "lists every allowed code in the root cause prompt, including its own verdict",
   },
   {
+    // could-not-read rendered as found-nothing in the one place a person reads.
+    id: "thread-renders-an-error-as-an-empty-result",
+    file: "src/core/report.ts",
+    from: '  if (a.status === "error") {',
+    to: "  if (false) {",
+    mustFail: "keeps could-not-read distinct from found-nothing, in the words a reader sees",
+  },
+  {
+    // A verdict that cites only what agrees, without saying the rest is there.
+    id: "thread-hides-the-evidence-against",
+    file: "src/core/report.ts",
+    from: "      (against.length === 0 ? \"\" : ` ${against.length} finding(s) argue against this; they are in the incident's evidence.`);",
+    to: '      "";',
+    mustFail: "tells the reader that contradicting evidence exists rather than omitting it",
+  },
+  {
     // Measured on a real call, 2026-09-05: told to state the unit without being
     // told where, the model made it a field, and the reply was refused.
     id: "metrics-prompt-stops-saying-where-the-unit-goes",
