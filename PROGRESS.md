@@ -246,6 +246,74 @@ permitted", без него „Device not configured", `-p` иска стойн�
 инструмент. Не е изчерпан въпросът дали Grok би намерил нещо — изчерпан е моят
 опит да го пусна headless.
 
+### Троен преглед · 2026-09-05 · 2 Grok + 1 Codex · $0.051
+
+Поискано от собственика като правило за всяко платено пускане, и приложено
+веднага върху изолацията. Записано в `CLAUDE.md` §3, включително решението и
+**трите да вървят едновременно** — независимостта се губи от реда, не от
+инструмента.
+
+**Основанието, измерено:** Codex прегледа изолацията **три пъти** и я одобри.
+Grok я разби на първото си пускане.
+
+#### Grok · 1 · кодът · $0.027
+
+*„What it actually does is deep-diff the payload against expectedPayload(),
+which re-copies the same slot from the same incident with the same own/snapshot
+path as the assembler… the checker is a second copy of the copier, not an
+independent spec of what the agent may see."*
+
+Проверено преди приемане: парола на друг клиент, сложена **в самото
+наблюдение**, връща `clean` и стига до агента. Заменил бях един proxy
+(разпознаваеми id-та) с друг (самосъгласуваност със собствения източник).
+
+Плюс: `deepDiffPaths` сравняваше при масиви само индекси и дължина, тоест
+именувано свойство на масив беше невидимо.
+
+#### Grok · 2 · тестовете · $0.024
+
+Шест находки, всичките приети. Най-важната:
+
+*„Nothing now requires a fail on the motivating leak… After the split, one half
+is self-consistency and the other is the old id pattern, tested off the path the
+model sees."* Тестът за източника питаше поле `note`, което assembler-ът така
+или иначе изхвърля.
+
+И една, която извади реален пропуск в prompt-а: правилото `error-is-not-no-data`
+за logs агента се проверяваше с regex `/status: "error"/`, което всяко
+споменаване удовлетворява. По-строгият regex показа, че **изречението, което
+различава двете, изобщо липсва** в logs prompt-а. Написано.
+
+#### Codex · diff · три находки
+
+**Критичната:** *„neither check is enforced in production… they are called only
+by tests. Runtime callers can assemble and send a contaminated payload without
+consulting either result… it created the appearance of a two-stage guard without
+wiring either stage into the boundary."*
+
+Проверка, която никой не вика, струва точно колкото коментар със същите думи.
+Сега има един вход — `assembleCheckedContext` — и нищо не стига до модел покрай
+него.
+
+**Втората:** тестът, който изискваше паролата да върне `clean`, **вкоренява
+слабостта** — той щеше да падне в деня, в който проверката се подобри. Пропускът
+е записан като дълг; тестът иска записът да съществува, не пропускът да оцелее.
+
+**Третата — въпросът, който никоя проверка не задава:**
+
+> *„Does this observation come from the trusted collection request that created
+> this incident? Content scanning cannot establish provenance. A foreign record
+> may contain no incident ID, while a legitimate log may mention another ID."*
+
+Записан като дълг с падеж chunk 3: произход по доверие на границата на приемане
+— арендатор, заявка за събиране, очакван инцидент — с отказ при несъответствие,
+преди наблюденията да се слеят.
+
+**И противоречие, което Codex посочи в самия списък:** DoD запис 6 беше маркиран
+за покрит, а сред доказателствата му стоеше тест, който **демонстрира дупката**.
+Записът стана непокрит. Покритието падна от 6 на **5 от 10** — и това е
+по-вярното число.
+
 ## Отсъдите, дословно
 
 Подканите и суровите отговори на Codex **не влизат в repo-то** (CLAUDE.md §6).

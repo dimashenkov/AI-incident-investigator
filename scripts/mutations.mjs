@@ -214,11 +214,49 @@ export const MUTATIONS = [
     mustFail: "lists every allowed code in the root cause prompt, including its own verdict",
   },
   {
+    // Codex, 2026-09-05: both checks existed and neither was called outside the
+    // tests — the appearance of a guard with nothing wiring it to the boundary.
+    id: "checked-path-stops-checking-the-source",
+    file: "src/agents/context.ts",
+    from: "  const source = checkSourceForForeignIncidents(incident);",
+    to: '  const source = { state: "clean" };',
+    mustFail: "refuses a contaminated incident rather than assembling from it",
+  },
+  {
+    // Grok, 2026-09-05: the test named for a "checked context" never called the
+    // check, so deleting the check left it green.
+    id: "context-check-never-called-by-its-own-test",
+    file: "src/agents/context.ts",
+    from: "export function checkPayloadIsExactlyTheSlice(",
+    to: "export function unusedRenamed(",
+    mustFail: "does not let a later mutation of the incident change a checked context",
+  },
+  {
+    // Grok, 2026-09-05: only array indices and length were compared, so a named
+    // property on an array produced no path while an extra key on a plain
+    // object did.
+    id: "array-properties-invisible-to-the-diff",
+    file: "src/agents/context.ts",
+    from: "    const named = (v: unknown[]) => Object.keys(v).filter((k) => !/^\\d+$/.test(k));",
+    to: "    const named = () => [];",
+    mustFail: "catches a named property hung on an array, which indices alone would miss",
+  },
+  {
+    // The question no earlier version asked: is the SOURCE contaminated. By the
+    // time foreign data reaches the payload it is indistinguishable from the
+    // legitimate slice, so nothing downstream can see it.
+    id: "source-contamination-goes-unasked",
+    file: "src/agents/context.ts",
+    from: "  const foreign = foreignIncidentIds(incident, ownId);",
+    to: "  const foreign = [];",
+    mustFail: "asks the source about foreign incidents, which comparing to the source cannot",
+  },
+  {
     id: "provenance-check-becomes-a-pattern-match",
     file: "src/agents/context.ts",
     from: "  const paths = deepDiffPaths(expected, result.payload);",
     to: "  const paths = [];",
-    mustFail: "catches foreign content that looks like nothing we know",
+    mustFail: "catches content added to the payload after assembly",
   },
   {
     id: "prompt-rule-disappears",

@@ -149,21 +149,29 @@ export function assembleRootCauseContext(
 }
 
 /**
- * Does this context contain anything that did not come from this incident?
+ * Does the assembler add anything to the payload beyond the slice it was told
+ * to copy?
  *
- * This is the real isolation check, and it works by PROVENANCE rather than by
- * recognising anything. The context was assembled by copying named parts of one
- * incident; so the test is whether the payload still equals exactly those parts.
- * Anything else — a foreign observation, a customer record, a secret, an id in
- * a format nobody anticipated — makes the payload differ from what it should be,
- * whether or not it looks like anything we know.
+ * This is what the function checks, and the name now says so. Grok, 2026-09-05,
+ * on the previous version, which was called checkIsolation and then
+ * checkProvenance:
  *
- * Codex, chunk 2, on the previous version: "This function checks 'recognized
- * incident IDs', not isolation." It reported clean for a copied log line
- * carrying another customer's password, because no INC-pattern appeared in it.
- * A check named for a property must test the property, not a proxy for it.
+ *   "What it actually does is deep-diff the payload against expectedPayload(),
+ *    which re-copies the same slot from the same incident with the same
+ *    own/snapshot path as the assembler… the checker is a second copy of the
+ *    copier, not an independent spec of what the agent may see."
+ *
+ * Verified before accepting: a log line carrying another customer's password,
+ * placed in the observation ITSELF rather than added afterwards, returns clean.
+ * It is on both sides of the comparison.
+ *
+ * So this establishes one real thing — the assembler copied the slice and
+ * nothing else — and does NOT establish that the slice is free of foreign
+ * material. That is a separate question with a separate check below, because
+ * one name covering both is how the previous two versions came to claim more
+ * than they tested.
  */
-export function checkProvenance(
+export function checkPayloadIsExactlyTheSlice(
   result: ContextResult,
   incident: Record<string, unknown>,
 ): { state: "clean" } | { state: "foreign"; paths: string[] } | { state: "unchecked"; reason: string } {
@@ -174,6 +182,35 @@ export function checkProvenance(
 
   const paths = deepDiffPaths(expected, result.payload);
   if (paths.length > 0) return { state: "foreign", paths };
+  return { state: "clean" };
+}
+
+/**
+ * Does the incident itself carry another incident's identifier?
+ *
+ * The question the previous checks were named for and did not ask. An
+ * observation contaminated at the source travels into the payload legitimately
+ * — it IS the slice — so no comparison against the slice can see it. Only
+ * looking at the content can.
+ *
+ * This is a weaker instrument than its name might suggest, and the limit is
+ * stated rather than left to be discovered: it recognises incident ids. A
+ * foreign log line with no id in it is invisible here, exactly as Grok pointed
+ * out about the version this replaces. What makes it worth having anyway is
+ * that it asks about the SOURCE, which nothing else did, and the source is
+ * where contamination has to be caught — by the time it reaches the payload it
+ * is indistinguishable from legitimate data.
+ *
+ * The honest scope: cross-incident ids, checked at the source, before assembly.
+ */
+export function checkSourceForForeignIncidents(
+  incident: Record<string, unknown>,
+): { state: "clean" } | { state: "contaminated"; foreign: string[] } | { state: "unchecked"; reason: string } {
+  const ownId = own(incident, "incident_id");
+  if (typeof ownId !== "string") return { state: "unchecked", reason: "the incident carries no incident_id" };
+
+  const foreign = foreignIncidentIds(incident, ownId);
+  if (foreign.length > 0) return { state: "contaminated", foreign };
   return { state: "clean" };
 }
 
@@ -207,6 +244,18 @@ export function deepDiffPaths(expected: unknown, actual: unknown, path = ""): st
     if (expected.length !== actual.length) out.push(`${path}/(length)`);
     for (let i = 0; i < Math.max(expected.length, actual.length); i += 1) {
       out.push(...deepDiffPaths(expected[i], actual[i], `${path}/${i}`));
+    }
+    // Grok, 2026-09-05: only indices were compared, so a named property hung on
+    // an array — lines.smuggled = "…" — produced no path at all, while extra
+    // keys on a plain object did. An array is an object; its named keys are
+    // compared like any other.
+    const named = (v: unknown[]) => Object.keys(v).filter((k) => !/^\d+$/.test(k));
+    for (const k of new Set([...named(expected), ...named(actual)])) {
+      out.push(...deepDiffPaths(
+        (expected as unknown as Record<string, unknown>)[k],
+        (actual as unknown as Record<string, unknown>)[k],
+        `${path}/${k}`,
+      ));
     }
     return out;
   }
@@ -251,4 +300,57 @@ export function foreignIncidentIds(payload: unknown, ownId: string): string[] {
   };
   walk(payload);
   return [...found].filter((id) => id !== ownId);
+}
+
+/**
+ * Build a context and refuse to hand it over unless both checks pass.
+ *
+ * Codex, 2026-09-05: "neither check is enforced in production… they are called
+ * only by tests. Runtime callers can assemble and send a contaminated payload
+ * without consulting either result… it created the appearance of a two-stage
+ * guard without wiring either stage into the boundary."
+ *
+ * That was exactly right, and it is the same defect as all the others in
+ * different clothing: a thing that looks like a guarantee while nothing makes
+ * it one. A check that exists and is never called is worth precisely as much as
+ * a comment saying the same words.
+ *
+ * This is the only function a caller should use. The two checks below it stay
+ * exported because the tests examine them separately, but nothing sends a
+ * payload to a model except through here.
+ *
+ * What it still does NOT establish is stated where each check is defined, and
+ * repeated once here so a caller reading only this does not leave with more
+ * confidence than the code earns: contamination already present in the
+ * observation, carrying no incident id, passes both and reaches the agent.
+ * Closing that needs trusted provenance at the ingestion boundary, which is
+ * recorded as debt rather than pretended away.
+ */
+export function assembleCheckedContext(
+  agent: AgentName,
+  incident: Record<string, unknown>,
+  root: string = PROMPT_ROOT,
+): ContextResult {
+  const source = checkSourceForForeignIncidents(incident);
+  if (source.state === "contaminated") {
+    return { state: "unavailable", agent, reason: `the incident carries another incident's data: ${source.foreign.join(", ")}` };
+  }
+  if (source.state === "unchecked") {
+    return { state: "unavailable", agent, reason: `could not check the source: ${source.reason}` };
+  }
+
+  const built = agent === "root-cause"
+    ? assembleRootCauseContext(incident, root)
+    : assembleObservingContext(agent, incident, root);
+  if (built.state !== "assembled") return built;
+
+  const slice = checkPayloadIsExactlyTheSlice(built, incident);
+  if (slice.state === "foreign") {
+    return { state: "unavailable", agent, reason: `the payload holds something the slice does not: ${slice.paths.slice(0, 3).join(", ")}` };
+  }
+  if (slice.state === "unchecked") {
+    return { state: "unavailable", agent, reason: `could not check the payload: ${slice.reason}` };
+  }
+
+  return built;
 }

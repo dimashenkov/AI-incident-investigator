@@ -30,6 +30,11 @@ than concluding from silence.
 **Empty lines with a valid window** is `status: "no_data"`. An unreadable
 observation is `status: "error"`.
 
+Could-not-read and found-nothing are different answers and must not arrive as
+the same one. An empty log over a window you actually read says something about
+the incident; a log you could not open says nothing about it at all, and a
+reader who cannot tell them apart will draw a conclusion from the wrong one.
+
 
 **A hypothesis `code` must be one of these, exactly.** Measured 2026-09-05: a
 real model answered with `H1`, an identifier it invented, because this file

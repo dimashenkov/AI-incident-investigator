@@ -10,7 +10,7 @@ import { describe, it, expect } from "vitest";
 import { assembleIncident, incidentIdFor, readRegistry, recordAgentResult, runnableAgents, serviceFromTags } from "../src/core/assemble.js";
 import { listScenarios } from "../src/providers/fixtures.js";
 import { validate } from "../src/schema/validate.js";
-import { assembleObservingContext, checkProvenance } from "../src/agents/context.js";
+import { assembleObservingContext, checkPayloadIsExactlyTheSlice } from "../src/agents/context.js";
 
 const SCENARIOS = new URL("../scenarios/", import.meta.url).pathname;
 const all = listScenarios(SCENARIOS);
@@ -182,7 +182,7 @@ describe("only agents with something to read can run", () => {
       if (a.state !== "assembled") throw new Error(`${scenario} did not assemble`);
       for (const slot of runnableAgents(a.incident)) {
         const ctx = assembleObservingContext(slot as never, a.incident);
-        expect(checkProvenance(ctx, a.incident), `${scenario}/${slot}`).toEqual({ state: "clean" });
+        expect(checkPayloadIsExactlyTheSlice(ctx, a.incident), `${scenario}/${slot}`).toEqual({ state: "clean" });
       }
     });
   });

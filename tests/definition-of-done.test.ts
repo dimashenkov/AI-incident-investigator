@@ -65,15 +65,15 @@ describe("the ten Definition-of-Done items", () => {
     }
   });
 
-  it("reports six of ten covered, and names the four that are not", () => {
+  it("reports five of ten covered, and names the five that are not", () => {
     // The number is asserted so that quietly reclassifying an item as covered
     // fails here rather than improving a statistic nobody checks. It went from
     // seven to six when Codex pointed out that item 2 was claiming more than
     // its tests establish.
     const covered = DEFINITION_OF_DONE.filter((i) => i.covered).map((i) => i.n);
     const outstanding = DEFINITION_OF_DONE.filter((i) => !i.covered).map((i) => i.n);
-    expect(covered).toEqual([1, 4, 5, 6, 7, 9]);
-    expect(outstanding).toEqual([2, 3, 8, 10]);
+    expect(covered).toEqual([1, 4, 5, 7, 9]);
+    expect(outstanding).toEqual([2, 3, 6, 8, 10]);
   });
 
   it("names only dependencies that provably do not exist yet", () => {
@@ -81,6 +81,10 @@ describe("the ten Definition-of-Done items", () => {
     // through, and would have let through a dependency that already exists.
     // Each allowed dependency is checked against the repository instead.
     const ABSENT: Record<string, () => boolean> = {
+      "trusted provenance at the ingestion boundary": () =>
+        // One fixture-backed provider that reads files. Nothing carries a
+        // collection-request identity, so there is nothing to check against.
+        !readFileSync(new URL("../src/providers/fixtures.ts", import.meta.url).pathname, "utf8").includes("collection_request"),
       "a model call": () =>
         // No model key anywhere the project reads. If one appears, this stops
         // being a reason and the items waiting on it become ordinary work.

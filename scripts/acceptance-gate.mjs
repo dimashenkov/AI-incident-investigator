@@ -592,6 +592,21 @@ export const LIMITATIONS = [
 
 export const DEBT = [
   {
+    // Codex, 2026-09-05, naming the question neither content check can answer:
+    // "Does this observation come from the trusted collection request that
+    // created this incident? Content scanning cannot establish provenance. A
+    // foreign record may contain no incident ID, while a legitimate log may
+    // mention another ID."
+    //
+    // Verified: another customer's password placed in the observation passes
+    // both checks and reaches the agent. Closing it needs ownership metadata at
+    // the ingestion boundary — tenant, collection request, expected incident —
+    // and a refusal on mismatch before observations are merged. That is a
+    // provider-boundary change, not a check that can be bolted on downstream.
+    claim: "observations carry trusted provenance from the collection request, checked before they are merged",
+    dueFromChunk: 3,
+  },
+  {
     // Deliberately carries no count, and neither does this comment.
     //
     // It used to name a number. The list moved and the sentence did not, which

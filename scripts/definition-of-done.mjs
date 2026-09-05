@@ -51,16 +51,21 @@ export const DEFINITION_OF_DONE = [
       "is idempotent: opening the same thread twice is not a duplicate",
     ],
   },
-  {
-    n: 6, claim: "No cross-incident data in assembled prompts.", covered: true,
-    by: [
-      "passes a context that is exactly the slice it was supposed to be",
-      "catches foreign content that looks like nothing we know",
-      "copies only what was asked for, so an unknown field cannot ride along",
-      "builds contexts that survive the provenance check for every scenario",
-      "does not let a later mutation of the incident change a checked context",
-    ],
+    {
+    // Codex, 2026-09-05: "a direct coverage contradiction — this marks it
+    // covered while its cited evidence includes a test proving in-slice
+    // contamination passes and reaches the agent. That item must remain
+    // uncovered until trusted source binding is implemented and enforced."
+    //
+    // He is right, and the contradiction was visible in the list itself: an
+    // item cannot cite, as proof of coverage, a test that demonstrates the
+    // hole. The checks that exist are real and are now enforced at the
+    // boundary; they do not add up to this claim.
+    n: 6, claim: "No cross-incident data in assembled prompts.", covered: false,
+    needs: "trusted provenance at the ingestion boundary",
+    why: "the two checks in place establish that the assembler adds nothing beyond the slice and that no foreign incident id appears, and both are enforced before any context is handed over — but content already present in an observation, carrying no id, passes both and reaches the agent, so the claim as written is larger than the evidence",
   },
+
   {
     n: 7, claim: "The created Slack thread is durably linked, not merely returned.", covered: true,
     by: [

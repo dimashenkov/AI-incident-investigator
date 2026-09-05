@@ -12,11 +12,13 @@ import { readFileSync } from "node:fs";
 import agentResultSchema from "../schemas/agent-result.schema.json" with { type: "json" };
 import incidentSchema from "../schemas/incident.schema.json" with { type: "json" };
 import commonSchema from "../schemas/common.schema.json" with { type: "json" };
+// @ts-expect-error — plain .mjs; the debt list the gate reads.
+import { DEBT } from "../scripts/acceptance-gate.mjs";
 
 /** The one list both schemas point at. */
 const CAUSE_CODES: string[] = commonSchema.$defs.causeCode.enum;
 import {
-  assembleObservingContext, assembleRootCauseContext, checkProvenance,
+  assembleObservingContext, assembleRootCauseContext, assembleCheckedContext, checkPayloadIsExactlyTheSlice, checkSourceForForeignIncidents,
   foreignIncidentIds, deepDiffPaths, readPrompt, OBSERVING_AGENTS, AGENT_SLOT, type AgentName,
 } from "../src/agents/context.js";
 
@@ -62,7 +64,7 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
     { id: "finding-needs-source-ref", prose: /Every finding needs a `source_ref`/ },
     { id: "hypothesis-code-from-the-list", prose: /A hypothesis `code` must be one of these, exactly/ },
     { id: "no-data-is-an-answer", prose: /status: "no_data"/ },
-    { id: "error-is-not-no-data", prose: /status: "error"/ },
+    { id: "error-is-not-no-data", prose: /Could-not-read and found-nothing|different answers|must not arrive as the same/ },
     { id: "do-not-diagnose", prose: /Do not diagnose/ },
     { id: "truncation-limits-conclusions", prose: /truncated/ },
     { id: "window-limits-conclusions", prose: /`window`/ },
@@ -154,6 +156,11 @@ describe("every prompt carries the rules its schema will enforce", () => {
     // said what may go in it. The schema refused the whole result. A prompt that
     // omits the allowed values is asking for a guess.
     const allowed = CAUSE_CODES;
+    // Grok, 2026-09-05: a double loop with the non-empty guard living in
+    // another it() passes vacuously if the shared enum is ever emptied, while
+    // still looking like coverage of the invented-identifier failure.
+    expect(allowed.length, "the shared code list is empty; this test would pass on nothing").toBeGreaterThan(0);
+    expect(OBSERVING_AGENTS.length).toBeGreaterThan(0);
     for (const agent of OBSERVING_AGENTS) {
       const p = readPrompt(agent)!;
       for (const code of allowed) {
@@ -187,14 +194,25 @@ describe("every prompt carries the rules its schema will enforce", () => {
 });
 
 describe("an agent receives one incident and one slot", () => {
-  it("gives an observing agent only the slot it reads", () => {
-    const r = assembleObservingContext("logs", incident("INC-2026-0001"));
-    expect(r.state).toBe("assembled");
-    if (r.state !== "assembled") return;
-    expect(r.payload.observation).toEqual(LOGS);
-    // The other two slots must not be there at all — not empty, absent.
-    expect(JSON.stringify(r.payload)).not.toContain("OOMKilled");
-    expect(JSON.stringify(r.payload)).not.toContain("container_memory_working_set_bytes");
+  it("gives every observing agent only the slot it reads, by exact shape", () => {
+    // Grok, 2026-09-05: this asserted the absence of two distinctive strings,
+    // so an empty sibling slot, or one whose values happened to lack those
+    // words, would have passed as isolation. And only kubernetes was ever asked
+    // for exact keys; metrics never was.
+    const inc = incident("INC-2026-0001");
+    const expected: Record<string, unknown> = { kubernetes: K8S, logs: LOGS, metrics: METRICS };
+    for (const slot of OBSERVING_AGENTS) {
+      const r = assembleObservingContext(slot, inc);
+      expect(r.state, `${slot} did not assemble`).toBe("assembled");
+      if (r.state !== "assembled") continue;
+      expect(Object.keys(r.payload).sort(), `${slot} payload keys`).toEqual(["incident_id", "observation"]);
+      expect(r.payload.observation, `${slot} got the wrong slot`).toEqual(expected[slot]);
+      for (const other of OBSERVING_AGENTS) {
+        if (other === slot) continue;
+        expect(deepDiffPaths(r.payload.observation, expected[other]).length,
+          `${slot} received something equal to the ${other} slot`).toBeGreaterThan(0);
+      }
+    }
   });
 
   it("copies only what was asked for, so an unknown field cannot ride along", () => {
@@ -241,17 +259,50 @@ describe("an agent receives one incident and one slot", () => {
   });
 });
 
-describe("isolation is proved by provenance, not by recognising anything", () => {
-  it("passes a context that is exactly the slice it was supposed to be", () => {
-    const inc = incident("INC-2026-0001");
-    expect(checkProvenance(assembleObservingContext("kubernetes", inc), inc)).toEqual({ state: "clean" });
+describe("nothing reaches a model except through the checked path", () => {
+  it("refuses a contaminated incident rather than assembling from it", () => {
+    // Codex, 2026-09-05: both checks existed and neither was called anywhere but
+    // in tests — "the appearance of a two-stage guard without wiring either
+    // stage into the boundary". A check nobody calls is a comment.
+    const contaminated = incident("INC-2026-0001", {
+      observations: { kubernetes: K8S, metrics: METRICS,
+        logs: { ...LOGS, lines: [...LOGS.lines, { ts: "2026-09-04T10:00:00Z", level: "info", container: "c", message: "see INC-2026-0009" }] } },
+    });
+    // The unchecked path still builds it — that is what makes the checked one worth having.
+    expect(assembleObservingContext("logs", contaminated).state).toBe("assembled");
+    const r = assembleCheckedContext("logs", contaminated);
+    expect(r.state).toBe("unavailable");
+    if (r.state !== "unavailable") return;
+    expect(r.reason).toContain("INC-2026-0009");
   });
 
-  it("catches foreign content that looks like nothing we know", () => {
-    // Codex, chunk 2: the previous check matched an INC pattern and therefore
-    // reported clean for a copied log line carrying another customer's
-    // password. Provenance does not need to recognise the leak — anything that
-    // was not in the slice makes the payload differ from what it should be.
+  it("assembles a clean incident through the checked path", () => {
+    const r = assembleCheckedContext("kubernetes", incident("INC-2026-0001"));
+    expect(r.state).toBe("assembled");
+  });
+
+  it("checks the root cause context too, not only the observing ones", () => {
+    const contaminated = incident("INC-2026-0001", {
+      analysis: { agents: [{ ...AGENT_RESULT, findings: [{ fact: "from INC-2026-0009", source_ref: "r" }] }] },
+    });
+    expect(assembleCheckedContext("root-cause", contaminated).state).toBe("unavailable");
+  });
+
+  it("refuses when the source cannot be checked at all", () => {
+    // No id means nothing can be compared against anything. Not clean.
+    expect(assembleCheckedContext("logs", { observations: { logs: LOGS } }).state).toBe("unavailable");
+  });
+});
+
+describe("two separate questions: did the assembler add anything, and is the source clean", () => {
+  it("passes a context that is exactly the slice it was supposed to be", () => {
+    const inc = incident("INC-2026-0001");
+    expect(checkPayloadIsExactlyTheSlice(assembleObservingContext("kubernetes", inc), inc)).toEqual({ state: "clean" });
+  });
+
+  it("catches content added to the payload after assembly", () => {
+    // Note what this does and does not say. It adds the line AFTER assembling,
+    // so the payload departs from the slice and the difference is visible.
     const inc = incident("INC-2026-0001");
     const leaked = assembleObservingContext("logs", inc);
     expect(leaked.state).toBe("assembled");
@@ -260,8 +311,89 @@ describe("isolation is proved by provenance, not by recognising anything", () =>
       ts: "2026-09-04T10:00:00Z", level: "info", container: "other",
       message: "customer B database password is hunter2",
     });
-    const r = checkProvenance(leaked, inc);
-    expect(r.state, "a leak with no recognisable pattern must still be caught").toBe("foreign");
+    const r = checkPayloadIsExactlyTheSlice(leaked, inc);
+    expect(r.state).toBe("foreign");
+    if (r.state !== "foreign") return;
+    expect(r.paths.some((p) => p.includes("lines")), "the report must name where it departed").toBe(true);
+  });
+
+  it("does NOT catch the same content when it is already in the slice", () => {
+    // Grok, 2026-09-05, and verified before accepting: a payload compared
+    // against a re-copy of its own source cannot see contamination that was in
+    // the source. This test exists so the limit is stated rather than
+    // discovered — a green suite must not read as "no leak can get through".
+    const contaminated = incident("INC-2026-0001", {
+      observations: { ...incident("INC-2026-0001").observations,
+        logs: { ...LOGS, lines: [...LOGS.lines, {
+          ts: "2026-09-04T10:00:00Z", level: "info", container: "other",
+          message: "customer B database password is hunter2" }] } },
+    });
+    const ctx = assembleObservingContext("logs", contaminated);
+    expect(checkPayloadIsExactlyTheSlice(ctx, contaminated).state,
+      "if this ever returns foreign, the check has grown a power its name does not claim").toBe("clean");
+  });
+
+  it("catches a named property hung on an array, which indices alone would miss", () => {
+    // Grok, 2026-09-05, twice: only indices and length were compared, so
+    // lines.smuggled = "…" produced no path while an extra key on a plain
+    // object did. And then this test drove only the helper, so the check could
+    // have stopped using it and stayed green. It goes through the check now,
+    // and names the path rather than counting.
+    const withProp: unknown[] = [1, 2];
+    (withProp as unknown as Record<string, unknown>).smuggled = "hunter2";
+    expect(deepDiffPaths([1, 2], withProp)).toContain("/smuggled");
+
+    const inc = incident("INC-2026-0001");
+    const ctx = assembleObservingContext("logs", inc);
+    if (ctx.state !== "assembled") throw new Error("not assembled");
+    ((ctx.payload.observation as { lines: unknown[] }).lines as unknown as Record<string, unknown>).smuggled = "hunter2";
+    const r = checkPayloadIsExactlyTheSlice(ctx, inc);
+    expect(r.state, "a property hung on an array inside the payload must be caught by the check itself").toBe("foreign");
+  });
+
+  it("asks the source about foreign incidents, which comparing to the source cannot", () => {
+    // The question the previous names claimed and never asked. It recognises
+    // ids and nothing more, which is stated where it is defined.
+    const clean = incident("INC-2026-0001");
+    expect(checkSourceForForeignIncidents(clean)).toEqual({ state: "clean" });
+
+    // Grok, 2026-09-05: this used to put the foreign id on a top-level `note`,
+    // a field the assembler drops anyway — so the test never asked about the
+    // path the model actually receives. It goes in the observation now.
+    const contaminated = incident("INC-2026-0001", {
+      observations: { kubernetes: K8S, metrics: METRICS,
+        logs: { ...LOGS, lines: [...LOGS.lines, { ts: "2026-09-04T10:00:00Z", level: "info", container: "c", message: "see INC-2026-0009" }] } },
+    });
+    const r = checkSourceForForeignIncidents(contaminated);
+    expect(r.state).toBe("contaminated");
+    if (r.state !== "contaminated") return;
+    expect(r.foreign).toEqual(["INC-2026-0009"]);
+
+    // ...and the id really is on the path the agent is handed, so this is a
+    // check about what the model sees rather than about a discarded field.
+    const ctx = assembleObservingContext("logs", contaminated);
+    expect(ctx.state).toBe("assembled");
+    if (ctx.state !== "assembled") return;
+    expect(JSON.stringify(ctx.payload)).toContain("INC-2026-0009");
+    expect(checkPayloadIsExactlyTheSlice(ctx, contaminated).state,
+      "the slice check cannot see in-slice contamination — that is why the source check exists").toBe("clean");
+  });
+
+  it("records the content-level gap as debt rather than as required behaviour", () => {
+    // Codex, 2026-09-05: the previous version of this test REQUIRED the password
+    // to pass, and would have failed the day detection improved — "wrong as a
+    // required behaviour… it entrenches a weakness".
+    //
+    // So the gap is asserted where a gap belongs: in the debt list, with a due
+    // chunk. The test requires the entry to exist, not the leak to survive.
+    const debt = DEBT as Array<{ claim: string; dueFromChunk: number }>;
+    const entry = debt.find((d) => d.claim.includes("trusted") || d.claim.includes("provenance"));
+    expect(entry, "the content-level gap is not recorded as debt anywhere").toBeDefined();
+    expect(entry!.dueFromChunk).toBeGreaterThan(0);
+  });
+
+  it("reports unchecked, not clean, for a source with no id of its own", () => {
+    expect(checkSourceForForeignIncidents({}).state).toBe("unchecked");
   });
 
   it("catches a foreign incident id too, since that also departs from the slice", () => {
@@ -269,7 +401,12 @@ describe("isolation is proved by provenance, not by recognising anything", () =>
     const ctx = assembleObservingContext("kubernetes", inc);
     if (ctx.state !== "assembled") throw new Error("not assembled");
     (ctx.payload as Record<string, unknown>).also = "see INC-2026-0009";
-    expect(checkProvenance(ctx, inc).state).toBe("foreign");
+    const r = checkPayloadIsExactlyTheSlice(ctx, inc);
+    expect(r.state).toBe("foreign");
+    // Grok, 2026-09-05: asserting only the state meant any extra property
+    // satisfied a test named for catching a foreign incident id.
+    if (r.state !== "foreign") return;
+    expect(r.paths, "the report must name where the id appeared").toContain("/also");
   });
 
   it("names where the payload departed, not merely that it did", () => {
@@ -277,7 +414,7 @@ describe("isolation is proved by provenance, not by recognising anything", () =>
     const ctx = assembleObservingContext("metrics", inc);
     if (ctx.state !== "assembled") throw new Error("not assembled");
     (ctx.payload.observation as { series: Array<{ unit: string }> }).series[0]!.unit = "furlongs";
-    const r = checkProvenance(ctx, inc);
+    const r = checkPayloadIsExactlyTheSlice(ctx, inc);
     expect(r.state).toBe("foreign");
     if (r.state !== "foreign") return;
     expect(r.paths[0]).toContain("/observation/series/0/unit");
@@ -287,17 +424,27 @@ describe("isolation is proved by provenance, not by recognising anything", () =>
     // Nothing to inspect is not the absence of a leak. Reporting clean here
     // would mean a context that was never built passes the isolation check.
     const inc = incident("INC-2026-0001", { observations: { kubernetes: K8S, logs: LOGS, metrics: null } });
-    expect(checkProvenance(assembleObservingContext("metrics", inc), inc).state).toBe("unchecked");
+    expect(checkPayloadIsExactlyTheSlice(assembleObservingContext("metrics", inc), inc).state).toBe("unchecked");
   });
 
   it("does not let a later mutation of the incident change a checked context", () => {
     // Codex, chunk 2: the payload used to hold a live reference into the
     // incident, so data could travel after the check that was meant to stop it.
+    //
+    // Grok, 2026-09-05: the assertion was the absence of one INC string — the
+    // recognised-id proxy this file says is not evidence. It compares the whole
+    // payload against a snapshot taken before the mutation now, so ANY change
+    // fails, not only one carrying that substring.
     const inc = incident("INC-2026-0001");
     const ctx = assembleObservingContext("logs", inc);
     if (ctx.state !== "assembled") throw new Error("not assembled");
-    (inc.observations.logs as { lines: unknown[] }).lines.push({ ts: "x", level: "info", container: "c", message: "INC-2026-0009" });
-    expect(JSON.stringify(ctx.payload)).not.toContain("INC-2026-0009");
+    // Grok, 2026-09-05: it never called the check, so deleting the check
+    // entirely left this green. It establishes copy-versus-alias only if the
+    // check is what declared the context sound in the first place.
+    expect(checkPayloadIsExactlyTheSlice(ctx, inc).state, "the context was not sound to begin with").toBe("clean");
+    const before = JSON.parse(JSON.stringify(ctx.payload));
+    (inc.observations.logs as { lines: unknown[] }).lines.push({ ts: "x", level: "info", container: "c", message: "anything at all" });
+    expect(deepDiffPaths(before, ctx.payload), "the payload moved after it was checked").toEqual([]);
   });
 
   it("ignores an inherited slot, which no one put in the incident", () => {
