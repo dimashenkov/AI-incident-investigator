@@ -324,6 +324,38 @@ export const MUTATIONS = [
     mustFail: "says which implementations have never been run, rather than counting them as working",
   },
   {
+    // A total that swallows what it could not price is the same defect as a
+    // gate that reports PASS for a check that never ran.
+    id: "unpriced-run-counted-as-free",
+    file: "scripts/spend.mjs",
+    from: '    return { state: "unknown", why: `no recorded price for ${model}; add it with the date it was read` };',
+    to: "    return { state: \"measured\", usd: 0, inTok: 0, outTok: 0, model };",
+    mustFail: "says it could not establish a cost rather than counting it as zero",
+  },
+  {
+    // The human report and the exit code must come from the same count.
+    id: "unreadable-run-counted-after-the-total-is-qualified",
+    file: "scripts/spend.mjs",
+    from: '  for (const u of unreadable) { unknown += 1; lines.push(`    UNREADABLE ${u}`); }\n  lines.push(`\\n    measured total: $${total.toFixed(4)}`);\n  if (unknown > 0) lines.push(`    ${unknown} run(s) could not be priced \u2014 the total above is a floor, not the answer`);',
+    to: '  lines.push(`\\n    measured total: $${total.toFixed(4)}`);\n  if (unknown > 0) lines.push(`    ${unknown} run(s) could not be priced \u2014 the total above is a floor, not the answer`);\n  for (const u of unreadable) { unknown += 1; lines.push(`    UNREADABLE ${u}`); }',
+    mustFail: "qualifies the total in the same report where an unreadable run is counted",
+  },
+  {
+    id: "token-counts-coerced-instead-of-checked",
+    file: "scripts/spend.mjs",
+    from: '    if (typeof v !== "number" || !Number.isInteger(v) || v < 0) {',
+    to: "    if (false) {",
+    mustFail: "refuses a token count that is not a whole non-negative number",
+  },
+  {
+    // The one line is the only place the number is usually read.
+    id: "one-line-drops-the-floor-qualification",
+    file: "scripts/spend.mjs",
+    from: "  if (r.unknown > 0) {\n    return `${money} \u2014 floor, ${r.unknown} run(s) could not be priced (npm run spend for the breakdown)`;\n  }",
+    to: "  if (false) {\n    return money;\n  }",
+    mustFail: "carries the qualification with the one figure, not only in the breakdown",
+  },
+  {
     id: "claimed-provider-not-compared",
     file: "src/providers/fixtures.ts",
     from: '      ["provider", `fake-${slot}`],',
