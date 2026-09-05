@@ -388,13 +388,27 @@ describe("the mutation machinery, which is what makes 'every fix has a test' che
     expect(namedTestFailed(report("refuses X", "passed"), "refuses X")).toBe(false);
   });
 
-  it("does not treat a test that vanished as caught", () => {
-    // A renamed or deleted test must never read as "the defect was noticed".
-    expect(namedTestFailed(report("something else", "failed"), "refuses X")).toBe(false);
+  it("does not treat a test that vanished as caught, nor as one that passed", () => {
+    /*
+     * The name of this test was already right and its assertion was half.
+     *
+     * It required `false`, which is the same answer as "the test ran and
+     * passed" — so a report missing the named test produced "the mutation
+     * SURVIVED", the one message that must never come from not looking. On
+     * 2026-09-05 exactly that happened: a run that did not finish reported a
+     * mutation as surviving, and I spent a while looking for a defect in the
+     * code rather than in the checker.
+     *
+     * Null is a third answer: not found. The caller reports it as unresolved.
+     */
+    expect(namedTestFailed(report("something else", "failed"), "refuses X")).toBeNull();
+    expect(namedTestFailed(report("refuses X", "passed"), "refuses X"), "a passing test is a different answer").toBe(false);
+    expect(namedTestFailed(report("refuses X", "failed"), "refuses X")).toBe(true);
   });
 
-  it("survives a report with no results at all", () => {
-    expect(namedTestFailed({}, "refuses X")).toBe(false);
+  it("says not-found for a report with no results at all", () => {
+    expect(namedTestFailed({}, "refuses X")).toBeNull();
+    expect(namedTestFailed({ testResults: [] }, "refuses X")).toBeNull();
   });
 
   it("keeps every mutation anchor unique in its target file", () => {

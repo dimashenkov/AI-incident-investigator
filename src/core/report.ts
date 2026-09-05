@@ -103,8 +103,21 @@ export function reportIncident(incident: Record<string, unknown>, at: string): R
 
     const text =
       `Root cause: ${code}. ${String(analysis["root_cause"] ?? "")}` +
+      /*
+       * Said as what it is: a number the model gave, not one anything measured.
+       *
+       * Codex, 2026-09-05, after the first live run: nothing checks the figure
+       * against the agreement count, the directness of the evidence, the
+       * contradictions or the ceiling the prompt asks for. Printing it bare
+       * reads as a measurement. Computing a second number here would be worse —
+       * it would look enforced while measuring the arithmetic.
+       *
+       * The percentage is for the reader: the owner asked on 2026-09-05 for
+       * confidence in percent, because a number between nought and one reads as
+       * a share rather than a judgement.
+       */
       (typeof confidence === "number"
-        ? ` Confidence ${confidence}.`
+        ? ` The agent puts its confidence at ${Math.round(confidence * 100)}%, which is its own estimate and nothing here checks it.`
         : " Confidence was not recorded, so this rests on the evidence below and nothing more.") +
       (against.length === 0 ? "" : ` ${against.length} finding(s) argue against this; they are in the incident's evidence.`);
     const failed = say({ role: "agent", incident_id: incidentId, ts: at, text,

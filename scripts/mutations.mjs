@@ -428,6 +428,43 @@ export const MUTATIONS = [
     mustFail: "shows no example whose hypothesis cites something its own findings do not",
   },
   {
+    // Measured, and it cost money: a refused item flowed into the next HTTP
+    // node and was charged for the agents before it.
+    id: "gate-lets-a-refusal-reach-the-paid-call",
+    file: "scripts/generate-workflow.mjs",
+    // Inverted by its right-hand side, not by rewriting the expression: the
+    // first attempt rewrote the expression and had to survive two layers of
+    // escaping. It produced a syntax error instead, the file then failed to
+    // load, its tests never ran — and the mutation read as surviving, which is
+    // the one answer that must never come from not looking.
+    from: '          rightValue: "asking",',
+    to: '          rightValue: "skipped",',
+    mustFail: "skips an agent whose slot holds an established absence, rather than refusing the incident",
+  },
+  {
+    id: "conclude-accepts-any-state-that-reaches-it",
+    file: "scripts/workflow-runtime.mjs",
+    from: '  if (j.state !== "recorded" && j.state !== "skipped") {',
+    to: "  if (false) {",
+    mustFail: "refuses a state this chain does not produce, rather than concluding from it",
+  },
+  {
+    id: "conclude-promotes-a-verdict-this-run-never-asked-for",
+    file: "scripts/workflow-runtime.mjs",
+    from: "  if (asked.length !== 1) {",
+    to: "  if (false) {",
+    mustFail: "refuses when the root cause agent did not answer in this run",
+  },
+  {
+    // Deciding by the words of a message means any future failure phrased that
+    // way becomes a skip, and the rule breaks the day someone rewords it.
+    id: "skip-decided-by-a-message-not-by-the-record",
+    file: "scripts/workflow-runtime.mjs",
+    from: '  if (record.state === "nothing") {',
+    to: '  if (String(ctx.reason || "").indexOf("nothing was collected") !== -1) {',
+    mustFail: "refuses a slot that could not be read, rather than skipping it like an absence",
+  },
+  {
     id: "claimed-provider-not-compared",
     file: "src/providers/fixtures.ts",
     from: '      ["provider", `fake-${slot}`],',

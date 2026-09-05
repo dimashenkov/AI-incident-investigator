@@ -101,6 +101,10 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
   ],
   "root-cause": [
     { id: "source-ref-copied-verbatim-from-agent-results", prose: /Copy a `source_ref` verbatim/ },
+    // Measured on the first live run: nine agreeing findings produced 0.6,
+    // because every rule about confidence pointed downwards and none said what
+    // earns a high one. A scale that only descends is read as "stay low".
+    { id: "confidence-reads-both-directions", prose: /0\.8 to 0\.95/ },
     { id: "insufficient-evidence-is-an-answer", prose: /Not enough to tell is a real answer/ },
     { id: "every-answer-carries-five-fields", prose: /All five fields, always/ },
     { id: "cause-code-from-the-list", prose: /The `root_cause_code` must be one of these, exactly/ },

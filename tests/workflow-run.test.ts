@@ -70,6 +70,37 @@ describe("the generated workflow investigates, not merely validates", () => {
     expect(JSON.stringify(rc), "the root cause agent must not receive observations").not.toContain("collected_at");
   });
 
+  it("skips an agent whose slot holds an established absence, rather than refusing the incident", async () => {
+    /*
+     * Measured on the first live run, 2026-09-05: two scenarios declare
+     * "__nothing" for metrics on purpose, and the whole incident was refused
+     * because one of three agents had nothing to read. An established absence
+     * is an answer; refusing over it throws away the agents that did have
+     * something — and, before the gate existed, it also kept spending.
+     */
+    for (const scenario of ["image-pull-failure", "insufficient-evidence"]) {
+      const r = await runScenario(scenario);
+      expect(r.state, r.state === "refused" ? String(r.reason) : "").toBe("concluded");
+    }
+  });
+
+  it("refuses a slot that could not be read, rather than skipping it like an absence", async () => {
+    /*
+     * The case that separates the two ways of deciding a skip.
+     *
+     * Codex, 2026-09-05: keying on the words "nothing was collected" in a
+     * reason string makes any failure phrased that way into a skip. A slot
+     * nobody could READ produces exactly that phrase — the observation is null
+     * either way — so the substring version quietly skips a broken provider and
+     * concludes without it. The document's own collection record says "failed"
+     * there and "nothing" for a declared absence, and that is what is asked.
+     */
+    const r = await runScenario("container-oom", STUB_AGENTS, "../fixtures/two-broken/");
+    expect(r.state, "a slot that could not be read must not be treated as an absence").toBe("refused");
+    if (r.state !== "refused") return;
+    expect(String(r.reason)).toContain("logs");
+  });
+
   it("stops when the model answers with something that is not JSON", async () => {
     // The most likely real failure, and the one a stub that always returns an
     // object cannot produce: the model writes prose, or fences the JSON.
@@ -148,5 +179,51 @@ describe("the Set node that joins the answer back to the incident", () => {
     const node = await collectNode("metrics");
     expect(() => runSetExpression(node, envelope({}), "Some Other Node", {}))
       .toThrow(/not the node before it/);
+  });
+
+});
+
+describe("what may reach the conclusion", () => {
+  /*
+   * Codex, 2026-09-05: the gates treat every state that is not "asking" alike,
+   * so an item in any other state walks every false branch and arrives intact.
+   * If it carried a verdict from elsewhere, Conclude would promote it — a
+   * conclusion the run never reached, wearing the run's name.
+   */
+  const concludeCode = async () => {
+    const { workflow } = await runScenario.generated();
+    return workflow.nodes.find((n: { name: string }) => n.name === "Conclude").parameters.jsCode as string;
+  };
+
+  const run = (code: string, json: Record<string, unknown>) =>
+    (new Function("$input", `"use strict";\n${code}`) as (i: unknown) => Array<{ json: Record<string, unknown> }>)(
+      { all: () => [{ json }] },
+    )[0]!.json;
+
+  it("refuses a state this chain does not produce, rather than concluding from it", async () => {
+    const code = await concludeCode();
+    for (const state of ["asking", "injected", undefined, ""]) {
+      const out = run(code, { state, incident: { analysis: { agents: [{ agent: "root_cause" }] } } });
+      expect(out.state, `state ${JSON.stringify(state)} was concluded`).toBe("refused");
+      expect(String(out.reason)).toContain("this chain does not produce");
+    }
+  });
+
+  it("refuses when the root cause agent did not answer in this run", async () => {
+    // A verdict already sitting in the incident is not a verdict this run
+    // reached. Exactly one, because two is not this run either.
+    const code = await concludeCode();
+    for (const agents of [[], [{ agent: "kubernetes" }], [{ agent: "root_cause" }, { agent: "root_cause" }]]) {
+      const out = run(code, { state: "recorded", incident: { analysis: { agents } } });
+      expect(out.state, `${agents.length} agents was concluded`).toBe("refused");
+      expect(String(out.reason)).toContain("root cause results");
+    }
+  });
+
+  it("still passes a refusal through untouched", async () => {
+    const code = await concludeCode();
+    const out = run(code, { state: "refused", agent: "logs", reason: "logs: something" });
+    expect(out.state).toBe("refused");
+    expect(out.reason).toBe("logs: something");
   });
 });

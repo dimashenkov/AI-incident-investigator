@@ -16,6 +16,8 @@
 import { generate, MODEL } from "../../scripts/generate-workflow.mjs";
 // @ts-expect-error - plain .mjs script, no types
 import { buildRuntime } from "../../scripts/workflow-runtime.mjs";
+import { assembleIncident } from "../../src/core/assemble.js";
+import { assembleCheckedContext } from "../../src/agents/context.js";
 
 export type Reply = Record<string, unknown> | null;
 export type Stub = (payload: Record<string, unknown>) => Reply;
@@ -28,13 +30,24 @@ export const STUB_AGENTS: Record<string, Stub> = {
     const containers = (pods[0]?.containers ?? []) as Array<Record<string, unknown>>;
     const c = containers[0];
     const reason = ((c?.last_state as Record<string, unknown>)?.terminated as Record<string, unknown>)?.reason;
+    /*
+     * Cites the path it actually resolved, never a path it hoped for.
+     *
+     * The first version always cited the terminated reason, which exists only
+     * where a container terminated — the same defect Grok found in the prompt's
+     * example, reproduced here. A stub that cites what is not there tests the
+     * citation check rather than the chain.
+     */
+    const ref = reason === undefined ? "collected_at" : "pods[0].containers[0].last_state.terminated.reason";
     return {
       agent: "kubernetes", status: "ok",
-      findings: [{ fact: `the container terminated with ${String(reason)}`,
-        source_ref: "pods[0].containers[0].last_state.terminated.reason" }],
+      findings: [{ fact: reason === undefined
+          ? `the observation was collected at ${String(o?.collected_at)}`
+          : `the container terminated with ${String(reason)}`,
+        source_ref: ref }],
       hypotheses: reason === "OOMKilled"
         ? [{ code: "CONTAINER_OOM", statement: "the container exceeded its memory limit",
-             supported_by: ["pods[0].containers[0].last_state.terminated.reason"] }]
+             supported_by: [ref] }]
         : [],
       confidence: reason === "OOMKilled" ? 0.9 : 0.2,
     };
@@ -45,7 +58,11 @@ export const STUB_AGENTS: Record<string, Stub> = {
     return {
       agent: "logs", status: lines.length > 0 ? "ok" : "no_data",
       findings: lines.length > 0
-        ? [{ fact: `the log window holds ${lines.length} line(s)`, source_ref: "lines[0].message" }] : [],
+        ? [{ fact: `the log window holds ${lines.length} line(s)`, source_ref: "lines[0].message" }]
+        // no_data forbids findings: an absence reported as a finding is the
+        // schema's way of keeping "I looked and saw nothing" from growing
+        // content.
+        : [],
       hypotheses: [], confidence: lines.length > 0 ? 0.4 : 0,
     };
   },
@@ -55,7 +72,8 @@ export const STUB_AGENTS: Record<string, Stub> = {
     return {
       agent: "metrics", status: series.length > 0 ? "ok" : "no_data",
       findings: series.length > 0
-        ? [{ fact: `${series.length} series were collected`, source_ref: "series[0].points[0].value" }] : [],
+        ? [{ fact: `${series.length} series were collected`, source_ref: "series[0].points[0].value" }]
+        : [],
       hypotheses: [], confidence: series.length > 0 ? 0.4 : 0,
     };
   },
@@ -92,6 +110,30 @@ type Item = { json: Record<string, unknown> };
  */
 export function envelope(answer: Reply): Record<string, unknown> {
   return { choices: [{ message: { content: answer === null ? "not json at all" : JSON.stringify(answer) } }] };
+}
+
+/**
+ * Evaluate an IF node's condition the way n8n does.
+ *
+ * Written after the second time a harness stood in for a node instead of
+ * running it: the gate that keeps a refusal out of a paid call was "tested" by
+ * the harness deciding for itself, so a mutation to the gate's own expression
+ * changed nothing. Only the string that ships decides here.
+ */
+export function runIfExpression(node: { parameters?: { conditions?: { conditions?: Array<Record<string, unknown>> } } },
+  current: Record<string, unknown>): boolean {
+  const list = node?.parameters?.conditions?.conditions;
+  if (!Array.isArray(list) || list.length !== 1) {
+    throw new Error("the gate no longer carries exactly one condition; this harness is testing nothing");
+  }
+  const c = list[0]!;
+  const op = (c.operator as { operation?: string })?.operation;
+  if (op !== "equals") throw new Error(`the gate compares with ${String(op)}, which this harness does not evaluate`);
+  const raw = String(c.leftValue);
+  if (!raw.startsWith("={{")) throw new Error("the gate's left side is not an expression");
+  const body = raw.slice(raw.indexOf("{{") + 2, raw.lastIndexOf("}}"));
+  const left = (new Function("$json", `"use strict"; return (${body});`) as (j: unknown) => unknown)(current);
+  return left === c.rightValue;
 }
 
 /**
@@ -134,9 +176,18 @@ async function runtimeOnce() {
 export async function runScenario(
   scenario: string,
   stubs: Record<string, Stub> = STUB_AGENTS,
+  /**
+   * A fixture root to assemble from instead of the real scenarios.
+   *
+   * The generated Assemble node carries the incidents built at generate time,
+   * so exercising a different set means building them here and substituting
+   * them into the item the node produces — which is what the webhook body would
+   * have selected. Only the incident changes; every node still runs as written.
+   */
+  fixtureRoot?: string,
 ): Promise<Record<string, unknown> & { state: string }> {
   const { workflow } = await generate();
-  const byName: Record<string, { parameters: { jsCode?: string; jsonOutput?: string } } | undefined> = Object.fromEntries(
+  const byName: Record<string, { parameters: { jsCode?: string; jsonOutput?: string; conditions?: { conditions?: Array<Record<string, unknown>> } } } | undefined> = Object.fromEntries(
     workflow.nodes.map((n: { name: string }) => [n.name, n]),
   );
 
@@ -149,9 +200,34 @@ export async function runScenario(
   let items = runCode(codeOf("Assemble"), [{ json: { body: { scenario } } }]);
   let previousName = "Assemble";
 
+  if (fixtureRoot !== undefined) {
+    const root = new URL(fixtureRoot, import.meta.url).pathname;
+    const a = assembleIncident(scenario, 1, { root });
+    if (a.state !== "assembled") throw new Error(`the fixture root does not assemble: ${a.reason}`);
+    // Re-run Assemble's own logic on the substituted incident by handing the
+    // first Record node the shape Assemble would have produced.
+    const ctx = assembleCheckedContext("kubernetes", a.incident);
+    if (ctx.state !== "assembled") throw new Error(`kubernetes context: ${ctx.reason}`);
+    items = [{ json: { index: 0, state: "asking", agent: "kubernetes", scenario,
+      incident: a.incident, prompt: ctx.prompt, payload: ctx.payload } }];
+  }
+
   for (const agent of ["kubernetes", "logs", "metrics", "root-cause"]) {
     const cur = items[0]?.json ?? {};
     if (cur.state === "refused") break;
+
+    /*
+     * The gate's own expression decides, not this harness. Measured on the
+     * first live run: a refused item flowed into the next HTTP node and was
+     * charged for the agents before it.
+     */
+    const gate = byName[`Ask ${agent}?`];
+    if (gate === undefined) throw new Error(`no gate before Ask ${agent}; the workflow shape changed`);
+    if (!runIfExpression(gate, cur)) {
+      items = runCode(codeOf(`Record ${agent}`), [{ json: cur }]);
+      previousName = `Record ${agent}`;
+      continue;
+    }
 
     /*
      * The Ask node is an HTTP call, so the stub stands in for the model — but

@@ -219,12 +219,16 @@ return items.map(function (item, index) {
   }
 
   const ctx = buildCheckedContext("kubernetes", incident, PROMPTS["kubernetes"]);
-  if (ctx.state !== "assembled") {
-    return { json: { index, state: "refused", reason: "kubernetes: " + ctx.reason } };
+  if (ctx.state === "assembled") {
+    return { json: { index, state: "asking", agent: "kubernetes", scenario: scenario,
+      incident: incident, prompt: ctx.prompt, payload: ctx.payload } };
   }
-
-  return { json: { index, state: "asking", agent: "kubernetes", scenario: scenario,
-    incident: incident, prompt: ctx.prompt, payload: ctx.payload } };
+  const kubeRecord = (incident.collection || {})["kubernetes"] || {};
+  if (kubeRecord.state === "nothing") {
+    return { json: { index, state: "skipped", agent: "kubernetes", scenario: scenario,
+      incident: incident, skipped_because: "kubernetes had nothing to read: the provider reported an established absence" } };
+  }
+  return { json: { index, state: "refused", reason: "kubernetes: " + ctx.reason } };
 });
 `;
 }
@@ -253,31 +257,56 @@ return items.map(function (item, index) {
   if (j.state === "refused") return { json: j };
 
   const incident = j.incident;
-  const reply = j.reply;
 
-  if (typeof reply !== "object" || reply === null) {
-    return { json: { index, state: "refused", agent: AGENT,
-      reason: AGENT + " returned nothing that could be read as an answer" } };
-  }
-
-  const recorded = recordAgentResult(validate, incident, reply);
-  if (recorded.state !== "recorded") {
-    return { json: { index, state: "refused", agent: AGENT,
-      reason: AGENT + ": " + recorded.reason,
-      errors: recorded.errors || [] } };
+  // Nothing was asked, because the slot before this one was empty. There is no
+  // reply to record; the incident simply travels on.
+  if (j.state !== "skipped") {
+    const reply = j.reply;
+    if (typeof reply !== "object" || reply === null) {
+      return { json: { index, state: "refused", agent: AGENT,
+        reason: AGENT + " returned nothing that could be read as an answer" } };
+    }
+    const recorded = recordAgentResult(validate, incident, reply);
+    if (recorded.state !== "recorded") {
+      return { json: { index, state: "refused", agent: AGENT,
+        reason: AGENT + ": " + recorded.reason, errors: recorded.errors || [] } };
+    }
+    j.incident = recorded.incident;
   }
 
   if (NEXT === null) {
-    return { json: { index, state: "recorded", agent: AGENT, scenario: j.scenario, incident: recorded.incident } };
+    return { json: { index, state: "recorded", agent: AGENT, scenario: j.scenario, incident: j.incident } };
   }
 
-  const ctx = buildCheckedContext(NEXT, recorded.incident, PROMPTS[NEXT]);
-  if (ctx.state !== "assembled") {
-    return { json: { index, state: "refused", agent: NEXT, reason: NEXT + ": " + ctx.reason } };
+  const ctx = buildCheckedContext(NEXT, j.incident, PROMPTS[NEXT]);
+  if (ctx.state === "assembled") {
+    return { json: { index, state: "asking", agent: NEXT, scenario: j.scenario,
+      incident: j.incident, prompt: ctx.prompt, payload: ctx.payload } };
   }
 
-  return { json: { index, state: "asking", agent: NEXT, scenario: j.scenario,
-    incident: recorded.incident, prompt: ctx.prompt, payload: ctx.payload } };
+  /*
+   * An agent with nothing to read is skipped, not refused.
+   *
+   * Measured on the first live run, 2026-09-05: two scenarios declare
+   * "__nothing" for metrics on purpose, and the whole incident was refused
+   * because one of three agents had no observation. An established absence is
+   * an answer; refusing the investigation over it throws away the two agents
+   * that did have something.
+   *
+   * The decision is read from the incident's own collection record, NOT from
+   * the text of a reason. Codex, the same day: matching a substring means any
+   * future failure whose message happens to contain those words becomes a skip,
+   * and the rule breaks silently the day someone rewords a sentence. The
+   * document already says which slots hold an established absence; that is the
+   * thing to ask.
+   */
+  const collection = (j.incident && j.incident.collection) || {};
+  const record = collection[AGENT_SLOT[NEXT]] || {};
+  if (record.state === "nothing") {
+    return { json: { index, state: "skipped", agent: NEXT, scenario: j.scenario,
+      incident: j.incident, skipped_because: NEXT + " had nothing to read: the provider reported an established absence" } };
+  }
+  return { json: { index, state: "refused", agent: NEXT, reason: NEXT + ": " + ctx.reason } };
 });
 `;
 }
@@ -294,6 +323,36 @@ const items = $input.all();
 return items.map(function (item, index) {
   const j = item.json || {};
   if (j.state === "refused") return { json: j };
+
+  /*
+   * Only a state this chain produced may arrive here.
+   *
+   * Codex, 2026-09-05: the gates treat everything that is not "asking" alike,
+   * so an item in any other state walks every false branch and lands here
+   * intact. If it carried a verdict from somewhere else, this node would
+   * promote it — a conclusion the run never reached, wearing the run's name.
+   */
+  if (j.state !== "recorded" && j.state !== "skipped") {
+    return { json: { index, state: "refused",
+      reason: "the item reached the end in state " + JSON.stringify(j.state) +
+        ", which this chain does not produce; refusing rather than concluding from it" } };
+  }
+
+  /*
+   * And the root cause agent must have answered in THIS execution.
+   *
+   * Same review: an incident that already carried a root cause result would
+   * otherwise be concluded without any agent being asked. The check is on the
+   * agents recorded in the document, because that is what concludeIncident
+   * reads — and the last thing this chain does before here is record it.
+   */
+  const agents = ((j.incident || {}).analysis || {}).agents || [];
+  const asked = agents.filter(function (a) { return a && a.agent === "root_cause"; });
+  if (asked.length !== 1) {
+    return { json: { index, state: "refused",
+      reason: "the incident carries " + asked.length + " root cause results; exactly one is expected, " +
+        "and a conclusion drawn from any other number did not come from this run" } };
+  }
 
   const concluded = concludeIncident(validate, j.incident);
   if (concluded.state !== "concluded") {

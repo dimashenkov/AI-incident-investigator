@@ -11,7 +11,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 // @ts-expect-error — plain .mjs, the same file node runs.
-import { buildWorkflow, serialise, generate, WEBHOOK_PATH, MODEL } from "../scripts/generate-workflow.mjs";
+import { buildWorkflow, serialise, generate, WEBHOOK_PATH, MODEL, OPENAI_CREDENTIAL } from "../scripts/generate-workflow.mjs";
 // @ts-expect-error — plain .mjs, the same file node runs.
 import { transpile, AGENT_ORDER } from "../scripts/workflow-runtime.mjs";
 
@@ -68,12 +68,39 @@ describe("the shape of the deployed chain", () => {
     // A branch that quietly ends is a run that produces no answer and no error.
     let at = "Incident Webhook";
     const visited = [at];
-    for (let i = 0; i < 40 && WF.connections[at] !== undefined; i += 1) {
+    for (let i = 0; i < 60 && WF.connections[at] !== undefined; i += 1) {
       at = WF.connections[at].main[0][0].node;
       visited.push(at);
     }
     expect(visited[visited.length - 1], `the chain ends at ${at}`).toBe("Conclude");
-    expect(visited).toHaveLength(2 + AGENT_ORDER.length * 3 + 1);
+    expect(visited).toHaveLength(2 + AGENT_ORDER.length * 4 + 1);
+  });
+
+  it("routes every gate's refusal past the paid call, and eventually to Conclude", () => {
+    /*
+     * Measured on the first live run, 2026-09-05, and it cost money: a refused
+     * item flowed into the next HTTP node, which built a request with an
+     * undefined prompt and was charged for the agents before it. Every false
+     * branch must reach Conclude without passing an Ask node.
+     */
+    for (const agent of AGENT_ORDER) {
+      const gate = WF.connections[`Ask ${agent}?`];
+      expect(gate, `no gate before Ask ${agent}`).toBeDefined();
+      expect(gate.main[0][0].node, "the true branch must ask").toBe(`Ask ${agent}`);
+
+      let at = gate.main[1][0].node;
+      const seen = [at];
+      for (let i = 0; i < 20 && at !== "Conclude"; i += 1) {
+        const c = WF.connections[at];
+        expect(c, `the false branch from ${agent} dead-ends at ${at}`).toBeDefined();
+        at = c.main[1] !== undefined && c.main[1].length > 0 ? c.main[1][0].node : c.main[0][0].node;
+        seen.push(at);
+      }
+      expect(at, `the false branch from ${agent} never reaches Conclude`).toBe("Conclude");
+      for (const n of seen) {
+        expect(n.startsWith("Ask ") && !n.endsWith("?"), `a refusal passes through ${n}, which spends`).toBe(false);
+      }
+    }
   });
 
   it("declares node types and versions the instance actually has", () => {
@@ -81,17 +108,25 @@ describe("the shape of the deployed chain", () => {
     expect(types.sort()).toEqual([
       "n8n-nodes-base.code@2",
       "n8n-nodes-base.httpRequest@4.2",
+      "n8n-nodes-base.if@2.2",
       "n8n-nodes-base.set@3.4",
       "n8n-nodes-base.webhook@2",
     ]);
   });
 
-  it("carries no credential material, only the name of a credential to use", () => {
-    // A credential reference in a generated file is a credential reference in
-    // git. Naming the type is how n8n is told which stored credential to use;
-    // anything key-shaped appearing here must fail as a test first.
+  it("carries a credential reference and no credential material", () => {
+    /*
+     * Measured on the first live run, 2026-09-05: naming only the type gets
+     * "Credentials not found" and the run stops before any model call. So the
+     * node names the stored credential by id and name.
+     *
+     * The id is a pointer, not a secret — the key never leaves n8n, and drift
+     * masks this field because it differs per instance. What must never appear
+     * is key-shaped material, and that is what this asserts.
+     */
     const text = JSON.stringify(WF);
     expect(text).toContain("openAiApi");
+    expect(text, "the node must name the stored credential, not merely its type").toContain(OPENAI_CREDENTIAL.name);
     // Anchored and long: the loose version matched the node id "ask-kubernetes",
     // which is the shape of check that reports a problem where none exists and
     // gets deleted the first time it is inconvenient.

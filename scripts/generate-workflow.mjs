@@ -58,6 +58,7 @@ function askNode(agent, position) {
     type: "n8n-nodes-base.httpRequest",
     typeVersion: 4.2,
     position,
+    credentials: { openAiApi: { id: OPENAI_CREDENTIAL.id, name: OPENAI_CREDENTIAL.name } },
     parameters: {
       method: "POST",
       url: "https://api.openai.com/v1/chat/completions",
@@ -82,6 +83,42 @@ function askNode(agent, position) {
  * the node before — and it is a Set node rather than Code so the join is
  * visible in the editor rather than buried in three hundred kilobytes.
  */
+/**
+ * The gate that keeps a refusal out of a paid call.
+ *
+ * Measured on the first live run, 2026-09-05, and it cost money to learn: a
+ * Record node refused, the item flowed on regardless, and the next HTTP node
+ * built a request with an undefined prompt. OpenAI answered 400 — after being
+ * paid for the two agents that ran before it. A refusal that keeps spending is
+ * the worst shape a refusal can have.
+ *
+ * True asks the agent. False walks past it to the next gate, and the last
+ * gate's false goes to Conclude, which passes a refusal through untouched. So a
+ * skipped agent and a refused run both reach the end without another call.
+ */
+function gateNode(agent, position) {
+  return {
+    id: `gate-${agent}`,
+    name: `Ask ${agent}?`,
+    type: "n8n-nodes-base.if",
+    typeVersion: 2.2,
+    position,
+    parameters: {
+      conditions: {
+        options: { caseSensitive: true, leftValue: "", typeValidation: "strict", version: 2 },
+        combinator: "and",
+        conditions: [{
+          id: `is-asking-${agent}`,
+          operator: { type: "string", operation: "equals" },
+          leftValue: "={{ $json.state }}",
+          rightValue: "asking",
+        }],
+      },
+      options: {},
+    },
+  };
+}
+
 function collectNode(agent, from, position) {
   return {
     id: `collect-${agent}`,
@@ -126,6 +163,27 @@ function collectNode(agent, from, position) {
 /** The model every agent is asked with, named once. */
 export const MODEL = "gpt-4o-mini";
 
+/**
+ * Which stored credential the HTTP nodes use.
+ *
+ * Measured on 2026-09-05, on the first live run: naming only the credential
+ * TYPE is not enough. n8n answered "Credentials not found" at the first agent
+ * and the run stopped before any model call — free, and a good way to find out.
+ *
+ * The id is a pointer, not a secret: the key itself never leaves the n8n
+ * instance, and drift detection masks this field precisely because it
+ * legitimately differs per instance. The NAME is compared, so a workflow
+ * pointed at a different account is drift rather than a surprise.
+ *
+ * Both come from the environment when it says so, and fall back to the values
+ * of the instance this repository deploys to, so that regenerating without a
+ * shell full of variables produces the same bytes.
+ */
+export const OPENAI_CREDENTIAL = {
+  id: process.env.N8N_OPENAI_CREDENTIAL_ID ?? "fcCTZNZiEZhLkGHD",
+  name: process.env.N8N_OPENAI_CREDENTIAL_NAME ?? "OpenAI account",
+};
+
 export function buildWorkflow(runtime, { name = "AI SRE — incident investigation" } = {}) {
   const code = (id, nodeName, body, position) => ({
     id,
@@ -154,26 +212,40 @@ export function buildWorkflow(runtime, { name = "AI SRE — incident investigati
 
   let previous = "Assemble";
   let x = 440;
+  const gates = [];
   AGENT_ORDER.forEach((agent, i) => {
     const next = AGENT_ORDER[i + 1] ?? null;
+    const gate = `Ask ${agent}?`;
     const ask = `Ask ${agent}`;
     const collect = `Collect ${agent}`;
     const record = `Record ${agent}`;
 
-    nodes.push(askNode(agent, [x, 0]));
-    nodes.push(collectNode(agent, previous, [x + 200, 0]));
-    nodes.push(code(`record-${agent}`, record, recordNodeCode(agent, next), [x + 400, 0]));
+    nodes.push(gateNode(agent, [x, 0]));
+    nodes.push(askNode(agent, [x + 180, 0]));
+    nodes.push(collectNode(agent, previous, [x + 360, 0]));
+    nodes.push(code(`record-${agent}`, record, recordNodeCode(agent, next), [x + 540, 0]));
 
-    connections[previous] = { main: [[{ node: ask, type: "main", index: 0 }]] };
+    connections[previous] = { main: [[{ node: gate, type: "main", index: 0 }]] };
+    // Output 0 is true, output 1 is false. The false branch is filled in below,
+    // once the node it should jump to is known.
+    connections[gate] = { main: [[{ node: ask, type: "main", index: 0 }], []] };
     connections[ask] = { main: [[{ node: collect, type: "main", index: 0 }]] };
     connections[collect] = { main: [[{ node: record, type: "main", index: 0 }]] };
 
+    gates.push(gate);
     previous = record;
-    x += 600;
+    x += 740;
   });
 
   nodes.push(code("conclude", "Conclude", concludeNodeCode(), [x, 0]));
   connections[previous] = { main: [[{ node: "Conclude", type: "main", index: 0 }]] };
+
+  // Each gate's false branch jumps to the NEXT gate, so several skips in a row
+  // still reach the end; the last one goes straight to Conclude.
+  gates.forEach((gate, i) => {
+    const onward = gates[i + 1] ?? "Conclude";
+    connections[gate].main[1] = [{ node: onward, type: "main", index: 0 }];
+  });
 
   return { name, nodes, connections, settings: { executionOrder: "v1" } };
 }

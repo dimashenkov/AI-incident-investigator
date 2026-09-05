@@ -550,10 +550,18 @@ function checkMutations() {
       } else {
         if (json === null) {
           outcome = { kind: "unresolved", detail: `${m.id} (no readable report)` };
-        } else if (namedTestFailed(json, m.mustFail)) {
-          outcome = { kind: "caught" };
         } else {
-          outcome = { kind: "survived", detail: `${m.id}: "${m.mustFail}" did not fail` };
+          const verdict = namedTestFailed(json, m.mustFail);
+          if (verdict === null) {
+            // Not "it passed" — the report does not contain that test at all,
+            // which is what a run that did not finish looks like.
+            outcome = { kind: "unresolved",
+              detail: `${m.id} (the report does not contain "${m.mustFail}"; the run may not have finished)` };
+          } else if (verdict) {
+            outcome = { kind: "caught" };
+          } else {
+            outcome = { kind: "survived", detail: `${m.id}: "${m.mustFail}" did not fail` };
+          }
         }
       }
     } finally {
@@ -572,12 +580,23 @@ function checkMutations() {
 
 /** Did the test with this name fail in the report? A test that vanished is not a pass. */
 export function namedTestFailed(report, name) {
+  /*
+   * Three states, in the checker that exists to enforce them.
+   *
+   * This returned `false` both for "the test ran and passed" and for "the test
+   * is not in this report at all" — and on 2026-09-05 the second happened: a
+   * partial report from a run that did not finish reported a mutation as
+   * SURVIVING. The one message that must never be produced by not looking.
+   *
+   * `null` means the named test was not found. The caller reports that as
+   * unresolved, which is what it is.
+   */
   for (const file of report.testResults ?? []) {
     for (const t of file.assertionResults ?? []) {
       if (t.title === name || t.fullName?.endsWith(name)) return t.status === "failed";
     }
   }
-  return false;
+  return null;
 }
 
 
@@ -646,6 +665,19 @@ export const LIMITATIONS = [
   // opens it, and what it does to a 350 KB Code node, nothing here has tried —
   // and nothing here can, because it is a browser.
   "that the n8n editor can open a workflow this size — the API stores and returns 2.25 MB, measured; the editor is untried",
+  // Codex, 2026-09-05, after the first live run: "the schema allows 0 to 1, and
+  // concludeIncident copies the model's number without checking the prompt's
+  // bands, the agreement count, directness, contradictions, or the 0.95
+  // ceiling. The displayed confidence is an unestablished model assertion."
+  //
+  // He is right, and the fix is not a second number computed here — that would
+  // be this repository's own recurring defect: answering a claim nothing checks
+  // with another claim nothing checks. A confidence derived from counting
+  // agreeing findings would look enforced and would measure the counting.
+  //
+  // So it is said instead: the number is what the model said, and a reader who
+  // takes it for a measurement is taking it for something it is not.
+  "that a confidence figure means anything beyond what the model asserted — the prompt asks for bands and nothing enforces them",
   "that every diff went through external review before commit",
   "that each review objection was recorded verbatim rather than paraphrased",
   "that memory was written after each step",

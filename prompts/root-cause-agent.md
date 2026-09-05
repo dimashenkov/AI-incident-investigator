@@ -80,6 +80,26 @@ honest silence, because somebody will act on it.
 argues against your conclusion, it still belongs in your `findings`. Leaving it
 out is how a diagnosis comes to look stronger than it is.
 
+**Confidence is a reading of the evidence, not a habit of caution.** Measured on
+2026-09-05, on the first live run: nine findings from three agents all pointed
+at the same terminated container, none contradicted it, and the answer came back
+at 0.6. Nothing in this file was wrong — but every rule about confidence pointed
+downwards, and a text that only ever says "lower it" is read as "stay low".
+
+So, in both directions:
+
+| What you are looking at | Where the number belongs |
+|---|---|
+| several agents, agreeing, and a direct observation of the cause | **0.8 to 0.95** |
+| one agent with a direct observation, the others silent | 0.6 to 0.8 |
+| circumstantial evidence only — nothing observed the cause itself | 0.4 to 0.6 |
+| agents disagree, or a source could not be read | **below 0.4**, and say why |
+| nothing supports any cause | `INSUFFICIENT_EVIDENCE` and `0` |
+
+**0.95 is the ceiling, not 1.0.** A conclusion drawn from what three agents
+happened to look at is never certain, and a number that says it is has stopped
+being a reading.
+
 **Lower the confidence when evidence conflicts.** Two agents disagreeing is not
 the same situation as two agreeing, and the number must show it.
 
@@ -103,6 +123,7 @@ would still point there if you had not already picked the answer.
 - `cause-code-from-the-list`
 - `every-answer-carries-five-fields`
 - `record-contradicting-evidence`
+- `confidence-reads-both-directions`
 - `lower-confidence-on-conflict`
 - `cite-only-what-agents-reported`
 - `error-is-not-no-data`
