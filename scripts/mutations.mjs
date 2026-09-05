@@ -141,7 +141,7 @@ export const MUTATIONS = [
     // An invalid agent result inside a valid incident passes the incident check
     // and poisons everything downstream of it.
     id: "agent-result-attached-unchecked",
-    file: "src/core/assemble.ts",
+    file: "src/core/merge.ts",
     from: '  const r = validate("agent-result", result);',
     to: '  const r = { state: "valid" };',
     mustFail: "says the result was invalid, not that attaching broke the incident",
@@ -465,7 +465,7 @@ export const MUTATIONS = [
     // Grok, 2026-09-05: a reply from another incident, citing a path that
     // resolves to nothing, was recorded as a completed agent turn.
     id: "reply-recorded-without-belonging-to-the-incident",
-    file: "src/core/assemble.ts",
+    file: "src/core/merge.ts",
     from: "  const bound = resultBelongsHere(incident, result as Record<string, unknown>);",
     to: "  const bound = null;",
     mustFail: "refuses a finding citing a path that resolves to nothing in that observation",
@@ -474,7 +474,7 @@ export const MUTATIONS = [
     // Codex, 2026-09-05: nothing updated the incident's own verdict, so the one
     // answer the system exists to produce had no way to become the incident's.
     id: "verdict-never-reaches-the-incident",
-    file: "src/core/assemble.ts",
+    file: "src/core/merge.ts",
     from: '    status: "diagnosed",',
     to: '    status: "investigating",',
     mustFail: "writes the cause, the confidence and the evidence onto the incident",
