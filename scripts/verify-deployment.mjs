@@ -72,7 +72,7 @@ async function main() {
     process.exit(2);
   }
 
-  const { workflow } = generate();
+  const { workflow } = await generate();
   const headers = { "X-N8N-API-KEY": KEY };
 
   const configuredId = process.env.N8N_WORKFLOW_ID;

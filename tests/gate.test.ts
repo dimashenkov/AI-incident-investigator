@@ -11,7 +11,8 @@
  *   · die on a check that throws, and report nothing at all
  */
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync, mkdtempSync, existsSync, symlinkSync, realpathSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 /**
@@ -37,7 +38,7 @@ function collectTests(dir: string): string[] {
 }
 // Plain .mjs — the same file node runs in production, so there are no types.
 // @ts-expect-error
-import { runGate, format, CHECKS, CHILD_MARKER, LIMITATIONS, DEBT, SECRET_SHAPED, readFreshReport, interpretVitestReport, interpretScripts, findSecretShaped, parsePorcelainZ, readCurrentChunk, namedTestFailed } from "../scripts/acceptance-gate.mjs";
+import { runGate, format, restoreInterruptedMutation, CHECKS, CHILD_MARKER, LIMITATIONS, DEBT, SECRET_SHAPED, readFreshReport, interpretVitestReport, interpretScripts, findSecretShaped, parsePorcelainZ, readCurrentChunk, namedTestFailed } from "../scripts/acceptance-gate.mjs";
 // @ts-expect-error
 import { MUTATIONS } from "../scripts/mutations.mjs";
 
@@ -471,3 +472,146 @@ describe("a stale report is not a result", () => {
     expect(json).toBe(null);
   });
 });
+
+describe("what a killed mutation run leaves behind", () => {
+  /*
+   * Measured on 2026-09-05: a run was interrupted, the prompt file stayed
+   * mutated — telling the model a hypothesis code is whatever seems right,
+   * the exact defect that had already wasted a paid run — and the tree stayed
+   * broken until a later test happened to notice. The finally block does not
+   * run when the process is killed, so the guarantee lives in a file instead.
+   */
+  const record = (dir: string, file: string, original: string, mutated = "the mutated text") => {
+    const path = join(dir, "in-flight.json");
+    writeFileSync(path, JSON.stringify({ id: "some-mutation", file, original, mutated }));
+    return path;
+  };
+
+  it("puts the file back and says which mutation left it broken", () => {
+    const dir = mkdtempSync(join(tmpdir(), "gate-"));
+    const target = join(dir, "prompt.md");
+    writeFileSync(target, "the mutated text");
+    const path = record(dir, target, "the original text");
+
+    const r = restoreInterruptedMutation(path, dir);
+    expect(r?.state).toBe("restored");
+    expect(r?.id).toBe("some-mutation");
+    expect(readFileSync(target, "utf8")).toBe("the original text");
+    expect(existsSync(path), "the record must go, or every later run repeats the repair").toBe(false);
+  });
+
+  it("records the file before it damages it, which is the only ordering that survives a kill", () => {
+    /*
+     * Asserted against the source, because the property is an ORDERING and the
+     * thing that violates it is a process that never reaches its next line.
+     * A mutation for this survived every test written the other way: handing
+     * restoreInterruptedMutation a record built by hand exercises the reading
+     * side and says nothing about when the record is written.
+     */
+    const src = readFileSync(new URL("../scripts/acceptance-gate.mjs", import.meta.url).pathname, "utf8");
+    const records = src.indexOf("writeFileSync(IN_FLIGHT, JSON.stringify(");
+    const damages = src.indexOf("writeFileSync(target, original.replace(m.from, m.to))");
+    expect(records, "nothing records the in-flight mutation").toBeGreaterThan(-1);
+    expect(damages, "nothing applies a mutation; this test is about a thing that no longer happens").toBeGreaterThan(-1);
+    expect(records, "the record is written after the file is broken, so a kill leaves no trace")
+      .toBeLessThan(damages);
+  });
+
+  it("refuses to touch a file someone edited after the interruption", () => {
+    /*
+     * Codex, 2026-09-05, High: it used to overwrite whenever the file differed
+     * from the recorded original, so a developer who fixed the file by hand and
+     * kept working lost that work to a repair announcing itself as a repair.
+     */
+    const dir = mkdtempSync(join(tmpdir(), "gate-"));
+    const target = join(dir, "prompt.md");
+    writeFileSync(target, "the text somebody wrote afterwards");
+    const path = record(dir, target, "the original text");
+
+    const r = restoreInterruptedMutation(path, dir);
+    expect(r?.state).toBe("refused");
+    expect(readFileSync(target, "utf8"), "their work must survive").toBe("the text somebody wrote afterwards");
+    expect(existsSync(path), "the record stays, so the next run says it again").toBe(true);
+    expect(String(r?.detail)).toContain("by hand");
+  });
+
+  it("refuses a record naming a path outside the repository", () => {
+    // A stale or forged record must not be a way to overwrite any writable file
+    // on the machine. Refusing by path is checkable; trusting it is not.
+    const dir = mkdtempSync(join(tmpdir(), "gate-"));
+    const outside = join(dir, "somebody-elses.txt");
+    writeFileSync(outside, "not ours");
+    const path = record(dir, outside, "whatever");
+    // The root is a sibling directory, so the recorded path is genuinely outside it.
+    const r = restoreInterruptedMutation(path, mkdtempSync(join(tmpdir(), "root-")));
+    expect(r?.state).toBe("refused");
+    expect(String(r?.detail)).toContain("outside this repository");
+    expect(readFileSync(outside, "utf8")).toBe("not ours");
+  });
+
+  it("refuses a symlink inside the repository that points outside it", () => {
+    /*
+     * Codex, 2026-09-05: comparing the resolved path STRING is not comparing
+     * the real file. readFileSync and writeFileSync follow a link, so a record
+     * naming one passed the check and would have restored a file outside.
+     */
+    const root = mkdtempSync(join(tmpdir(), "root-"));
+    const elsewhere = mkdtempSync(join(tmpdir(), "elsewhere-"));
+    const outside = join(elsewhere, "not-ours.md");
+    writeFileSync(outside, "the mutated text");
+
+    const link = join(root, "looks-like-ours.md");
+    symlinkSync(outside, link);
+
+    const path = join(root, "in-flight.json");
+    writeFileSync(path, JSON.stringify({ id: "some-mutation", file: link, original: "ours", mutated: "the mutated text" }));
+
+    const r = restoreInterruptedMutation(path, root);
+    expect(r?.state).toBe("refused");
+    expect(readFileSync(outside, "utf8"), "the file outside must be untouched").toBe("the mutated text");
+    // Naming the RESOLVED file, not the link. Asserting only "outside this
+    // repository" passed while the check still judged the path string: on this
+    // machine a temporary directory is itself a symlink, so the link's own path
+    // already looked outside, and the mutation survived a test that read as
+    // though it covered this.
+    expect(String(r?.detail), "the refusal must name the file the link resolves to")
+      .toContain(realpathSync(outside));
+  });
+
+  it("refuses a record naming a file that is not there, rather than resolving it away", () => {
+    // realpathSync throws on a missing file, and that is the right answer: a
+    // record describing nothing must not become permission to create it.
+    const root = mkdtempSync(join(tmpdir(), "root-"));
+    const path = join(root, "in-flight.json");
+    writeFileSync(path, JSON.stringify({ id: "x", file: join(root, "gone.md"), original: "a", mutated: "b" }));
+    const r = restoreInterruptedMutation(path, root);
+    expect(r?.state).toBe("refused");
+    expect(String(r?.detail)).toContain("cannot resolve");
+  });
+
+  it("says nothing happened when nothing was interrupted", () => {
+    expect(restoreInterruptedMutation(join(mkdtempSync(join(tmpdir(), "gate-")), "absent.json"))).toBeNull();
+  });
+
+  it("keeps a file that is already correct, and still clears the record", () => {
+    const dir = mkdtempSync(join(tmpdir(), "gate-"));
+    const target = join(dir, "prompt.md");
+    writeFileSync(target, "the original text");
+    const path = record(dir, target, "the original text");
+    const r = restoreInterruptedMutation(path, dir);
+    expect(r?.state).toBe("already-clean");
+    expect(existsSync(path)).toBe(false);
+  });
+
+  it("refuses to act on a record it cannot read, rather than guessing", () => {
+    // A half-written record is not permission to overwrite a source file with
+    // whatever could be parsed out of it.
+    const dir = mkdtempSync(join(tmpdir(), "gate-"));
+    const path = join(dir, "in-flight.json");
+    writeFileSync(path, "{ not json");
+    expect(restoreInterruptedMutation(path, dir)?.state).toBe("unreadable");
+    writeFileSync(path, JSON.stringify({ id: "x" }));
+    expect(restoreInterruptedMutation(path, dir)?.state).toBe("unreadable");
+  });
+});
+

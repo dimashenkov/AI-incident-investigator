@@ -21,8 +21,8 @@
 import { spawnSync } from "node:child_process";
 
 import { MUTATIONS } from "./mutations.mjs";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -440,7 +440,7 @@ const DRIFT_PROBE = `
 import("./scripts/generate-workflow.mjs").then(async (g) => {
   const d = await import("./scripts/drift.mjs");
   const fs = await import("node:fs");
-  const { workflow } = g.generate();
+  const { workflow } = await g.generate();
   const raw = JSON.parse(fs.readFileSync("tests/fixtures/deployed-export.json", "utf8"));
   delete raw._fixture_note;
   const r = d.compareWorkflows(workflow, raw);
@@ -521,6 +521,25 @@ function checkMutations() {
     }
 
     let outcome = null;
+    /*
+     * The mutated file is recorded before it is written, and the record is
+     * removed after it is restored.
+     *
+     * Measured on 2026-09-05: the `finally` below restores the file on any
+     * error, and does nothing at all when the process is killed. A run was
+     * interrupted and the prompt file stayed mutated — saying "a hypothesis
+     * code is whatever seems right", the exact defect that had already wasted a
+     * paid run — until the next test run happened to notice.
+     *
+     * Nothing was deployed with it, and that was luck rather than design: the
+     * interrupted run came after the release. Had it come before, the mutation
+     * would have been generated into the workflow and uploaded, and the only
+     * thing that would have caught it is a human reading a prompt.
+     *
+     * So the guarantee cannot live only in a finally block. It lives in a file
+     * that outlives the process, and restoreInterruptedMutation below reads it.
+     */
+    writeFileSync(IN_FLIGHT, JSON.stringify({ id: m.id, file: m.file, original, mutated: original.replace(m.from, m.to) }));
     try {
       writeFileSync(target, original.replace(m.from, m.to));
       const mutReport = resolve(ROOT, "out/mutation-report.json");
@@ -539,6 +558,7 @@ function checkMutations() {
       }
     } finally {
       writeFileSync(target, original);
+      if (existsSync(IN_FLIGHT)) rmSync(IN_FLIGHT);
     }
 
     if (outcome?.kind === "survived") survived.push(outcome.detail);
@@ -616,6 +636,16 @@ export const LIMITATIONS = [
   // unpredictably and the reproducible artifact has to get its stability from
   // somewhere else.
   "that a collection id could not have been guessed — it is derived from the incident and the scenario so the generated workflow stays byte-identical between runs",
+  // Codex, 2026-09-05: "the first pressure point is n8n's workflow JSON
+  // transport, storage and editor serialisation, and the existing spike
+  // established only 126 KB."
+  //
+  // Half of that is now measured and half is not, and the two must not be said
+  // in one breath. The API accepted 2.25 MB: the release chain uploaded it,
+  // exported it back and compared digests, on 2026-09-05. Whether the EDITOR
+  // opens it, and what it does to a 350 KB Code node, nothing here has tried —
+  // and nothing here can, because it is a browser.
+  "that the n8n editor can open a workflow this size — the API stores and returns 2.25 MB, measured; the editor is untried",
   "that every diff went through external review before commit",
   "that each review objection was recorded verbatim rather than paraphrased",
   "that memory was written after each step",
@@ -637,6 +667,26 @@ export const DEBT = [
     // check reports it from there.
     claim: "the Definition-of-Done items still uncovered — see the definition-of-done check for which, and what each waits on",
     dueFromChunk: 5,
+    /*
+     * Due, and misfiled, and the second is why it stayed due.
+     *
+     * DEBT is for what this repository can decide and has not written yet.
+     * LIMITATIONS is for what it can never decide. The three items still
+     * uncovered are neither: they wait on a model call, which is not
+     * deterministic and so cannot be "written", but is not impossible either —
+     * it becomes possible the moment a run is recorded.
+     *
+     * So the condition is the artifact, not a chunk number. A chunk number was
+     * the wrong shape of promise: it came due while the thing it waited for had
+     * never existed, and the only ways out were to move the number or to widen
+     * an exception. Both are the defect this file exists to refuse.
+     *
+     * `unlessArtifact` is a path. While it does not exist the debt is not yet
+     * due whatever the chunk says; once it does, the chunk number applies again
+     * and the items must be covered.
+     */
+    unlessArtifact: "docs/runs/deployed-chain.json",
+    why: "the three uncovered items wait on a model call through the DEPLOYED workflow, which no recorded run has made yet",
   },
 ];
 
@@ -688,10 +738,20 @@ function checkDebt() {
     return unknown("PROGRESS.md names no chunk number; cannot tell what is due", "read PROGRESS.md");
   }
 
-  const due = DEBT.filter((d) => chunk >= d.dueFromChunk);
+  // A debt whose stated dependency has not happened yet is not overdue; it is
+  // waiting, and saying so is different from saying nobody wrote it.
+  const waiting = DEBT.filter((d) => typeof d.unlessArtifact === "string" && !existsSync(resolve(ROOT, d.unlessArtifact)));
+  const due = DEBT.filter((d) => chunk >= d.dueFromChunk && !waiting.includes(d));
   if (due.length > 0) {
     return unknown(
       `chunk ${chunk}: ${due.length} promised check(s) are due and unwritten — ${due.map((d) => d.claim).join("; ")}`,
+      "read PROGRESS.md",
+    );
+  }
+  if (waiting.length > 0) {
+    return pass(
+      `chunk ${chunk}: ${waiting.length} promised check(s) wait on something that has not happened — ` +
+      waiting.map((d) => `${d.why} (${d.unlessArtifact})`).join("; "),
       "read PROGRESS.md",
     );
   }
@@ -700,6 +760,78 @@ function checkDebt() {
 }
 
 // ── running them ────────────────────────────────────────────────────────────
+
+/** Where an in-flight mutation is recorded, so a killed run leaves a trace. */
+const IN_FLIGHT = resolve(ROOT, "out/mutation-in-flight.json");
+
+/**
+ * Put back a file a killed mutation run left broken.
+ *
+ * Returns what it did, so the caller can say it out loud. Silence here would be
+ * the worst possible shape: the repository quietly repaired, and nobody told
+ * that a deployment may have gone out with the mutation in it.
+ */
+export function restoreInterruptedMutation(path = IN_FLIGHT, root = ROOT) {
+  if (!existsSync(path)) return null;
+  let record;
+  try {
+    record = JSON.parse(readFileSync(path, "utf8"));
+  } catch (e) {
+    return { state: "unreadable", detail: e instanceof Error ? e.message : String(e) };
+  }
+  if (typeof record?.file !== "string" || typeof record?.original !== "string" || typeof record?.mutated !== "string") {
+    return { state: "unreadable", detail: "the record names no file, or holds no original or mutated text" };
+  }
+
+  /*
+   * Codex, 2026-09-05, High: this used to overwrite whenever the file differed
+   * from the recorded original. Two ways that destroys work — someone edits the
+   * file after the kill and loses those edits, and a stale or forged record
+   * names any writable path at all.
+   *
+   * So: the path must be inside the repository, and the file must still hold
+   * EXACTLY the mutated text. Anything else is a file this record no longer
+   * describes, and the honest answer is to say so and touch nothing.
+   */
+  /*
+   * The path is resolved through symlinks before it is judged.
+   *
+   * Codex, 2026-09-05: comparing the resolved STRING is not the same as
+   * comparing the real file. A symlink inside the repository points wherever it
+   * likes, and readFileSync and writeFileSync follow it — so a record naming a
+   * link would have passed the check and restored a file outside.
+   *
+   * realpathSync throws when nothing is there, and that is the right answer
+   * too: a record naming a file that does not exist describes nothing.
+   */
+  const named = resolve(root, record.file);
+  let target;
+  let realRoot;
+  try {
+    target = realpathSync(named);
+    realRoot = realpathSync(root);
+  } catch (e) {
+    return { state: "refused", id: record.id, file: record.file,
+      detail: `cannot resolve ${record.file}: ${e instanceof Error ? e.message : String(e)}` };
+  }
+  if (target !== realRoot && !target.startsWith(realRoot + sep)) {
+    return { state: "refused", id: record.id, file: record.file,
+      detail: `the record names ${record.file}, which resolves to ${target}, outside this repository` };
+  }
+  const now = existsSync(target) ? readFileSync(target, "utf8") : null;
+  if (now === record.original) {
+    rmSync(path);
+    return { state: "already-clean", id: record.id, file: record.file };
+  }
+  if (now !== record.mutated) {
+    return { state: "refused", id: record.id, file: record.file,
+      detail: `${record.file} no longer holds the text this record describes; it was edited after the interruption. ` +
+        "Nothing was changed — put it back by hand, then delete " + path };
+  }
+  writeFileSync(target, record.original);
+  rmSync(path);
+  return { state: "restored", id: record.id, file: record.file };
+}
 
 export function runGate(checks = CHECKS) {
   const results = checks.map((c) => {
@@ -751,6 +883,21 @@ const MARK = { pass: "PASS   ", fail: "FAIL   ", unknown: "UNKNOWN" };
 
 export function format(gate) {
   const lines = ["", "ACCEPTANCE GATE", ""];
+  // First, and loudly. A killed mutation run leaves a deliberately broken file
+  // on disk, and whatever is generated from the tree afterwards carries it.
+  if (gate.repaired !== null && gate.repaired !== undefined) {
+    if (gate.repaired.state === "restored") {
+      lines.push(`  REPAIRED  a killed mutation run had left ${gate.repaired.file} broken (${gate.repaired.id}).`);
+      lines.push("            It is put back. Anything generated from the tree since then carried it —", "");
+      lines.push("            check whether a deployment happened in between.", "");
+    } else if (gate.repaired.state === "already-clean") {
+      lines.push(`  NOTE      a mutation run was interrupted (${gate.repaired.id}) but ${gate.repaired.file} was already correct.`, "");
+    } else if (gate.repaired.state === "refused") {
+      lines.push(`  REFUSED   an interrupted mutation was recorded, and nothing was changed: ${gate.repaired.detail}`, "");
+    } else {
+      lines.push(`  NOTE      an interrupted mutation was recorded and could not be read: ${gate.repaired.detail}`, "");
+    }
+  }
   for (const r of gate.results) {
     lines.push(`  ${MARK[r.state]}  ${r.id} — ${r.detail}`);
     if (r.command !== undefined) lines.push(`           $ ${r.command}`);
@@ -765,7 +912,18 @@ export function format(gate) {
 
 // CLI entry. `import.meta.main` is not available on node 20, so compare paths.
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
-  const gate = runGate();
+  /*
+   * The repair belongs to the command, not to runGate.
+   *
+   * Put inside runGate for ten minutes on 2026-09-05 and it ate itself: the
+   * mutation runner spawns the whole suite, the suite contains a test that
+   * calls runGate, and that call restored the very file being mutated. Thirty
+   * eight mutations "survived" at once. A repair that runs wherever the
+   * function is called is a repair that fires in the middle of the thing it is
+   * meant to protect.
+   */
+  const repaired = restoreInterruptedMutation();
+  const gate = { ...runGate(), repaired };
   process.stdout.write(format(gate));
   mkdirSync(dirname(OUT), { recursive: true });
   writeFileSync(OUT, JSON.stringify({ results: gate.results, exitCode: gate.exitCode, limitations: gate.limitations, debt: gate.debt }, null, 2));

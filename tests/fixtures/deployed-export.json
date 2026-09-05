@@ -1,14 +1,14 @@
 {
   "id": "49T3pwFvfumqTdo7",
-  "name": "AI SRE — incident validation",
+  "name": "AI SRE — incident investigation",
   "description": null,
   "active": false,
   "activeVersionId": null,
   "createdAt": "2026-09-04T13:44:43.103Z",
-  "updatedAt": "2026-09-05T08:26:23.712Z",
+  "updatedAt": "2026-09-05T16:12:21.194Z",
   "isArchived": false,
-  "versionId": "43558b4f-cd5a-4d6d-9c7d-67e5c488541e",
-  "versionCounter": 8,
+  "versionId": "400afe54-7b13-474c-9f1c-f4b4015f983f",
+  "versionCounter": 9,
   "sourceWorkflowId": null,
   "triggerCount": 0,
   "nodes": [
@@ -26,23 +26,253 @@
         "httpMethod": "POST",
         "responseMode": "lastNode"
       },
-      "webhookId": "a3f6be11-c266-49db-9ddc-4902dc1d6f6b"
+      "webhookId": "d1678f1a-7ee0-4aac-8160-b9fba0939158"
     },
     {
-      "id": "validate-core",
-      "name": "Validate",
+      "id": "assemble",
+      "name": "Assemble",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        260,
+        220,
         0
       ],
       "parameters": {
         "language": "javaScript",
         "mode": "runOnceForAllItems",
         "jsCode": {
-          "__sha256": "0cc64a2b88072b5bf98a43829546f7aa9001cd3312430a82eea5117715ae4a16",
-          "__bytes": 302235
+          "__sha256": "8f66b9a4b9602e54421bf7abe0685a99221394cddb16ddfdcd430d7bfc06b513",
+          "__bytes": 358002
+        }
+      }
+    },
+    {
+      "id": "ask-kubernetes",
+      "name": "Ask kubernetes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"gpt-4o-mini\", temperature: 0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "collect-kubernetes",
+      "name": "Collect kubernetes",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        640,
+        0
+      ],
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify(Object.assign({}, $('Assemble').item.json, { reply: (function () { try { return JSON.parse($json.choices[0].message.content); } catch (e) { return null; } })() })) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "record-kubernetes",
+      "name": "Record kubernetes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        0
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "mode": "runOnceForAllItems",
+        "jsCode": {
+          "__sha256": "3c128b8b8a3853dc01d2c2f97631384c389c38fc17e2c956f72e5ee30843c8a9",
+          "__bytes": 358112
+        }
+      }
+    },
+    {
+      "id": "ask-logs",
+      "name": "Ask logs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1040,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"gpt-4o-mini\", temperature: 0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "collect-logs",
+      "name": "Collect logs",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1240,
+        0
+      ],
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify(Object.assign({}, $('Record kubernetes').item.json, { reply: (function () { try { return JSON.parse($json.choices[0].message.content); } catch (e) { return null; } })() })) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "record-logs",
+      "name": "Record logs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        0
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "mode": "runOnceForAllItems",
+        "jsCode": {
+          "__sha256": "3370dba21a329717a3e4f17381c4aa46b49e08ed9428816be51241dc988d01bc",
+          "__bytes": 358109
+        }
+      }
+    },
+    {
+      "id": "ask-metrics",
+      "name": "Ask metrics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1640,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"gpt-4o-mini\", temperature: 0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "collect-metrics",
+      "name": "Collect metrics",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1840,
+        0
+      ],
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify(Object.assign({}, $('Record logs').item.json, { reply: (function () { try { return JSON.parse($json.choices[0].message.content); } catch (e) { return null; } })() })) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "record-metrics",
+      "name": "Record metrics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2040,
+        0
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "mode": "runOnceForAllItems",
+        "jsCode": {
+          "__sha256": "01a4f1a845eff37bb9a76090025aec98beb7935a2c1ccca9e7e712d01f61ddd6",
+          "__bytes": 358115
+        }
+      }
+    },
+    {
+      "id": "ask-root-cause",
+      "name": "Ask root-cause",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2240,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"gpt-4o-mini\", temperature: 0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "collect-root-cause",
+      "name": "Collect root-cause",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2440,
+        0
+      ],
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify(Object.assign({}, $('Record metrics').item.json, { reply: (function () { try { return JSON.parse($json.choices[0].message.content); } catch (e) { return null; } })() })) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "record-root-cause",
+      "name": "Record root-cause",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        0
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "mode": "runOnceForAllItems",
+        "jsCode": {
+          "__sha256": "a0466269ea3e18ac0fd9d231cc3ddd6b2c6582870f74c4bad2bff53b973fe0e5",
+          "__bytes": 358110
+        }
+      }
+    },
+    {
+      "id": "conclude",
+      "name": "Conclude",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2840,
+        0
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "mode": "runOnceForAllItems",
+        "jsCode": {
+          "__sha256": "94aab6b550701f241d5612542834bdafb2a30b14ca29da96c891db63c71567ce",
+          "__bytes": 357397
         }
       }
     }
@@ -52,7 +282,150 @@
       "main": [
         [
           {
-            "node": "Validate",
+            "node": "Assemble",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assemble": {
+      "main": [
+        [
+          {
+            "node": "Ask kubernetes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask kubernetes": {
+      "main": [
+        [
+          {
+            "node": "Collect kubernetes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect kubernetes": {
+      "main": [
+        [
+          {
+            "node": "Record kubernetes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record kubernetes": {
+      "main": [
+        [
+          {
+            "node": "Ask logs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask logs": {
+      "main": [
+        [
+          {
+            "node": "Collect logs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect logs": {
+      "main": [
+        [
+          {
+            "node": "Record logs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record logs": {
+      "main": [
+        [
+          {
+            "node": "Ask metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask metrics": {
+      "main": [
+        [
+          {
+            "node": "Collect metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect metrics": {
+      "main": [
+        [
+          {
+            "node": "Record metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record metrics": {
+      "main": [
+        [
+          {
+            "node": "Ask root-cause",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask root-cause": {
+      "main": [
+        [
+          {
+            "node": "Collect root-cause",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect root-cause": {
+      "main": [
+        [
+          {
+            "node": "Record root-cause",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record root-cause": {
+      "main": [
+        [
+          {
+            "node": "Conclude",
             "type": "main",
             "index": 0
           }

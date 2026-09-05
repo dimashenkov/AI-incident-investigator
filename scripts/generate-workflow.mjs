@@ -14,7 +14,7 @@
  */
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 
-import { buildCore } from "./build-core.mjs";
+import { buildRuntime, assembleNodeCode, recordNodeCode, concludeNodeCode, AGENT_ORDER } from "./workflow-runtime.mjs";
 import { createHash } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,70 +39,118 @@ export const WEBHOOK_PATH = "ai-sre-incident";
  * undefined and `module` carries only an empty exports (measured, see
  * docs/n8n-spike.md §9). So the CommonJS artifact is handed its own.
  */
-export function buildNodeCode(core) {
-  return `// GENERATED — do not edit. Regenerate with: node scripts/generate-workflow.mjs
-const module = { exports: {} };
-const exports = module.exports;
-(function (module, exports) {
-${core}
-})(module, exports);
-const validators = module.exports;
-
-// Every item, not merely the first.
-//
-// Codex, chunk 1 parts 1-2: reading $input.first() threw on an empty input and
-// silently discarded every item after the first, in a node configured to run
-// once for ALL items. Dropping items quietly is the same defect as absence
-// reading as consent: nothing reports what was never looked at.
-//
-// No items in means no results out — an empty run is not an error, and it is
-// not a pass either. It is simply nothing, and it says so by returning nothing.
-const items = $input.all();
-
-return items.map((item, index) => {
-  const body = (item.json && item.json.body) || {};
-  const target = body.schema || "incident";
-  const validator = validators["validate_" + String(target).replace(/-/g, "_")];
-
-  // Three states, never two: a schema nobody has is "unchecked", not "invalid".
-  // Collapsing them would report a typo'd schema name as a clean rejection.
-  if (typeof validator !== "function") {
-    return { json: { index, state: "unchecked", reason: "no such schema: " + target } };
-  }
-
-  const ok = validator(body.data);
-  if (ok) return { json: { index, state: "valid", schema: target } };
-  return { json: { index, state: "invalid", schema: target, errors: (validator.errors || []).map(function (e) {
-    return { where: e.instancePath === "" ? "(root)" : e.instancePath, message: e.message || "failed" };
-  }) } };
-});
-`;
+/**
+ * The node that asks one agent, through the OpenAI credential in n8n.
+ *
+ * The prompt and the payload come from the item, never from this file. A node
+ * that carried its own prompt would be a second copy of what the context
+ * assembler produced, and the isolation checks would be checking something
+ * other than what was sent.
+ *
+ * temperature 0 and a fixed model, because a run that cannot be repeated cannot
+ * be compared with the previous one, and comparison is the only thing that
+ * makes a second run worth its cost.
+ */
+function askNode(agent, position) {
+  return {
+    id: `ask-${agent}`,
+    name: `Ask ${agent}`,
+    type: "n8n-nodes-base.httpRequest",
+    typeVersion: 4.2,
+    position,
+    parameters: {
+      method: "POST",
+      url: "https://api.openai.com/v1/chat/completions",
+      authentication: "predefinedCredentialType",
+      nodeCredentialType: "openAiApi",
+      sendBody: true,
+      specifyBody: "json",
+      jsonBody: "={{ JSON.stringify({ model: " + JSON.stringify(MODEL) + ", temperature: 0, "
+        + "response_format: { type: 'json_object' }, messages: [ "
+        + "{ role: 'system', content: $json.prompt }, "
+        + "{ role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
+      options: {},
+    },
+  };
 }
 
-export function buildWorkflow(core, { name = "AI SRE — incident validation" } = {}) {
+/**
+ * Pull the model's answer out of the API response and put the incident back.
+ *
+ * n8n replaces the item with the HTTP response, so everything the chain was
+ * carrying is gone by the time the next Code node runs. This puts it back from
+ * the node before — and it is a Set node rather than Code so the join is
+ * visible in the editor rather than buried in three hundred kilobytes.
+ */
+function collectNode(agent, from, position) {
   return {
-    name,
-    nodes: [
-      {
-        id: "incident-webhook",
-        name: "Incident Webhook",
-        type: "n8n-nodes-base.webhook",
-        typeVersion: 2,
-        position: [0, 0],
-        parameters: { path: WEBHOOK_PATH, httpMethod: "POST", responseMode: "lastNode" },
-      },
-      {
-        id: "validate-core",
-        name: "Validate",
-        type: "n8n-nodes-base.code",
-        typeVersion: 2,
-        position: [260, 0],
-        parameters: { language: "javaScript", mode: "runOnceForAllItems", jsCode: buildNodeCode(core) },
-      },
-    ],
-    connections: { "Incident Webhook": { main: [[{ node: "Validate", type: "main", index: 0 }]] } },
-    settings: { executionOrder: "v1" },
+    id: `collect-${agent}`,
+    name: `Collect ${agent}`,
+    type: "n8n-nodes-base.set",
+    typeVersion: 3.4,
+    position,
+    parameters: {
+      mode: "raw",
+      jsonOutput: `={{ JSON.stringify(Object.assign({}, $('${from}').item.json, { reply: (function () {`
+        + ` try { return JSON.parse($json.choices[0].message.content); } catch (e) { return null; } })() })) }}`,
+      options: {},
+    },
   };
+}
+
+/** The model every agent is asked with, named once. */
+export const MODEL = "gpt-4o-mini";
+
+export function buildWorkflow(runtime, { name = "AI SRE — incident investigation" } = {}) {
+  const code = (id, nodeName, body, position) => ({
+    id,
+    name: nodeName,
+    type: "n8n-nodes-base.code",
+    typeVersion: 2,
+    position,
+    parameters: { language: "javaScript", mode: "runOnceForAllItems", jsCode: runtime.prelude + body },
+  });
+
+  const nodes = [
+    {
+      id: "incident-webhook",
+      name: "Incident Webhook",
+      type: "n8n-nodes-base.webhook",
+      typeVersion: 2,
+      position: [0, 0],
+      parameters: { path: WEBHOOK_PATH, httpMethod: "POST", responseMode: "lastNode" },
+    },
+    code("assemble", "Assemble", assembleNodeCode(), [220, 0]),
+  ];
+
+  const connections = {
+    "Incident Webhook": { main: [[{ node: "Assemble", type: "main", index: 0 }]] },
+  };
+
+  let previous = "Assemble";
+  let x = 440;
+  AGENT_ORDER.forEach((agent, i) => {
+    const next = AGENT_ORDER[i + 1] ?? null;
+    const ask = `Ask ${agent}`;
+    const collect = `Collect ${agent}`;
+    const record = `Record ${agent}`;
+
+    nodes.push(askNode(agent, [x, 0]));
+    nodes.push(collectNode(agent, previous, [x + 200, 0]));
+    nodes.push(code(`record-${agent}`, record, recordNodeCode(agent, next), [x + 400, 0]));
+
+    connections[previous] = { main: [[{ node: ask, type: "main", index: 0 }]] };
+    connections[ask] = { main: [[{ node: collect, type: "main", index: 0 }]] };
+    connections[collect] = { main: [[{ node: record, type: "main", index: 0 }]] };
+
+    previous = record;
+    x += 600;
+  });
+
+  nodes.push(code("conclude", "Conclude", concludeNodeCode(), [x, 0]));
+  connections[previous] = { main: [[{ node: "Conclude", type: "main", index: 0 }]] };
+
+  return { name, nodes, connections, settings: { executionOrder: "v1" } };
 }
 
 /** Stable JSON: key order fixed, so regeneration cannot produce a spurious diff. */
@@ -123,15 +171,15 @@ export function serialise(workflow) {
  * Building in memory makes the chain source -> artifact -> workflow unbroken:
  * there is no intermediate file to be out of date.
  */
-export function generate() {
-  const core = buildCore().code;
-  const workflow = buildWorkflow(core);
+export async function generate() {
+  const runtime = await buildRuntime();
+  const workflow = buildWorkflow(runtime);
   const text = serialise(workflow);
   return { workflow, text, sha256: createHash("sha256").update(text).digest("hex") };
 }
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
-  const { text, sha256 } = generate();
+  const { text, sha256 } = await generate();
   mkdirSync(dirname(OUT), { recursive: true });
   const changed = !existsSync(OUT) || readFileSync(OUT, "utf8") !== text;
   writeFileSync(OUT, text);

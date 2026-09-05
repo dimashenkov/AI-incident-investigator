@@ -33,7 +33,7 @@ function deployedExport() {
 }
 
 describe("a real deployment compares equal to what we generated", () => {
-  it("reports same when the deployment carries the digest of what we generated", () => {
+  it("reports same when the deployment carries the digest of what we generated", async () => {
     /*
      * This used to compare the generated workflow against the CURRENT recorded
      * baseline, and so it failed the moment the repository moved ahead of the
@@ -48,31 +48,42 @@ describe("a real deployment compares equal to what we generated", () => {
      * that a deployment running exactly our code compares equal. The real
      * n8n export supplies the instance fields, which is why it is still read.
      */
-    const { workflow } = generate();
-    const deployed = deployedExport();
-    deployed.nodes[1].parameters.jsCode = digestCode(workflow).nodes[1].parameters.jsCode;
+    /*
+     * And a second time on 2026-09-05, when the workflow grew from two nodes to
+     * fifteen: substituting one node's digest into a two-node export compared a
+     * shape against a different shape. The recorded export is read for the
+     * fields the INSTANCE adds — that is the only thing it can honestly supply
+     * here — and the deployed side is otherwise built from what we generated.
+     */
+    const { workflow } = await generate();
+    const recorded = deployedExport();
+    const deployed = digestCode(workflow) as Record<string, unknown>;
+    for (const key of Object.keys(recorded)) {
+      if (key === "nodes" || key === "connections" || key === "name" || key === "_fixture_note") continue;
+      deployed[key] = recorded[key];
+    }
     const r = compareWorkflows(workflow, deployed);
     expect(r.state, JSON.stringify(r.differences?.slice(0, 4))).toBe("same");
   });
 
-  it("reports drift when the deployed code differs by one character", () => {
+  it("reports drift when the deployed code differs by one character", async () => {
     // The digest comes from the deployment. Changing it stands for a deployment
     // running code we did not generate — the case the old fixture could not
     // express, because it was handed the generated code before comparing.
-    const { workflow } = generate();
+    const { workflow } = await generate();
     const deployed = deployedExport();
     deployed.nodes[1].parameters.jsCode.__sha256 = "0".repeat(64);
     expect(compareWorkflows(workflow, deployed).state).toBe("drifted");
   });
 
-  it("reports drift when the deployed code is merely a different length", () => {
-    const { workflow } = generate();
+  it("reports drift when the deployed code is merely a different length", async () => {
+    const { workflow } = await generate();
     const deployed = deployedExport();
     deployed.nodes[1].parameters.jsCode.__bytes += 1;
     expect(compareWorkflows(workflow, deployed).state).toBe("drifted");
   });
 
-  it("takes the digest from what the deployment returned, not from what we generated", () => {
+  it("takes the digest from what the deployment returned, not from what we generated", async () => {
     // The property, asked of the recorder rather than of today's deployment.
     // Handed an export whose code is nothing like ours, the baseline must carry
     // THAT code's digest — if it ever borrowed the generated side again, drift
@@ -86,7 +97,7 @@ describe("a real deployment compares equal to what we generated", () => {
     expect(stamped.__sha256).toBe(createHash("sha256").update(FOREIGN_CODE, "utf8").digest("hex"));
     expect(stamped.__bytes).toBe(Buffer.byteLength(FOREIGN_CODE, "utf8"));
 
-    const { workflow } = generate();
+    const { workflow } = await generate();
     const ours = digestCode(workflow).nodes[1].parameters.jsCode.__sha256;
     expect(stamped.__sha256, "the recorder borrowed the generated code").not.toBe(ours);
   });

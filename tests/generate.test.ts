@@ -3,55 +3,43 @@
  * being derived — that someone edits workflows/incident.json directly and the
  * file and the generator drift apart silently.
  *
- * Every test here is written against a way that drift could hide.
+ * Rewritten on 2026-09-05, when the workflow grew from two nodes to fifteen.
+ * The old tests exercised a single Validate node through buildNodeCode, which
+ * no longer exists; what each one was FOR is kept, asked of the new shape.
+ * Behaviour of the chain end to end lives in workflow-run.test.ts.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 // @ts-expect-error — plain .mjs, the same file node runs.
-import { buildWorkflow, buildNodeCode, serialise, generate, WEBHOOK_PATH } from "../scripts/generate-workflow.mjs";
+import { buildWorkflow, serialise, generate, WEBHOOK_PATH, MODEL } from "../scripts/generate-workflow.mjs";
+// @ts-expect-error — plain .mjs, the same file node runs.
+import { transpile, AGENT_ORDER } from "../scripts/workflow-runtime.mjs";
 
 /**
- * Run the generated node code for real, with a fake $input.
+ * A runtime small enough to read, with the same shape the real one has.
  *
- * Codex, chunk 1 parts 1-2: the tests asserted substrings and static shape, so
- * nothing established what the node DOES with zero items or with several. A
- * test that reads code is not a test that runs it.
+ * Using the real 350 KB prelude here would make every assertion below a
+ * statement about ajv's output rather than about the generator.
  */
-function runNode(core: string, items: Array<{ json: unknown }>): Array<{ json: Record<string, unknown> }> {
-  const $input = {
-    all: () => items,
-    first: () => items[0],
-  };
-  const fn = new Function("$input", `${buildNodeCode(core)}`);
-  return fn($input);
-}
-
-/** A core exposing one validator that accepts only { ok: true }. */
-const TOY_CORE = `
-exports.validate_incident = function v(data) {
-  const ok = Boolean(data && data.ok === true);
-  v.errors = ok ? null : [{ instancePath: "/ok", message: "must be true" }];
-  return ok;
-};`;
-
-const CORE_STUB = "exports.validate_incident = function () { return true; };";
-const WF = buildWorkflow(CORE_STUB);
+const RUNTIME = { prelude: "// toy prelude\nconst validators = {};\n" };
+const WF = buildWorkflow(RUNTIME);
 const COMMITTED = new URL("../workflows/incident.json", import.meta.url).pathname;
 
+const node = (name: string) => WF.nodes.find((n: { name: string }) => n.name === name);
+
 describe("the workflow is generated, not written", () => {
-  it("matches the committed file exactly, so a hand edit fails here", () => {
+  it("matches the committed file exactly, so a hand edit fails here", async () => {
     // The committed JSON exists to be compared against a deployment. If it can
     // be edited without anything noticing, the comparison proves nothing about
     // the generator — only that two files someone maintained by hand agree.
-    expect(existsSync(COMMITTED), "workflows/incident.json is missing; run node scripts/generate-workflow.mjs").toBe(true);
-    expect(readFileSync(COMMITTED, "utf8")).toBe(generate().text);
+    expect(existsSync(COMMITTED), "workflows/incident.json is missing; regenerate it").toBe(true);
+    expect(readFileSync(COMMITTED, "utf8")).toBe((await generate()).text);
   });
 
   it("is byte-identical across two generations from the same input", () => {
     // Any instability — a timestamp, a random id, unordered keys — would make
-    // every drift comparison report a difference that means nothing, and the
-    // real differences would drown in the noise.
-    expect(serialise(buildWorkflow(CORE_STUB))).toBe(serialise(buildWorkflow(CORE_STUB)));
+    // every drift comparison report a difference that means nothing.
+    expect(serialise(buildWorkflow(RUNTIME))).toBe(serialise(buildWorkflow(RUNTIME)));
   });
 
   it("uses a fixed webhook path rather than a generated one", () => {
@@ -59,111 +47,108 @@ describe("the workflow is generated, not written", () => {
     expect(JSON.stringify(WF)).toContain(WEBHOOK_PATH);
   });
 
-  it("changes when the core changes, so a stale artifact cannot pass unnoticed", () => {
-    const other = serialise(buildWorkflow(CORE_STUB + "// one more line"));
+  it("changes when the runtime changes, so a stale artifact cannot pass unnoticed", () => {
+    const other = serialise(buildWorkflow({ prelude: RUNTIME.prelude + "// one more line\n" }));
     expect(other).not.toBe(serialise(WF));
   });
 });
 
-describe("the node the core runs in", () => {
-  const code: string = buildNodeCode(CORE_STUB);
-
-  it("carries the core inside it", () => {
-    expect(code).toContain(CORE_STUB);
+describe("the shape of the deployed chain", () => {
+  it("asks every agent, in the order that lets the last one weigh the others", () => {
+    // Order is not incidental: the root cause agent receives the other results
+    // and never the observations, so running it first would give it nothing.
+    expect(AGENT_ORDER).toEqual(["kubernetes", "logs", "metrics", "root-cause"]);
+    for (const agent of AGENT_ORDER) {
+      expect(node(`Ask ${agent}`), `no node asks ${agent}`).toBeDefined();
+      expect(node(`Record ${agent}`), `no node records ${agent}`).toBeDefined();
+    }
   });
 
-  it("supplies the module system the Code node does not have", () => {
-    // Measured: exports is undefined and module holds only an empty exports.
-    expect(code).toContain("const module = { exports: {} }");
-    expect(code).toContain("const exports = module.exports");
-  });
-
-  it("says it is generated, in the file a human would open first", () => {
-    expect(code.split("\n")[0]).toContain("GENERATED");
-  });
-
-  it("reports unchecked, not invalid, for a schema it does not have", () => {
-    // Three states, never two — the same rule the local validator follows.
-    // A typo'd schema name must not come back as a clean rejection.
-    expect(code).toContain('state: "unchecked"');
-    expect(code).toContain("no such schema");
-  });
-
-  it("reads all items rather than only the first", () => {
-    expect(code).toContain("$input.all()");
-  });
-});
-
-describe("the generated workflow shape", () => {
-  it("wires the webhook into the code node", () => {
-    expect(WF.connections["Incident Webhook"].main[0][0].node).toBe("Validate");
+  it("runs one unbroken line from the webhook to the conclusion", () => {
+    // A branch that quietly ends is a run that produces no answer and no error.
+    let at = "Incident Webhook";
+    const visited = [at];
+    for (let i = 0; i < 40 && WF.connections[at] !== undefined; i += 1) {
+      at = WF.connections[at].main[0][0].node;
+      visited.push(at);
+    }
+    expect(visited[visited.length - 1], `the chain ends at ${at}`).toBe("Conclude");
+    expect(visited).toHaveLength(2 + AGENT_ORDER.length * 3 + 1);
   });
 
   it("declares node types and versions the instance actually has", () => {
-    const types = WF.nodes.map((n: { type: string; typeVersion: number }) => `${n.type}@${n.typeVersion}`);
-    expect(types).toEqual(["n8n-nodes-base.webhook@2", "n8n-nodes-base.code@2"]);
+    const types = [...new Set(WF.nodes.map((n: { type: string; typeVersion: number }) => `${n.type}@${n.typeVersion}`))];
+    expect(types.sort()).toEqual([
+      "n8n-nodes-base.code@2",
+      "n8n-nodes-base.httpRequest@4.2",
+      "n8n-nodes-base.set@3.4",
+      "n8n-nodes-base.webhook@2",
+    ]);
   });
 
-  it("carries no credentials, because nothing here authenticates", () => {
+  it("carries no credential material, only the name of a credential to use", () => {
     // A credential reference in a generated file is a credential reference in
-    // git. If one ever appears, it must appear as a failing test first.
-    expect(JSON.stringify(WF)).not.toContain("credentials");
+    // git. Naming the type is how n8n is told which stored credential to use;
+    // anything key-shaped appearing here must fail as a test first.
+    const text = JSON.stringify(WF);
+    expect(text).toContain("openAiApi");
+    // Anchored and long: the loose version matched the node id "ask-kubernetes",
+    // which is the shape of check that reports a problem where none exists and
+    // gets deleted the first time it is inconvenient.
+    expect(text).not.toMatch(/\bsk-[A-Za-z0-9_-]{20,}/);
+    expect(text).not.toContain("Authorization");
   });
 
+  it("pins the model and the temperature, so two runs can be compared", () => {
+    expect(MODEL).toMatch(/^gpt-/);
+    const ask = node("Ask kubernetes");
+    expect(ask.parameters.jsonBody).toContain(MODEL);
+    expect(ask.parameters.jsonBody).toContain("temperature: 0");
+  });
+
+  it("sends the prompt and payload from the item, never from the node", () => {
+    // A node carrying its own prompt would be a second copy of what the context
+    // assembler produced, and the isolation checks would then be checking
+    // something other than what was sent.
+    const ask = node("Ask metrics");
+    expect(ask.parameters.jsonBody).toContain("$json.prompt");
+    expect(ask.parameters.jsonBody).toContain("$json.payload");
+    expect(ask.parameters.jsonBody, "the prompt text must not be baked into the node").not.toContain("You are given");
+  });
+
+  it("puts every Code node's prelude in, so none runs without the validators", () => {
+    for (const n of WF.nodes.filter((x: { type: string }) => x.type === "n8n-nodes-base.code")) {
+      expect(n.parameters.jsCode, `${n.name} has no prelude`).toContain(RUNTIME.prelude);
+    }
+  });
 });
 
-describe("what the node actually does when it runs", () => {
-  it("returns one result per input item, not one for the first", () => {
-    // Measured defect: $input.first() discarded every item after the first in a
-    // node configured to run once for ALL items. Items vanished with no trace.
-    const out = runNode(TOY_CORE, [
-      { json: { body: { schema: "incident", data: { ok: true } } } },
-      { json: { body: { schema: "incident", data: { ok: false } } } },
-      { json: { body: { schema: "incident", data: { ok: true } } } },
-    ]);
-    expect(out).toHaveLength(3);
-    expect(out.map((r) => r.json.state)).toEqual(["valid", "invalid", "valid"]);
-    expect(out.map((r) => r.json.index)).toEqual([0, 1, 2]);
+describe("what the transpiler refuses to deploy", () => {
+  it("refuses a source that cannot run in the Code node, rather than shipping it", () => {
+    /*
+     * Found by running the workflow locally on 2026-09-05: a stray
+     * import.meta.url survived transpiling and every node threw before doing
+     * anything. The generator had no opinion, so the workflow was produced and
+     * committed. This is that opinion.
+     */
+    expect(() => transpile("tests/fixtures/not-node-safe.ts")).toThrow(/import\.meta/);
   });
 
-  it("returns nothing for no items instead of throwing", () => {
-    // An empty run is not an error and not a pass. It is nothing, and it says so.
-    expect(runNode(TOY_CORE, [])).toEqual([]);
+  it("catches a dynamic import, which the static-import pattern does not match", () => {
+    // Codex, 2026-09-05: import(...) is the same unavailable thing spelled
+    // differently, and the pattern anchored to the start of a line missed it.
+    expect(() => transpile("tests/fixtures/not-node-safe.ts")).toThrow(/dynamic import/);
   });
 
-  it("reports unchecked for a schema it does not have", () => {
-    const out = runNode(TOY_CORE, [{ json: { body: { schema: "incidnet", data: {} } } }]);
-    expect(out[0]!.json.state).toBe("unchecked");
-    expect(String(out[0]!.json.reason)).toContain("incidnet");
+  it("catches a re-export, which is not a thing a script can do", () => {
+    expect(() => transpile("tests/fixtures/re-export.ts")).toThrow(/re-export/);
   });
 
-  it("reads the payload from body, where the webhook actually puts it", () => {
-    // Measured 2026-09-04: the webhook wraps the request and the posted JSON
-    // sits under `body`, not at the root. Reading the root would yield undefined
-    // and every validation would fail for the right reason by accident.
-    const atRoot = runNode(TOY_CORE, [{ json: { schema: "incident", data: { ok: true } } }]);
-    expect(atRoot[0]!.json.state, "payload at the root must not validate").toBe("invalid");
-    const inBody = runNode(TOY_CORE, [{ json: { body: { schema: "incident", data: { ok: true } } } }]);
-    expect(inBody[0]!.json.state).toBe("valid");
-  });
-
-  it("survives an item with no body at all", () => {
-    // The webhook always wraps, but a Code node upstream might not. A missing
-    // body must produce a validation failure, not a crash that loses the batch.
-    const out = runNode(TOY_CORE, [{ json: {} }]);
-    expect(out[0]!.json.state).toBe("invalid");
-  });
-
-  it("carries the validator errors through, not just a boolean", () => {
-    const out = runNode(TOY_CORE, [{ json: { body: { schema: "incident", data: { ok: false } } } }]);
-    expect(out[0]!.json.errors).toEqual([{ where: "/ok", message: "must be true" }]);
-  });
-
-  it("keeps one failing item from hiding the others", () => {
-    const out = runNode(TOY_CORE, [
-      { json: { body: { schema: "nope", data: {} } } },
-      { json: { body: { schema: "incident", data: { ok: true } } } },
-    ]);
-    expect(out.map((r) => r.json.state)).toEqual(["unchecked", "valid"]);
+  it("accepts the sources it actually deploys", () => {
+    // The precondition. Without it the refusal above would pass against a
+    // transpiler that rejected everything.
+    for (const f of ["src/core/merge.ts", "src/agents/slice.ts"]) {
+      expect(() => transpile(f), `${f} can no longer be deployed`).not.toThrow();
+    }
   });
 });

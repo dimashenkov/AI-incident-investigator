@@ -356,6 +356,60 @@ export const MUTATIONS = [
     mustFail: "carries the qualification with the one figure, not only in the breakdown",
   },
   {
+    // The whole point is surviving a kill, so the record must be written before
+    // the file is touched. Written after, it protects nothing.
+    id: "mutation-record-written-after-the-damage",
+    file: "scripts/acceptance-gate.mjs",
+    from: '    writeFileSync(IN_FLIGHT, JSON.stringify({ id: m.id, file: m.file, original, mutated: original.replace(m.from, m.to) }));',
+    to: "",
+    mustFail: "records the file before it damages it, which is the only ordering that survives a kill",
+  },
+  {
+    id: "unreadable-repair-record-acted-on-anyway",
+    file: "scripts/acceptance-gate.mjs",
+    from: '    return { state: "unreadable", detail: "the record names no file, or holds no original or mutated text" };',
+    to: '    return { state: "already-clean" };',
+    mustFail: "refuses to act on a record it cannot read, rather than guessing",
+  },
+  {
+    id: "repair-overwrites-a-file-it-no-longer-describes",
+    file: "scripts/acceptance-gate.mjs",
+    from: "  if (now !== record.mutated) {",
+    to: "  if (false) {",
+    mustFail: "refuses to touch a file someone edited after the interruption",
+  },
+  {
+    id: "repair-follows-a-path-out-of-the-repository",
+    file: "scripts/acceptance-gate.mjs",
+    from: "  if (target !== realRoot && !target.startsWith(realRoot + sep)) {",
+    to: "  if (false) {",
+    mustFail: "refuses a record naming a path outside the repository",
+  },
+  {
+    id: "dynamic-import-passes-the-blocklist",
+    file: "scripts/workflow-runtime.mjs",
+    from: '    { what: /\\bimport\\s*\\(/g, why: "a dynamic import" },',
+    to: "",
+    mustFail: "catches a dynamic import, which the static-import pattern does not match",
+  },
+  {
+    // A throwing expression stops the workflow with an n8n error rather than a
+    // refusal that says which agent produced nothing.
+    id: "collect-throws-instead-of-returning-null",
+    file: "scripts/generate-workflow.mjs",
+    from: "` try { return JSON.parse($json.choices[0].message.content); } catch (e) { return null; } })() })) }}`",
+    to: "` return JSON.parse($json.choices[0].message.content); })() })) }}`",
+    mustFail: "turns an unparseable answer into null rather than throwing inside n8n",
+  },
+  {
+    // Comparing the path string is not comparing the file a link points at.
+    id: "repair-judges-the-path-string-not-the-real-file",
+    file: "scripts/acceptance-gate.mjs",
+    from: "    target = realpathSync(named);",
+    to: "    target = named;",
+    mustFail: "refuses a symlink inside the repository that points outside it",
+  },
+  {
     id: "claimed-provider-not-compared",
     file: "src/providers/fixtures.ts",
     from: '      ["provider", `fake-${slot}`],',
@@ -483,7 +537,7 @@ export const MUTATIONS = [
     // Codex, 2026-09-05: both checks existed and neither was called outside the
     // tests — the appearance of a guard with nothing wiring it to the boundary.
     id: "checked-path-stops-checking-the-source",
-    file: "src/agents/context.ts",
+    file: "src/agents/slice.ts",
     from: "  const source = checkSourceForForeignIncidents(incident);",
     to: '  const source = { state: "clean" };',
     mustFail: "refuses a contaminated incident rather than assembling from it",
@@ -492,7 +546,7 @@ export const MUTATIONS = [
     // Grok, 2026-09-05: the test named for a "checked context" never called the
     // check, so deleting the check left it green.
     id: "context-check-never-called-by-its-own-test",
-    file: "src/agents/context.ts",
+    file: "src/agents/slice.ts",
     from: "export function checkPayloadIsExactlyTheSlice(",
     to: "export function unusedRenamed(",
     mustFail: "does not let a later mutation of the incident change a checked context",
@@ -502,7 +556,7 @@ export const MUTATIONS = [
     // property on an array produced no path while an extra key on a plain
     // object did.
     id: "array-properties-invisible-to-the-diff",
-    file: "src/agents/context.ts",
+    file: "src/agents/slice.ts",
     from: "    const named = (v: unknown[]) => Object.keys(v).filter((k) => !/^\\d+$/.test(k));",
     to: "    const named = () => [];",
     mustFail: "catches a named property hung on an array, which indices alone would miss",
@@ -512,14 +566,14 @@ export const MUTATIONS = [
     // time foreign data reaches the payload it is indistinguishable from the
     // legitimate slice, so nothing downstream can see it.
     id: "source-contamination-goes-unasked",
-    file: "src/agents/context.ts",
+    file: "src/agents/slice.ts",
     from: "  const foreign = foreignIncidentIds(incident, ownId);",
     to: "  const foreign = [];",
     mustFail: "asks the source about foreign incidents, which comparing to the source cannot",
   },
   {
     id: "provenance-check-becomes-a-pattern-match",
-    file: "src/agents/context.ts",
+    file: "src/agents/slice.ts",
     from: "  const paths = deepDiffPaths(expected, result.payload);",
     to: "  const paths = [];",
     mustFail: "catches content added to the payload after assembly",
@@ -535,7 +589,7 @@ export const MUTATIONS = [
     // The leak this system is built to prevent, in the function built to prevent
     // it: copying the whole incident instead of the one slot the agent reads.
     id: "agent-context-copies-the-whole-incident",
-    file: "src/agents/context.ts",
+    file: "src/agents/slice.ts",
     from: "    payload: { incident_id: incidentId, observation: snapshot(observation) },",
     to: "    payload: { incident_id: incidentId, observation: snapshot(observation), ...incident },",
     mustFail: "copies only what was asked for, so an unknown field cannot ride along",
@@ -544,7 +598,7 @@ export const MUTATIONS = [
     // Reporting clean for a context that was never assembled would mean the
     // isolation check passes hardest exactly when it inspected nothing.
     id: "unassembled-context-reads-as-clean",
-    file: "src/agents/context.ts",
+    file: "src/agents/slice.ts",
     from: '  if (result.state !== "assembled") return { state: "unchecked", reason: result.reason };',
     to: '  if (result.state !== "assembled") return { state: "clean" };',
     mustFail: "reports unchecked, not clean, when the context could not be assembled",
