@@ -35,7 +35,8 @@ export const DEFINITION_OF_DONE = [
     n: 4, claim: "risk and requires_approval.", covered: true,
     by: [
       "refuses a state-changing action that claims it needs no approval",
-      "refuses no_action that demands approval or claims risk",
+      "refuses no_action that claims risk",
+      "refuses no_action that demands approval",
       "accepts every state-changing action once it names a target and asks for approval",
       "leaves no action type outside a category, and none in both",
     ],
@@ -61,10 +62,17 @@ export const DEFINITION_OF_DONE = [
     // item cannot cite, as proof of coverage, a test that demonstrates the
     // hole. The checks that exist are real and are now enforced at the
     // boundary; they do not add up to this claim.
+    // Codex, 2026-09-05: "item 6 is directly overclaimed — the evidence
+    // supports 'rejects inconsistent provenance labels', not 'no cross-incident
+    // data in assembled prompts'." Provenance establishes that the data arrived
+    // under a request we made; it cannot establish that the provider answered
+    // honestly. Both halves are needed for the claim as written.
     n: 6, claim: "No cross-incident data in assembled prompts.", covered: false,
-    needs: "trusted provenance at the ingestion boundary",
-    why: "the two checks in place establish that the assembler adds nothing beyond the slice and that no foreign incident id appears, and both are enforced before any context is handed over — but content already present in an observation, carrying no id, passes both and reaches the agent, so the claim as written is larger than the evidence",
+    needs: "a provider whose answers can be checked, not only requested",
+    why: "the assembler adds nothing beyond the slice, no foreign incident id appears, and every observation is stamped with the collection request we issued and refused otherwise — but a provider can return another tenant's data under a correct request, and nothing downstream can see it, so the claim as written is still larger than the evidence",
   },
+
+
 
   {
     n: 7, claim: "The created Slack thread is durably linked, not merely returned.", covered: true,

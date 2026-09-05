@@ -1,3 +1,16 @@
-{ "collected_at": "2026-09-04T18:41:13Z", "window": { "from": "2026-09-04T18:30:00Z", "to": "2026-09-04T18:41:00Z" },
+{
+  "collected_at": "2026-09-04T18:41:13Z",
+  "window": {
+    "from": "2026-09-04T18:30:00Z",
+    "to": "2026-09-04T18:41:00Z"
+  },
   "truncated": false,
-  "lines": [{ "ts": "2026-09-04T18:38:02Z", "level": "info", "container": "report-worker", "message": "monthly report batch started, 41200 rows" }] }
+  "lines": [
+    {
+      "ts": "2026-09-04T18:38:02Z",
+      "level": "info",
+      "container": "report-worker",
+      "message": "monthly report batch started, 41200 rows"
+    }
+  ]
+}

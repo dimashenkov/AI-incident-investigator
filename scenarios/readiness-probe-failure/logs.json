@@ -1,5 +1,22 @@
-{ "collected_at": "2026-09-04T09:13:07Z", "window": { "from": "2026-09-04T09:05:00Z", "to": "2026-09-04T09:13:00Z" },
+{
+  "collected_at": "2026-09-04T09:13:07Z",
+  "window": {
+    "from": "2026-09-04T09:05:00Z",
+    "to": "2026-09-04T09:13:00Z"
+  },
   "truncated": true,
   "lines": [
-    { "ts": "2026-09-04T09:11:40Z", "level": "warn", "container": "search-api", "message": "index warmup at 61%, readiness withheld" },
-    { "ts": "2026-09-04T09:12:30Z", "level": "warn", "container": "search-api", "message": "index warmup at 68%, readiness withheld" }] }
+    {
+      "ts": "2026-09-04T09:11:40Z",
+      "level": "warn",
+      "container": "search-api",
+      "message": "index warmup at 61%, readiness withheld"
+    },
+    {
+      "ts": "2026-09-04T09:12:30Z",
+      "level": "warn",
+      "container": "search-api",
+      "message": "index warmup at 68%, readiness withheld"
+    }
+  ]
+}

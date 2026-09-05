@@ -1,3 +1,28 @@
-{ "collected_at": "2026-09-04T09:13:09Z", "window": { "from": "2026-09-04T09:05:00Z", "to": "2026-09-04T09:13:00Z" },
-  "series": [{ "name": "container_memory_working_set_bytes", "unit": "bytes", "container": "search-api",
-    "points": [{ "ts": "2026-09-04T09:07:00Z", "value": 934281216 }, { "ts": "2026-09-04T09:10:00Z", "value": 1073741824 }, { "ts": "2026-09-04T09:13:00Z", "value": 1181116006 }] }] }
+{
+  "collected_at": "2026-09-04T09:13:09Z",
+  "window": {
+    "from": "2026-09-04T09:05:00Z",
+    "to": "2026-09-04T09:13:00Z"
+  },
+  "series": [
+    {
+      "name": "container_memory_working_set_bytes",
+      "unit": "bytes",
+      "container": "search-api",
+      "points": [
+        {
+          "ts": "2026-09-04T09:07:00Z",
+          "value": 934281216
+        },
+        {
+          "ts": "2026-09-04T09:10:00Z",
+          "value": 1073741824
+        },
+        {
+          "ts": "2026-09-04T09:13:00Z",
+          "value": 1181116006
+        }
+      ]
+    }
+  ]
+}

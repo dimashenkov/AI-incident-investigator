@@ -30,5 +30,12 @@
       "container": "payment-api",
       "message": "process terminated"
     }
-  ]
+  ],
+  "provenance": {
+    "collection_id": "a1b2c3d4-0001-4000-8000-000000000001",
+    "requested_for": "INC-2026-0101",
+    "cluster": "prod-eu",
+    "namespace": "production",
+    "provider": "fake-logs"
+  }
 }

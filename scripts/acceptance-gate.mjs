@@ -585,6 +585,15 @@ export function namedTestFailed(report, name) {
  * files on disk? If yes it is debt, and debt has a due date.
  */
 export const LIMITATIONS = [
+  // Moved here on 2026-09-05, when provenance closed the other half.
+  //
+  // An observation can be asked for correctly, arrive from the right cluster in
+  // one collection, and still contain a line belonging to another customer —
+  // because the provider put it there. Nothing downstream can see that: by then
+  // it is indistinguishable from legitimate data, and it carries no incident id
+  // to recognise. It is a defect in a provider, and this repository cannot
+  // check other people's collection.
+  "that a legitimately collected observation contains nothing belonging to anyone else — provenance says it was asked for, not that its contents are clean",
   // Moved here from DEBT on 2026-09-05. Codex: "the DEBT trigger is not
   // checkable — it describes an external permission condition while enforcement
   // is an unrelated dueFromChunk. Nothing detects the second pusher arriving."
@@ -594,6 +603,19 @@ export const LIMITATIONS = [
   // decide, printed every run, until repository-visible ownership metadata
   // exists to check it against.
   "that deployment goes through a chain nobody can skip — true while one person deploys by hand, unchecked and unenforced the moment a second can push",
+  // Codex, 2026-09-05: "deterministicCollectionId is unsafe as provenance
+  // evidence. It is public and predictable, and reruns reuse it, so an old or
+  // forged response for the same incident and scenario passes."
+  //
+  // He is right about what it is, and it stays deterministic on purpose: the
+  // generated workflow has to be byte-identical between runs or drift detection
+  // becomes noise. So the id proves that an answer belongs to THIS collection,
+  // not that the collection is fresh — and today every observation is a file
+  // this process reads itself, so there is nobody to forge one. The day an
+  // observation arrives from outside this process, the id has to be minted
+  // unpredictably and the reproducible artifact has to get its stability from
+  // somewhere else.
+  "that a collection id could not have been guessed — it is derived from the incident and the scenario so the generated workflow stays byte-identical between runs",
   "that every diff went through external review before commit",
   "that each review objection was recorded verbatim rather than paraphrased",
   "that memory was written after each step",
@@ -602,21 +624,7 @@ export const LIMITATIONS = [
 export const DEBT = [
 
 
-  {
-    // Codex, 2026-09-05, naming the question neither content check can answer:
-    // "Does this observation come from the trusted collection request that
-    // created this incident? Content scanning cannot establish provenance. A
-    // foreign record may contain no incident ID, while a legitimate log may
-    // mention another ID."
-    //
-    // Verified: another customer's password placed in the observation passes
-    // both checks and reaches the agent. Closing it needs ownership metadata at
-    // the ingestion boundary — tenant, collection request, expected incident —
-    // and a refusal on mismatch before observations are merged. That is a
-    // provider-boundary change, not a check that can be bolted on downstream.
-    claim: "observations carry trusted provenance from the collection request, checked before they are merged",
-    dueFromChunk: 3,
-  },
+
   {
     // Deliberately carries no count, and neither does this comment.
     //

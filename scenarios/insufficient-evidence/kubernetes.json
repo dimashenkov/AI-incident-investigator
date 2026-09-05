@@ -1,6 +1,37 @@
-{ "collected_at": "2026-09-04T21:16:40Z",
-  "pods": [{ "name": "notify-api-5b7c9d884-hq2rt", "namespace": "production", "phase": "Running", "restart_count": 0,
-    "containers": [{ "name": "notify-api", "ready": true, "restart_count": 0,
-      "limits": { "memory": "512Mi", "cpu": "500m" }, "requests": { "memory": "256Mi", "cpu": "250m" } }] }],
+{
+  "collected_at": "2026-09-04T21:16:40Z",
+  "pods": [
+    {
+      "name": "notify-api-5b7c9d884-hq2rt",
+      "namespace": "production",
+      "phase": "Running",
+      "restart_count": 0,
+      "containers": [
+        {
+          "name": "notify-api",
+          "ready": true,
+          "restart_count": 0,
+          "limits": {
+            "memory": "512Mi",
+            "cpu": "500m"
+          },
+          "requests": {
+            "memory": "256Mi",
+            "cpu": "250m"
+          }
+        }
+      ]
+    }
+  ],
   "events": [],
-  "deployment": { "name": "notify-api", "namespace": "production", "replicas": { "desired": 3, "ready": 3, "available": 3 }, "image": "registry.internal/notify-api:4.0.2" } }
+  "deployment": {
+    "name": "notify-api",
+    "namespace": "production",
+    "replicas": {
+      "desired": 3,
+      "ready": 3,
+      "available": 3
+    },
+    "image": "registry.internal/notify-api:4.0.2"
+  }
+}

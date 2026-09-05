@@ -7,7 +7,7 @@
  * valid incident, because "this is hard to diagnose" is not "this is malformed".
  */
 import { describe, it, expect } from "vitest";
-import { assembleIncident, concludeIncident, incidentIdFor, readRegistry, recordAgentResult, resultBelongsHere, resolveRef, runnableAgents, serviceFromTags } from "../src/core/assemble.js";
+import { assembleIncident, checkProvenance, concludeIncident, incidentIdFor, readRegistry, recordAgentResult, resultBelongsHere, resolveRef, runnableAgents, serviceFromTags } from "../src/core/assemble.js";
 import { listScenarios } from "../src/providers/fixtures.js";
 import { validate } from "../src/schema/validate.js";
 import { assembleObservingContext, checkPayloadIsExactlyTheSlice } from "../src/agents/context.js";
@@ -31,7 +31,7 @@ describe("every scenario assembles into a valid incident", () => {
 
   it("assembles each one and validates it", () => {
     all.forEach((scenario, i) => {
-      const a = assembleIncident(scenario, i + 1, { root: SCENARIOS });
+      const a = assembleIncident(scenario, 1, { root: SCENARIOS });
       expect(a.state, `${scenario}: ${a.state === "refused" ? `${a.reason} ${JSON.stringify(a.errors)}` : ""}`).toBe("assembled");
       if (a.state !== "assembled") return;
       expect(validate("incident", a.incident).state).toBe("valid");
@@ -62,7 +62,7 @@ describe("every scenario assembles into a valid incident", () => {
 describe("scenarios built to be awkward still assemble", () => {
   it("assembles the one whose metrics say nothing on purpose", () => {
     // image-pull-failure has a metrics fixture carrying the nothing sentinel.
-    const a = assembleIncident("image-pull-failure", 2, { root: SCENARIOS });
+    const a = assembleIncident("image-pull-failure", 1, { root: SCENARIOS });
     expect(a.state).toBe("assembled");
     if (a.state !== "assembled") return;
     expect(a.incident.observations).toHaveProperty("metrics", null);
@@ -70,7 +70,7 @@ describe("scenarios built to be awkward still assemble", () => {
   });
 
   it("assembles the one whose logs are truncated, keeping the flag", () => {
-    const a = assembleIncident("readiness-probe-failure", 3, { root: SCENARIOS });
+    const a = assembleIncident("readiness-probe-failure", 1, { root: SCENARIOS });
     expect(a.state).toBe("assembled");
     if (a.state !== "assembled") return;
     expect((a.incident.observations as { logs: { truncated: boolean } }).logs.truncated).toBe(true);
@@ -79,12 +79,12 @@ describe("scenarios built to be awkward still assemble", () => {
   it("assembles the one whose right answer is that there is not enough", () => {
     // "Hard to diagnose" is not "malformed". If this refused to assemble, the
     // system could never report insufficient evidence at all.
-    const a = assembleIncident("insufficient-evidence", 4, { root: SCENARIOS });
+    const a = assembleIncident("insufficient-evidence", 1, { root: SCENARIOS });
     expect(a.state).toBe("assembled");
   });
 
   it("refuses a scenario that does not exist rather than inventing one", () => {
-    const a = assembleIncident("no-such-scenario", 5, { root: SCENARIOS });
+    const a = assembleIncident("no-such-scenario", 1, { root: SCENARIOS });
     expect(a.state).toBe("refused");
   });
 
@@ -92,7 +92,7 @@ describe("scenarios built to be awkward still assemble", () => {
     // Three failed reads are not three established absences. Building one would
     // produce a document asserting things nobody looked at.
     const root = new URL("./fixtures/all-broken/", import.meta.url).pathname;
-    const a = assembleIncident("container-oom", 6, { root });
+    const a = assembleIncident("container-oom", 1, { root });
     expect(a.state).toBe("refused");
     if (a.state !== "refused") return;
     expect(a.reason).toContain("every observation failed");
@@ -102,7 +102,7 @@ describe("scenarios built to be awkward still assemble", () => {
     // Codex, chunk 2: the tests covered three failures and normal scenarios,
     // never the boundary the rule actually states. This is that boundary.
     const root = new URL("./fixtures/two-broken/", import.meta.url).pathname;
-    const a = assembleIncident("container-oom", 7, { root });
+    const a = assembleIncident("container-oom", 1, { root });
     expect(a.state).toBe("assembled");
     if (a.state !== "assembled") return;
     expect(a.failures).toHaveLength(2);
@@ -163,13 +163,13 @@ describe("scenarios built to be awkward still assemble", () => {
 
 describe("only agents with something to read can run", () => {
   it("lists the slots that hold data, not all three", () => {
-    const a = assembleIncident("image-pull-failure", 2, { root: SCENARIOS });
+    const a = assembleIncident("image-pull-failure", 1, { root: SCENARIOS });
     if (a.state !== "assembled") throw new Error("not assembled");
     expect(runnableAgents(a.incident).sort()).toEqual(["kubernetes", "logs"]);
   });
 
   it("refuses to build a context for a slot nothing was collected from", () => {
-    const a = assembleIncident("image-pull-failure", 2, { root: SCENARIOS });
+    const a = assembleIncident("image-pull-failure", 1, { root: SCENARIOS });
     if (a.state !== "assembled") throw new Error("not assembled");
     const r = assembleObservingContext("metrics", a.incident);
     expect(r.state).toBe("unavailable");
@@ -178,7 +178,7 @@ describe("only agents with something to read can run", () => {
   it("builds contexts that survive the provenance check for every scenario", () => {
     // The isolation property, checked across all five without spending anything.
     all.forEach((scenario, i) => {
-      const a = assembleIncident(scenario, i + 1, { root: SCENARIOS });
+      const a = assembleIncident(scenario, 1, { root: SCENARIOS });
       if (a.state !== "assembled") throw new Error(`${scenario} did not assemble`);
       for (const slot of runnableAgents(a.incident)) {
         const ctx = assembleObservingContext(slot as never, a.incident);
@@ -267,7 +267,7 @@ describe("a reply must belong to the incident it is recorded on", () => {
   it("refuses a result for a slot where nothing was collected", () => {
     // image-pull-failure states it has no metrics. An agent reporting on it
     // never ran, whatever the reply says.
-    const a = assembleIncident("image-pull-failure", 2, { root: SCENARIOS });
+    const a = assembleIncident("image-pull-failure", 1, { root: SCENARIOS });
     if (a.state !== "assembled") throw new Error("not assembled");
     const r = recordAgentResult(a.incident, { agent: "metrics", status: "ok",
       findings: [{ fact: "x", source_ref: "series[0]" }], hypotheses: [], confidence: 0.5 });
@@ -428,5 +428,186 @@ describe("the verdict becomes the incident's own", () => {
     if (r.state !== "concluded") return;
     const evidence = (r.incident.analysis as { evidence: Array<{ supports: string }> }).evidence;
     expect(evidence.some((e) => e.supports === "against"), "the contradicting finding was dropped").toBe(true);
+  });
+});
+
+describe("an observation must have been gathered under the request we issued", () => {
+  /*
+   * Every test here goes through assembleIncident.
+   *
+   * Grok, 2026-09-05: five of the seven tests this replaces called the helper
+   * directly, while the file's own comment said a helper-only test would not
+   * notice the call being removed from assembly. So the check could have been
+   * deleted from the merge path and the suite stayed green.
+   */
+  const withStamp = (root: string, over: Record<string, unknown> = {}) =>
+    assembleIncident("container-oom", 1, { root, ...over });
+
+  it("assembles every scenario, and every slot carries the issued collection", () => {
+    // The happy path used to assert only that it assembled, so deleting the
+    // check would have left it green. It reads the stamp now.
+    for (const s of listScenarios(SCENARIOS)) {
+      const a = assembleIncident(s, 1, { root: SCENARIOS });
+      expect(a.state, `${s}: ${a.state === "refused" ? a.reason : ""}`).toBe("assembled");
+      if (a.state !== "assembled") continue;
+
+      const observations = a.incident.observations as Record<string, unknown>;
+      const ids = new Set<string>();
+      let collected = 0;
+      for (const slot of ["kubernetes", "logs", "metrics"]) {
+        const o = observations[slot];
+        if (o === null) continue;
+        collected += 1;
+        const p = (o as { provenance?: Record<string, unknown> }).provenance;
+        expect(p, `${s}/${slot} carries no provenance`).toBeDefined();
+        expect(p!.requested_for, `${s}/${slot} names another incident`).toBe(a.incident.incident_id);
+        expect(p!.cluster).toBe(a.incident.cluster);
+        expect(p!.namespace).toBe(a.incident.namespace);
+        ids.add(String(p!.collection_id));
+      }
+      expect(collected, `${s} collected nothing, so its provenance is vacuous`).toBeGreaterThan(0);
+      expect(ids.size, `${s} slots came from ${ids.size} collections`).toBe(1);
+      const first = [...ids].at(0) ?? "";
+      expect(first).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-8[0-9a-f]{3}-[0-9a-f]{12}$/);
+    }
+  });
+
+  it("refuses a provider that stamps its answer with another collection", () => {
+    // The fixture claims a collection and an incident it was not gathered
+    // under. A provider contradicting its own request is refused rather than
+    // quietly overwritten.
+    const a = withStamp(new URL("./fixtures/wrong-incident/", import.meta.url).pathname);
+    expect(a.state).toBe("refused");
+    if (a.state !== "refused") return;
+    expect(a.reason).toContain("INC-2026-0909");
+  });
+
+  it("refuses an answer whose stamp disagrees about the namespace", () => {
+    // Grok, 2026-09-05, and then found again by a mutation: the provider used
+    // to overwrite a claimed stamp with ours, which erased exactly the
+    // disagreement worth knowing about. An answer agreeing about the collection
+    // and naming another tenant's namespace was silently normalised.
+    const a = withStamp(new URL("./fixtures/wrong-namespace/", import.meta.url).pathname);
+    expect(a.state).toBe("refused");
+    if (a.state !== "refused") return;
+    expect(a.reason).toContain("another-tenant");
+    expect(a.reason).toContain("namespace");
+  });
+
+  it("refuses a nothing that arrives with a foreign stamp", () => {
+    // Codex, 2026-09-05: the sentinel was recognised before the stamp was
+    // checked, so "we have nothing for you" was the one answer believed without
+    // ever being looked at. An answer carrying both the sentinel and another
+    // tenant's namespace became a trusted absence.
+    const a = withStamp(new URL("./fixtures/nothing-but-foreign/", import.meta.url).pathname);
+    expect(a.state).toBe("refused");
+    if (a.state !== "refused") return;
+    expect(a.reason).toContain("another-tenant");
+  });
+
+  it("refuses an answer that claims to come from another collector", () => {
+    // Codex, 2026-09-05: the provider field was neither compared nor kept. An
+    // answer saying where it came from was silently renamed into one of ours.
+    const a = withStamp(new URL("./fixtures/foreign-provider/", import.meta.url).pathname);
+    expect(a.state).toBe("refused");
+    if (a.state !== "refused") return;
+    expect(a.reason).toContain("somebody-elses-collector");
+  });
+
+  it("writes the three collection answers into the document itself", () => {
+    // Codex, 2026-09-05, High: the failures were handed back beside the
+    // incident, so anything reading the document alone saw null and could not
+    // tell "the provider looked and found nothing" from "nobody looked". An
+    // unchecked source is not a clean source.
+    const root = new URL("./fixtures/two-broken/", import.meta.url).pathname;
+    const a = assembleIncident("container-oom", 1, { root });
+    expect(a.state, a.state === "refused" ? a.reason : "").toBe("assembled");
+    if (a.state !== "assembled") return;
+
+    const c = a.incident.collection as Record<string, { state: string; kind?: string; reason?: string } | undefined>;
+    const at = (slot: string) => c[slot] ?? { state: "(missing)", kind: undefined, reason: undefined };
+    expect(at("kubernetes").state).toBe("collected");
+    for (const slot of ["logs", "metrics"]) {
+      expect(at(slot).state, `${slot} was unreadable and the document must say so`).toBe("failed");
+      expect(at(slot).kind).toBe("unreadable");
+      expect(at(slot).reason, `${slot} must carry why`).toContain("not JSON");
+    }
+  });
+
+  it("records an established absence as nothing, not as a failure", () => {
+    // The other half. If both became "failed" the document would be honest and
+    // useless; if both became "nothing" it would be readable and wrong.
+    const root = new URL("./fixtures/partial/", import.meta.url).pathname;
+    const a = assembleIncident("container-oom", 1, { root });
+    expect(a.state, a.state === "refused" ? a.reason : "").toBe("assembled");
+    if (a.state !== "assembled") return;
+    const c = a.incident.collection as Record<string, { state: string } | undefined>;
+    expect(c.metrics?.state, "the fixture says __nothing explicitly").toBe("nothing");
+    expect(c.logs?.state, "the file is simply not there").toBe("failed");
+  });
+
+  it("stamps from the request rather than reading the answer", () => {
+    // Two runs of one scenario share a collection; two scenarios do not. If the
+    // id came from the payload, both would be whatever the file said.
+    const one = assembleIncident("container-oom", 1, { root: SCENARIOS });
+    const again = assembleIncident("container-oom", 1, { root: SCENARIOS });
+    const other = assembleIncident("cpu-throttling", 1, { root: SCENARIOS });
+    if (one.state !== "assembled" || again.state !== "assembled" || other.state !== "assembled") throw new Error("x");
+    const idOf = (i: Record<string, unknown>) => {
+      const k = (i.observations as Record<string, { provenance?: { collection_id?: string } } | null>).kubernetes;
+      return String(k?.provenance?.collection_id ?? "");
+    };
+    expect(idOf(one.incident)).toBe(idOf(again.incident));
+    expect(idOf(one.incident)).not.toBe(idOf(other.incident));
+  });
+
+  it("refuses a collection id that is not a real one", () => {
+    const a = assembleIncident("container-oom", 1, { root: SCENARIOS, collectionId: "not-a-uuid" });
+    expect(a.state).toBe("refused");
+    if (a.state !== "refused") return;
+    expect(a.reason).toContain("must be a uuid");
+  });
+
+  it("checks the namespace, not only the cluster", () => {
+    // Grok, 2026-09-05: namespace was required by the schema and read by
+    // nothing, while it is the field that actually partitions tenant data.
+    const request = { collection_id: "aaaaaaaa-0000-4000-8000-000000000000",
+      incident_id: "INC-2026-0101", cluster: "prod-eu", namespace: "production" };
+    const stamped = (over: Record<string, unknown>) => ({
+      kubernetes: { state: "collected" as const, slot: "kubernetes" as const,
+        data: { provenance: { ...request, requested_for: request.incident_id, provider: "x", ...over } } },
+      logs: { state: "nothing" as const, slot: "logs" as const },
+      metrics: { state: "nothing" as const, slot: "metrics" as const },
+    });
+    expect(checkProvenance(stamped({}), request)).toBeNull();
+    expect(checkProvenance(stamped({ namespace: "another-tenant" }), request)).toContain("namespace another-tenant");
+    expect(checkProvenance(stamped({ cluster: "staging-us" }), request)).toContain("cluster staging-us");
+    expect(checkProvenance(stamped({ collection_id: "bbbbbbbb-0000-4000-8000-000000000000" }), request)).toContain("not the aaaaaaaa");
+  });
+
+  it("refuses a null stamp rather than throwing on it", () => {
+    // Grok, 2026-09-05: null is not undefined, so the missing-provenance branch
+    // was skipped and the next line threw. A crash is not a refusal.
+    const request = { collection_id: "aaaaaaaa-0000-4000-8000-000000000000",
+      incident_id: "INC-2026-0101", cluster: "prod-eu", namespace: "production" };
+    const obs = {
+      kubernetes: { state: "collected" as const, slot: "kubernetes" as const, data: { provenance: null } },
+      logs: { state: "nothing" as const, slot: "logs" as const },
+      metrics: { state: "nothing" as const, slot: "metrics" as const },
+    };
+    expect(() => checkProvenance(obs, request)).not.toThrow();
+    expect(checkProvenance(obs, request)).toContain("no provenance");
+  });
+
+  it("says nothing was established when nothing was collected", () => {
+    // One collected slot used to make the collection check vacuously true.
+    const request = { collection_id: "aaaaaaaa-0000-4000-8000-000000000000",
+      incident_id: "INC-2026-0101", cluster: "prod-eu", namespace: "production" };
+    const none = {
+      kubernetes: { state: "nothing" as const, slot: "kubernetes" as const },
+      logs: { state: "nothing" as const, slot: "logs" as const },
+      metrics: { state: "nothing" as const, slot: "metrics" as const },
+    };
+    expect(checkProvenance(none, request)).toContain("nothing whose provenance could be established");
   });
 });

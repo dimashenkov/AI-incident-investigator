@@ -159,6 +159,36 @@ function invariantErrors(name: SchemaName, data: unknown): string[] {
      * `analysis.agents[]` — precisely the "passes here, fails there" split this
      * file opens by saying it exists to prevent.
      */
+    /*
+     * The observation and the record of collecting it must say the same thing.
+     *
+     * Codex, 2026-09-05: null in an observation slot meant both "the provider
+     * looked and there was nothing" and "nobody could look", and the failure
+     * lived outside the document, so serialising it lost even the fact that a
+     * slot had failed. The `collection` record carries the three answers; this
+     * is what keeps it from disagreeing with the observation beside it, because
+     * a record nothing cross-checks would drift into decoration.
+     */
+    const collection = obj["collection"];
+    const observations = obj["observations"];
+    if (typeof collection === "object" && collection !== null
+        && typeof observations === "object" && observations !== null) {
+      const c = collection as Record<string, unknown>;
+      const o = observations as Record<string, unknown>;
+      for (const slot of ["kubernetes", "logs", "metrics"]) {
+        const entry = c[slot];
+        if (typeof entry !== "object" || entry === null) continue;
+        const state = (entry as Record<string, unknown>)["state"];
+        const present = o[slot] !== null && o[slot] !== undefined;
+        if (present && state !== "collected") {
+          errs.push(`/collection/${slot}/state says ${String(state)} while /observations/${slot} carries an observation`);
+        }
+        if (!present && state === "collected") {
+          errs.push(`/collection/${slot}/state says collected while /observations/${slot} is null`);
+        }
+      }
+    }
+
     const agents = (obj["analysis"] as Record<string, unknown> | undefined)?.["agents"];
     if (Array.isArray(agents)) {
       agents.forEach((a, i) => {

@@ -7,34 +7,85 @@
     "kubernetes": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["collected_at", "pods", "events", "deployment"],
+      "required": [
+        "provenance",
+        "collected_at",
+        "pods",
+        "events",
+        "deployment"
+      ],
       "description": "Every key required. A collection that silently omitted pods would read as a cluster with no pods, which is a finding, not an absence.",
       "properties": {
-        "collected_at": { "type": "string", "format": "date-time" },
+        "collected_at": {
+          "type": "string",
+          "format": "date-time"
+        },
         "pods": {
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["name", "namespace", "phase", "restart_count", "containers"],
+            "required": [
+              "name",
+              "namespace",
+              "phase",
+              "restart_count",
+              "containers"
+            ],
             "properties": {
-              "name": { "type": "string", "minLength": 1 },
-              "namespace": { "type": "string", "minLength": 1 },
-              "phase": { "type": "string", "enum": ["Pending", "Running", "Succeeded", "Failed", "Unknown"] },
-              "restart_count": { "type": "integer", "minimum": 0 },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "namespace": {
+                "type": "string",
+                "minLength": 1
+              },
+              "phase": {
+                "type": "string",
+                "enum": [
+                  "Pending",
+                  "Running",
+                  "Succeeded",
+                  "Failed",
+                  "Unknown"
+                ]
+              },
+              "restart_count": {
+                "type": "integer",
+                "minimum": 0
+              },
               "containers": {
                 "type": "array",
                 "minItems": 1,
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
-                  "required": ["name", "ready", "restart_count", "limits", "requests"],
+                  "required": [
+                    "name",
+                    "ready",
+                    "restart_count",
+                    "limits",
+                    "requests"
+                  ],
                   "properties": {
-                    "name": { "type": "string", "minLength": 1 },
-                    "ready": { "type": "boolean" },
-                    "restart_count": { "type": "integer", "minimum": 0 },
-                    "limits": { "$ref": "#/$defs/resources" },
-                    "requests": { "$ref": "#/$defs/resources" },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "ready": {
+                      "type": "boolean"
+                    },
+                    "restart_count": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "limits": {
+                      "$ref": "#/$defs/resources"
+                    },
+                    "requests": {
+                      "$ref": "#/$defs/resources"
+                    },
                     "last_state": {
                       "type": "object",
                       "additionalProperties": false,
@@ -43,12 +94,28 @@
                         "terminated": {
                           "type": "object",
                           "additionalProperties": false,
-                          "required": ["reason", "exit_code", "started_at", "finished_at"],
+                          "required": [
+                            "reason",
+                            "exit_code",
+                            "started_at",
+                            "finished_at"
+                          ],
                           "properties": {
-                            "reason": { "type": "string", "minLength": 1 },
-                            "exit_code": { "type": "integer" },
-                            "started_at": { "type": "string", "format": "date-time" },
-                            "finished_at": { "type": "string", "format": "date-time" }
+                            "reason": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "exit_code": {
+                              "type": "integer"
+                            },
+                            "started_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "finished_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
                           }
                         }
                       }
@@ -64,46 +131,115 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["type", "reason", "message", "count", "last_seen", "involved_object"],
+            "required": [
+              "type",
+              "reason",
+              "message",
+              "count",
+              "last_seen",
+              "involved_object"
+            ],
             "properties": {
-              "type": { "type": "string", "enum": ["Normal", "Warning"] },
-              "reason": { "type": "string", "minLength": 1 },
-              "message": { "type": "string", "minLength": 1 },
-              "count": { "type": "integer", "minimum": 1 },
-              "last_seen": { "type": "string", "format": "date-time" },
-              "involved_object": { "type": "string", "minLength": 1 }
+              "type": {
+                "type": "string",
+                "enum": [
+                  "Normal",
+                  "Warning"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "last_seen": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "involved_object": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           }
         },
         "deployment": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["name", "namespace", "replicas", "image"],
+          "required": [
+            "name",
+            "namespace",
+            "replicas",
+            "image"
+          ],
           "properties": {
-            "name": { "type": "string", "minLength": 1 },
-            "namespace": { "type": "string", "minLength": 1 },
-            "image": { "type": "string", "minLength": 1 },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "namespace": {
+              "type": "string",
+              "minLength": 1
+            },
+            "image": {
+              "type": "string",
+              "minLength": 1
+            },
             "replicas": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["desired", "ready", "available"],
+              "required": [
+                "desired",
+                "ready",
+                "available"
+              ],
               "properties": {
-                "desired": { "type": "integer", "minimum": 0 },
-                "ready": { "type": "integer", "minimum": 0 },
-                "available": { "type": "integer", "minimum": 0 }
+                "desired": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "ready": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "available": {
+                  "type": "integer",
+                  "minimum": 0
+                }
               }
             }
           }
+        },
+        "provenance": {
+          "$ref": "https://ai-sre-mvp/schemas/common.schema.json#/$defs/provenance"
         }
       }
     },
     "logs": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["collected_at", "window", "truncated", "lines"],
+      "required": [
+        "provenance",
+        "collected_at",
+        "window",
+        "truncated",
+        "lines"
+      ],
       "properties": {
-        "collected_at": { "type": "string", "format": "date-time" },
-        "window": { "$ref": "#/$defs/window" },
+        "collected_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "window": {
+          "$ref": "#/$defs/window"
+        },
         "truncated": {
           "type": "boolean",
           "description": "Required, because a truncated log that does not say so makes an incomplete read look like a complete one — and an agent would then reason from an absence that was never established."
@@ -113,34 +249,84 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["ts", "level", "container", "message"],
+            "required": [
+              "ts",
+              "level",
+              "container",
+              "message"
+            ],
             "properties": {
-              "ts": { "type": "string", "format": "date-time" },
-              "level": { "type": "string", "enum": ["debug", "info", "warn", "error", "fatal"] },
-              "container": { "type": "string", "minLength": 1 },
-              "message": { "type": "string", "minLength": 1 }
+              "ts": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "level": {
+                "type": "string",
+                "enum": [
+                  "debug",
+                  "info",
+                  "warn",
+                  "error",
+                  "fatal"
+                ]
+              },
+              "container": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           }
+        },
+        "provenance": {
+          "$ref": "https://ai-sre-mvp/schemas/common.schema.json#/$defs/provenance"
         }
       }
     },
     "metrics": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["collected_at", "window", "series"],
+      "required": [
+        "provenance",
+        "collected_at",
+        "window",
+        "series"
+      ],
       "properties": {
-        "collected_at": { "type": "string", "format": "date-time" },
-        "window": { "$ref": "#/$defs/window" },
+        "collected_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "window": {
+          "$ref": "#/$defs/window"
+        },
         "series": {
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["name", "unit", "container", "points"],
+            "required": [
+              "name",
+              "unit",
+              "container",
+              "points"
+            ],
             "properties": {
-              "name": { "type": "string", "minLength": 1 },
-              "unit": { "type": "string", "minLength": 1 },
-              "container": { "type": "string", "minLength": 1 },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "unit": {
+                "type": "string",
+                "minLength": 1
+              },
+              "container": {
+                "type": "string",
+                "minLength": 1
+              },
               "points": {
                 "type": "array",
                 "minItems": 1,
@@ -148,35 +334,64 @@
                 "items": {
                   "type": "object",
                   "additionalProperties": false,
-                  "required": ["ts", "value"],
+                  "required": [
+                    "ts",
+                    "value"
+                  ],
                   "properties": {
-                    "ts": { "type": "string", "format": "date-time" },
-                    "value": { "type": "number" }
+                    "ts": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "value": {
+                      "type": "number"
+                    }
                   }
                 }
               }
             }
           }
+        },
+        "provenance": {
+          "$ref": "https://ai-sre-mvp/schemas/common.schema.json#/$defs/provenance"
         }
       }
     },
     "window": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["from", "to"],
+      "required": [
+        "from",
+        "to"
+      ],
       "description": "Which stretch of time was actually read. Without it, finding nothing is indistinguishable from looking at the wrong minutes.",
       "properties": {
-        "from": { "type": "string", "format": "date-time" },
-        "to": { "type": "string", "format": "date-time" }
+        "from": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "to": {
+          "type": "string",
+          "format": "date-time"
+        }
       }
     },
     "resources": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["memory", "cpu"],
+      "required": [
+        "memory",
+        "cpu"
+      ],
       "properties": {
-        "memory": { "type": "string", "minLength": 1 },
-        "cpu": { "type": "string", "minLength": 1 }
+        "memory": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cpu": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     }
   }

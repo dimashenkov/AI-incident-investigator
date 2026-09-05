@@ -81,6 +81,10 @@ describe("the ten Definition-of-Done items", () => {
     // through, and would have let through a dependency that already exists.
     // Each allowed dependency is checked against the repository instead.
     const ABSENT: Record<string, () => boolean> = {
+      "a provider whose answers can be checked, not only requested": () =>
+        // One fixture-backed provider that reads files it is handed. Nothing
+        // can verify what it returns is what was asked for.
+        readdirSync(new URL("../src/providers/", import.meta.url).pathname).filter((f) => f.endsWith(".ts")).length < 3,
       "trusted provenance at the ingestion boundary": () =>
         // One fixture-backed provider that reads files. Nothing carries a
         // collection-request identity, so there is nothing to check against.

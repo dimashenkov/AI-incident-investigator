@@ -16,7 +16,8 @@
     "observations",
     "analysis",
     "remediation",
-    "conversation"
+    "conversation",
+    "collection"
   ],
   "properties": {
     "incident_id": {
@@ -251,6 +252,243 @@
     },
     "conversation": {
       "$ref": "https://ai-sre-mvp/schemas/conversation.schema.json"
+    },
+    "collection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kubernetes",
+        "logs",
+        "metrics"
+      ],
+      "description": "The outcome of collecting each slot, recorded in the document rather than handed back on the side. Codex, 2026-09-05: the failures used to live outside the incident, so once it was serialised the fact that a slot had failed was gone entirely.",
+      "properties": {
+        "kubernetes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state"
+          ],
+          "description": "What happened when this slot was collected. Three answers, not two: an observation, an established absence, and a failure to look. Absence and failure both leave the observation null, and a reader that sees only null cannot tell 'the provider looked and found nothing' from 'nobody looked'.",
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "collected",
+                "nothing",
+                "failed"
+              ],
+              "description": "collected: an observation is present. nothing: the provider said explicitly that there was nothing here. failed: the slot could not be collected, and the incident is missing it."
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "absent",
+                "unreadable",
+                "contradiction"
+              ],
+              "description": "Only for state failed. absent: nothing was there to read. unreadable: something was there and could not be understood. contradiction: something was there and disagreed with the request it was gathered under."
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Only for state failed. Why the slot could not be collected, in the words of whatever refused it."
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "state": {
+                    "const": "failed"
+                  }
+                },
+                "required": [
+                  "state"
+                ]
+              },
+              "then": {
+                "required": [
+                  "state",
+                  "kind",
+                  "reason"
+                ],
+                "properties": {
+                  "state": {},
+                  "kind": {},
+                  "reason": {}
+                }
+              },
+              "else": {
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "kind"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "reason"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "logs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state"
+          ],
+          "description": "What happened when this slot was collected. Three answers, not two: an observation, an established absence, and a failure to look. Absence and failure both leave the observation null, and a reader that sees only null cannot tell 'the provider looked and found nothing' from 'nobody looked'.",
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "collected",
+                "nothing",
+                "failed"
+              ],
+              "description": "collected: an observation is present. nothing: the provider said explicitly that there was nothing here. failed: the slot could not be collected, and the incident is missing it."
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "absent",
+                "unreadable",
+                "contradiction"
+              ],
+              "description": "Only for state failed. absent: nothing was there to read. unreadable: something was there and could not be understood. contradiction: something was there and disagreed with the request it was gathered under."
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Only for state failed. Why the slot could not be collected, in the words of whatever refused it."
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "state": {
+                    "const": "failed"
+                  }
+                },
+                "required": [
+                  "state"
+                ]
+              },
+              "then": {
+                "required": [
+                  "state",
+                  "kind",
+                  "reason"
+                ],
+                "properties": {
+                  "state": {},
+                  "kind": {},
+                  "reason": {}
+                }
+              },
+              "else": {
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "kind"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "reason"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state"
+          ],
+          "description": "What happened when this slot was collected. Three answers, not two: an observation, an established absence, and a failure to look. Absence and failure both leave the observation null, and a reader that sees only null cannot tell 'the provider looked and found nothing' from 'nobody looked'.",
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "collected",
+                "nothing",
+                "failed"
+              ],
+              "description": "collected: an observation is present. nothing: the provider said explicitly that there was nothing here. failed: the slot could not be collected, and the incident is missing it."
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "absent",
+                "unreadable",
+                "contradiction"
+              ],
+              "description": "Only for state failed. absent: nothing was there to read. unreadable: something was there and could not be understood. contradiction: something was there and disagreed with the request it was gathered under."
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Only for state failed. Why the slot could not be collected, in the words of whatever refused it."
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "state": {
+                    "const": "failed"
+                  }
+                },
+                "required": [
+                  "state"
+                ]
+              },
+              "then": {
+                "required": [
+                  "state",
+                  "kind",
+                  "reason"
+                ],
+                "properties": {
+                  "state": {},
+                  "kind": {},
+                  "reason": {}
+                }
+              },
+              "else": {
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "kind"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "reason"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
     }
   },
   "allOf": [

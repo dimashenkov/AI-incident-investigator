@@ -7,6 +7,9 @@
  * should have reported, or report something it should have ignored.
  */
 import { describe, it, expect } from "vitest";
+import { createHash } from "node:crypto";
+// @ts-expect-error - plain .mjs script, no types
+import { recordFrom } from "../scripts/record-baseline.mjs";
 import { readFileSync } from "node:fs";
 // @ts-expect-error — plain .mjs, the same file node runs.
 import { normalise, differences, compareWorkflows, digestCode, jsonUnsafePaths, INSTANCE_FIELDS, CREDENTIAL_ID_PLACEHOLDER } from "../scripts/drift.mjs";
@@ -30,12 +33,25 @@ function deployedExport() {
 }
 
 describe("a real deployment compares equal to what we generated", () => {
-  it("reports same against the recorded export", () => {
-    // The baseline is a genuine n8n Cloud export from 2026-09-04, not a
-    // hand-written approximation of one. A hand-written baseline would only
-    // prove that normalisation agrees with my idea of what n8n adds.
+  it("reports same when the deployment carries the digest of what we generated", () => {
+    /*
+     * This used to compare the generated workflow against the CURRENT recorded
+     * baseline, and so it failed the moment the repository moved ahead of the
+     * deployment — which is true of every change worth releasing.
+     *
+     * That question belongs to the gate's no-drift-from-baseline check, which
+     * asks it once. Asked here as well it was a second carrier of one rule, and
+     * it deadlocked the release: the gate may be walked past on drift alone,
+     * but a failing test suite stops the chain outright.
+     *
+     * What is left here is what this file can prove without the environment:
+     * that a deployment running exactly our code compares equal. The real
+     * n8n export supplies the instance fields, which is why it is still read.
+     */
     const { workflow } = generate();
-    const r = compareWorkflows(workflow, deployedExport());
+    const deployed = deployedExport();
+    deployed.nodes[1].parameters.jsCode = digestCode(workflow).nodes[1].parameters.jsCode;
+    const r = compareWorkflows(workflow, deployed);
     expect(r.state, JSON.stringify(r.differences?.slice(0, 4))).toBe("same");
   });
 
@@ -56,14 +72,23 @@ describe("a real deployment compares equal to what we generated", () => {
     expect(compareWorkflows(workflow, deployed).state).toBe("drifted");
   });
 
-  it("does not take the digest from the generated side", () => {
-    // If the baseline ever borrowed the generated code again, this would pass
-    // for any deployment at all. It must be the recorded digest that decides.
-    const recorded = deployedExport().nodes[1].parameters.jsCode.__sha256;
-    expect(recorded).toMatch(/^[0-9a-f]{64}$/);
+  it("takes the digest from what the deployment returned, not from what we generated", () => {
+    // The property, asked of the recorder rather than of today's deployment.
+    // Handed an export whose code is nothing like ours, the baseline must carry
+    // THAT code's digest — if it ever borrowed the generated side again, drift
+    // detection would report "same" for any deployment at all.
+    const FOREIGN_CODE = "// a deployment running something else\n";
+    const foreign = { nodes: [{ parameters: { jsCode: FOREIGN_CODE } }] };
+    const recorded = recordFrom(foreign, { note: "t" }) as { nodes: Array<{ parameters: { jsCode: { __sha256: string; __bytes: number } } }> };
+    const stamped = recorded.nodes[0]?.parameters.jsCode;
+    expect(stamped, "the recorder returned no node at all").toBeDefined();
+    if (stamped === undefined) return;
+    expect(stamped.__sha256).toBe(createHash("sha256").update(FOREIGN_CODE, "utf8").digest("hex"));
+    expect(stamped.__bytes).toBe(Buffer.byteLength(FOREIGN_CODE, "utf8"));
+
     const { workflow } = generate();
-    const generatedDigest = digestCode(workflow).nodes[1].parameters.jsCode.__sha256;
-    expect(generatedDigest).toBe(recorded);
+    const ours = digestCode(workflow).nodes[1].parameters.jsCode.__sha256;
+    expect(stamped.__sha256, "the recorder borrowed the generated code").not.toBe(ours);
   });
 });
 

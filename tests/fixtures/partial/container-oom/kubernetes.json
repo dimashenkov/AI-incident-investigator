@@ -11,8 +11,14 @@
           "name": "payment-api",
           "ready": false,
           "restart_count": 7,
-          "limits": { "memory": "512Mi", "cpu": "500m" },
-          "requests": { "memory": "256Mi", "cpu": "200m" },
+          "limits": {
+            "memory": "512Mi",
+            "cpu": "500m"
+          },
+          "requests": {
+            "memory": "256Mi",
+            "cpu": "200m"
+          },
           "last_state": {
             "terminated": {
               "reason": "OOMKilled",
@@ -38,7 +44,11 @@
   "deployment": {
     "name": "payment-api",
     "namespace": "production",
-    "replicas": { "desired": 3, "ready": 2, "available": 2 },
+    "replicas": {
+      "desired": 3,
+      "ready": 2,
+      "available": 2
+    },
     "image": "registry.internal/payment-api:2.14.0"
   }
 }

@@ -98,8 +98,8 @@ export const MUTATIONS = [
     // termination reason is what the whole container-oom scenario turns on.
     id: "termination-reason-becomes-optional",
     file: "schemas/observations.schema.json",
-    from: '"required": ["reason", "exit_code", "started_at", "finished_at"]',
-    to: '"required": ["exit_code", "started_at", "finished_at"]',
+    from: '"reason",\n                            "exit_code",',
+    to: '"exit_code",',
     mustFail: "refuses a termination that does not say why",
   },
   {
@@ -107,7 +107,7 @@ export const MUTATIONS = [
     // to prevent it: a missing file reported as "the provider found nothing".
     id: "missing-fixture-reads-as-nothing",
     file: "src/providers/fixtures.ts",
-    from: '  if (!existsSync(root)) return { state: "failed", slot, reason: `no scenario root at ${root}` };',
+    from: '  if (!existsSync(root)) return { state: "failed", slot, kind: "absent", reason: `no scenario root at ${root}` };',
     to: '  if (!existsSync(root)) return { state: "nothing", slot };',
     mustFail: "reports failure, not nothing, when the scenario root does not exist",
   },
@@ -248,6 +248,107 @@ export const MUTATIONS = [
     from: '  core.update(`model:${model.name}@${model.temperature}`);',
     to: "  // no model in the stamp",
     mustFail: "moves when the model or its temperature changes",
+  },
+  {
+    // Without this the contradicting slot is filed as one absence among three
+    // and two healthy slots carry the incident anyway.
+    id: "assembly-tolerates-a-contradicting-slot",
+    file: "src/core/assemble.ts",
+    from: '  const contradictions = failures.filter((f) => f.kind === "contradiction");',
+    to: "  const contradictions = [];",
+    mustFail: "refuses an answer whose stamp disagrees about the namespace",
+  },
+  {
+    // Eleven contract tests went vacuous when the stamp became required and
+    // nothing stamped them. The precondition is what noticed; this keeps it so.
+    id: "contract-tests-stop-stamping-the-slot",
+    file: "tests/providers.test.ts",
+    from: "      ? { ...(data as Record<string, unknown>), provenance: stampOf(slot) }",
+    to: "      ? { ...(data as Record<string, unknown>) }",
+    mustFail: "accepts a well-formed slot, so the refusals below are about what they say",
+  },
+  {
+    // The sentinel is the one answer nothing else looks at. Recognised before
+    // the stamp, it is a way in that leaves no trace.
+    id: "sentinel-read-before-the-stamp-is-checked",
+    file: "src/providers/fixtures.ts",
+    from: "    const said = readSentinel(data as Record<string, unknown>, slot);\n    if (said !== null) return said;",
+    to: "    const said = null;\n    if (said !== null) return said;",
+    mustFail: "reports nothing under a request too, not only when read raw",
+  },
+  {
+    // "Nothing here" is the one answer nothing downstream re-examines, so it is
+    // the one that has to say why, and say only that.
+    id: "sentinel-accepted-without-a-reason",
+    file: "src/providers/fixtures.ts",
+    from: "  if (typeof why !== \"string\" || why.trim().length === 0) {",
+    to: "  if (false) {",
+    mustFail: "refuses a nothing that does not say why it is nothing",
+  },
+  {
+    id: "sentinel-accepted-alongside-real-data",
+    file: "src/providers/fixtures.ts",
+    from: "  if (extra.length > 0) {",
+    to: "  if (false) {",
+    mustFail: "refuses a nothing that arrives carrying an observation as well",
+  },
+  {
+    id: "release-reads-an-unestablished-drift-check-as-behind",
+    file: "scripts/release.mjs",
+    from: '  if (notPassing[0]?.state !== "fail") {',
+    to: "  if (false) {",
+    mustFail: "stops when the drift check could not be established, rather than reading it as merely behind",
+  },
+  {
+    id: "sentinel-provenance-exempted-wholesale",
+    file: "src/providers/fixtures.ts",
+    from: "    if (strays.length > 0) {",
+    to: "    if (false) {",
+    mustFail: "refuses a nothing that hides an observation inside its provenance",
+  },
+  {
+    id: "claimed-provider-not-compared",
+    file: "src/providers/fixtures.ts",
+    from: '        ["provider", `fake-${slot}`],',
+    to: "",
+    mustFail: "refuses an answer that claims to come from another collector",
+  },
+  {
+    // The narrow exception has to stay narrow. Widened to any failure, the
+    // release walks past the gate entirely.
+    id: "release-walks-past-any-gate-failure",
+    file: "scripts/release.mjs",
+    from: "  const other = notPassing.filter((r) => r?.id !== DRIFT_CHECK_ID);",
+    to: "  const other = [];",
+    mustFail: "stops on anything else, even alongside the drift failure",
+  },
+  {
+    id: "release-reads-a-missing-report-as-clean",
+    file: "scripts/release.mjs",
+    from: '    return "the gate failed and its report could not be read, so there is no way to tell what failed";',
+    to: "    return null;",
+    mustFail: "stops when the report cannot be read, rather than reading absence as agreement",
+  },
+  {
+    // The question no content check can answer, unasked.
+    // The provider refuses a contradicting stamp before assembly ever sees it,
+    // so this is the second line: an observation that arrives stamped but was
+    // not gathered under our request. Reached by the direct tests, and that is
+    // said rather than hidden behind a mutation pointing somewhere convenient.
+    id: "provider-normalises-a-disagreeing-stamp",
+    file: "src/providers/fixtures.ts",
+    from: "      ] as const).filter(([k, want]) => c[k] !== want);",
+    to: "      ] as const).filter(() => false);",
+    mustFail: "refuses an answer whose stamp disagrees about the namespace",
+  },
+  {
+    // Three slots from three collections are three moments read as one.
+    // The provider contradicting its own request — the path a real answer takes.
+    id: "provider-stamp-overwritten-instead-of-refused",
+    file: "src/providers/fixtures.ts",
+    from: "      if (disagreements.length > 0) {",
+    to: "      if (false) {",
+    mustFail: "refuses a provider that stamps its answer with another collection",
   },
   {
     // A review that judges a different code than what was shown makes every

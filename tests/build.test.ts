@@ -47,6 +47,9 @@ const INC = {
   started_at: "2026-09-04T10:30:00Z",
   source: { provider: "fake-datadog", alert: { id: "a", title: "t", triggered_at: "2026-09-04T10:29:00Z" } },
   observations: { kubernetes: null, logs: null, metrics: null },
+  // Three answers per slot, recorded in the document. Everything here is a
+  // deliberate "the provider said there was nothing", not a slot nobody read.
+  collection: { kubernetes: { state: "nothing" }, logs: { state: "nothing" }, metrics: { state: "nothing" } },
   analysis: { agents: [], root_cause_code: null, root_cause: null, confidence: null, evidence: [] },
   remediation: { recommended_actions: [] }, conversation: CONV,
 };

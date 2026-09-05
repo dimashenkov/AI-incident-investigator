@@ -34,6 +34,44 @@
         "CPU_THROTTLING"
       ],
       "description": "The named causes this system can identify. One carrier, referenced by both the incident's root_cause_code and an agent's hypothesis code. Codex, 2026-09-05: keeping them as two enums that a test compares means the lists can still be written apart and only caught afterwards - and one such drift had already made a scenario unsolvable, with CPU_THROTTLING recordable while no agent could propose it. INSUFFICIENT_EVIDENCE is deliberately NOT here: it is a verdict about a whole incident, not a cause an agent can hold a hypothesis about."
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "collection_id",
+        "requested_for",
+        "cluster",
+        "namespace",
+        "provider"
+      ],
+      "description": "Where an observation came from, carried by the observation itself.\n\nCodex, 2026-09-05, naming the question no content check can answer: 'Does this observation come from the trusted collection request that created this incident? Content scanning cannot establish provenance. A foreign record may contain no incident ID, while a legitimate log may mention another ID.'\n\nEverything before this trusted an observation because it looked right. This is the only thing that can say it was asked for, for this incident, from this cluster, in one collection.",
+      "properties": {
+        "collection_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "description": "The one request that gathered this. Every slot of one incident must carry the same value: three observations from three separate collections do not describe one moment, and agents read them as though they do."
+        },
+        "requested_for": {
+          "type": "string",
+          "pattern": "^INC-[0-9]{4}-[0-9]{4}$",
+          "description": "Which incident it was gathered for. An observation asked for elsewhere is not this incident's, however well it fits."
+        },
+        "cluster": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Which cluster it came from. Data from another cluster looks entirely ordinary, which is why nothing downstream can catch it."
+        },
+        "namespace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Which implementation produced it. Recorded so a defect can be traced to a provider rather than to the agents reading it."
+        }
+      }
     }
   }
 }

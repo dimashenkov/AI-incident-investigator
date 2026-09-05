@@ -8,6 +8,9 @@ const INC = {
   incident_id: "INC-2026-0001", status: "investigating", service: "payment-api", namespace: "production",
   cluster: "prod-eu", started_at: "2026-09-04T10:30:00Z", source: { provider: "fake-datadog", alert: {} },
   observations: { kubernetes: null, logs: null, metrics: null },
+  // Three answers per slot, recorded in the document. Everything here is a
+  // deliberate "the provider said there was nothing", not a slot nobody read.
+  collection: { kubernetes: { state: "nothing" }, logs: { state: "nothing" }, metrics: { state: "nothing" } },
   analysis: { agents: [], root_cause_code: null, root_cause: null, confidence: null, evidence: [] },
   remediation: { recommended_actions: [] }, conversation: CONV,
 };
@@ -200,9 +203,25 @@ describe("absence is not consent — cases that used to pass", () => {
   it("refuses an empty object as a collected observation", () => {
     // Codex, chunk 0 round 13: {} said "collected, and here is what we found"
     // while carrying exactly what null already says honestly — nothing.
+    // INC is deliberately invalid — its alert is one of the cases above — so a
+    // test built on it is refused before the slot is ever looked at. This one
+    // was, for as long as it has existed. VALID is the complete object, and the
+    // precondition below is what keeps that true.
+    const VALID = { ...INC,
+      source: { provider: "fake-datadog", alert: { id: "a-1", title: "t", triggered_at: "2026-09-04T10:29:00Z" } } };
+    expect(validate("incident", VALID).state,
+      `the base must be valid, or nothing below is about the slot: ${JSON.stringify(validate("incident", VALID))}`).toBe("valid");
     for (const slot of ["kubernetes", "logs", "metrics"]) {
-      const bad = { ...INC, observations: { kubernetes: null, logs: null, metrics: null, [slot]: {} } };
-      expect(validate("incident", bad).state, `${slot}: ${JSON.stringify(validate("incident", bad))}`).toBe("invalid");
+      const bad = { ...VALID, observations: { kubernetes: null, logs: null, metrics: null, [slot]: {} } };
+      const r = validate("incident", bad);
+      expect(r.state, `${slot}: ${JSON.stringify(r)}`).toBe("invalid");
+      if (r.state !== "invalid") continue;
+      // Naming the rule that does the refusing. minProperties used to, and no
+      // longer exists anywhere in schemas/ — the fixture contracts took over.
+      // A test that asserted only "invalid" survived both that replacement and
+      // an invalid base, which is how it spent its whole life proving nothing.
+      expect(r.errors.join("; "), `${slot} was refused for something other than being empty`)
+        .toContain(`/observations/${slot} must have required property`);
     }
   });
 
@@ -219,8 +238,13 @@ describe("absence is not consent — cases that used to pass", () => {
     // A collected observation now has to have the shape its fixture contract
     // declares. `{ pods: [] }` used to pass here, which meant "collected" could
     // be claimed by an object that said nothing.
-    const collected = JSON.parse(readFileSync(new URL("../../scenarios/container-oom/kubernetes.json", import.meta.url).pathname, "utf8"));
-    const withData = { ...base, observations: { kubernetes: collected, logs: null, metrics: null } };
+    // The stamp is applied by the provider from the request; a hand-built
+    // observation has to carry one or the schema refuses it.
+    const collected = { ...JSON.parse(readFileSync(new URL("../../scenarios/container-oom/kubernetes.json", import.meta.url).pathname, "utf8")),
+      provenance: { collection_id: "aaaaaaaa-0000-4000-8000-000000000000", requested_for: "INC-2026-0001",
+        cluster: "prod-eu", namespace: "production", provider: "fake-kubernetes" } };
+    const withData = { ...base, observations: { kubernetes: collected, logs: null, metrics: null },
+      collection: { kubernetes: { state: "collected" }, logs: { state: "nothing" }, metrics: { state: "nothing" } } };
     expect(validate("incident", withData).state, JSON.stringify(validate("incident", withData))).toBe("valid");
   });
 });

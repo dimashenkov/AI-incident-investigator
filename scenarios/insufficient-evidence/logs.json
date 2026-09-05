@@ -1,3 +1,16 @@
-{ "collected_at": "2026-09-04T21:16:42Z", "window": { "from": "2026-09-04T21:14:00Z", "to": "2026-09-04T21:16:00Z" },
+{
+  "collected_at": "2026-09-04T21:16:42Z",
+  "window": {
+    "from": "2026-09-04T21:14:00Z",
+    "to": "2026-09-04T21:16:00Z"
+  },
   "truncated": true,
-  "lines": [{ "ts": "2026-09-04T21:15:30Z", "level": "error", "container": "notify-api", "message": "upstream returned 502" }] }
+  "lines": [
+    {
+      "ts": "2026-09-04T21:15:30Z",
+      "level": "error",
+      "container": "notify-api",
+      "message": "upstream returned 502"
+    }
+  ]
+}

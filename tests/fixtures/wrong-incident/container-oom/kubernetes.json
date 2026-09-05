@@ -50,5 +50,12 @@
       "available": 2
     },
     "image": "registry.internal/payment-api:2.14.0"
+  },
+  "provenance": {
+    "collection_id": "ffffffff-0000-4000-8000-000000000000",
+    "requested_for": "INC-2026-0909",
+    "cluster": "prod-eu",
+    "namespace": "production",
+    "provider": "a provider claiming its own answer"
   }
 }
