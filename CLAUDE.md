@@ -868,3 +868,4 @@ do not run any network command
 | `npm run X` | печата `npm notice` редове, които замърсяват всеки `grep` върху изхода | викай скрипта директно с `node`, когато четеш изхода машинно |
 | `npm run X` през pipe | `$?` е кодът на последната команда в pipe-а, не на скрипта | пусни го без pipe и после чети `$?` |
 | `out/` | gitignored — резултатът на gate-а **не оцелява clone** | доказателството влиза в `PROGRESS.md` като ред с дата и изходен код |
+| n8n при HTTP 429 от OpenAI | показва „The service is receiving too many requests from you" и предлага retry — **дори когато причината е нула кредит** | истинската причина е в `error.description` и `messages[0]` на изпълнението: `insufficient_quota`, `credit_balance_exhausted`. Четѝ ги, не заглавието. Измерено на 2026-09-05. |
