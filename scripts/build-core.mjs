@@ -31,8 +31,8 @@ const OUT = resolve(ROOT, "out/core.js");
 const MANIFEST = resolve(ROOT, "out/core.manifest.json");
 
 /** The validatable schemas, plus `common`, which is registered but not validated against. */
-export const SCHEMA_FILES = ["common", "observations", "incident", "agent-result", "conversation", "remediation"];
-export const VALIDATABLE = ["incident", "agent-result", "conversation", "remediation"];
+export const SCHEMA_FILES = ["common", "observations", "incident", "agent-result", "conversation", "remediation", "verdict-review"];
+export const VALIDATABLE = ["incident", "agent-result", "conversation", "remediation", "verdict-review"];
 
 /**
  * What gets inlined, and how many times each must be replaced.

@@ -600,23 +600,7 @@ export const LIMITATIONS = [
 ];
 
 export const DEBT = [
-  {
-    // Asked by the owner on 2026-09-05: is there a reviewer reaction in the
-    // thread, recorded somewhere, so the agent can be improved from it?
-    //
-    // There is not. The thread is one-way: the system speaks and nobody
-    // answers. The only quality signal today is the schema, which says whether
-    // an answer is well FORMED, never whether it is RIGHT. Human judgement is
-    // the only thing that can say the second.
-    //
-    // Two things must be settled before any code: a reaction has to name the
-    // prompt version it is about, or it becomes an opinion about something that
-    // no longer exists; and it has to say whether it judges the ANSWER or the
-    // OUTCOME, because an agent can reason correctly from bad data, and mixing
-    // the two means fixing prompts for provider problems.
-    claim: "a reviewer's reaction in the thread is recorded against the prompt version it judges, and says whether it judges the answer or the outcome",
-    dueFromChunk: 4,
-  },
+
 
   {
     // Codex, 2026-09-05, naming the question neither content check can answer:

@@ -13,10 +13,11 @@ import incidentSchema from "../../schemas/incident.schema.json" with { type: "js
 import agentResultSchema from "../../schemas/agent-result.schema.json" with { type: "json" };
 import conversationSchema from "../../schemas/conversation.schema.json" with { type: "json" };
 import remediationSchema from "../../schemas/remediation.schema.json" with { type: "json" };
+import verdictReviewSchema from "../../schemas/verdict-review.schema.json" with { type: "json" };
 import commonSchema from "../../schemas/common.schema.json" with { type: "json" };
 import observationsSchema from "../../schemas/observations.schema.json" with { type: "json" };
 
-export type SchemaName = "incident" | "agent-result" | "conversation" | "remediation";
+export type SchemaName = "incident" | "agent-result" | "conversation" | "remediation" | "verdict-review";
 
 /**
  * Every $id this validator resolves, including `common`, which is registered
@@ -30,7 +31,7 @@ export type SchemaName = "incident" | "agent-result" | "conversation" | "remedia
  */
 export const REGISTERED_IDS: readonly string[] = [
   incidentSchema.$id, agentResultSchema.$id, conversationSchema.$id,
-  remediationSchema.$id, commonSchema.$id, observationsSchema.$id,
+  remediationSchema.$id, commonSchema.$id, observationsSchema.$id, verdictReviewSchema.$id,
 ];
 
 /**
@@ -64,6 +65,7 @@ const SCHEMAS = {
   "agent-result": agentResultSchema,
   conversation: conversationSchema,
   remediation: remediationSchema,
+  "verdict-review": verdictReviewSchema,
 } as const;
 
 let compiled: Map<SchemaName, ValidateFunction> | null = null;

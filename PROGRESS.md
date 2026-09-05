@@ -484,6 +484,73 @@ Stub не може да прецени дали доказателството *
 изрично какво установява (че веригата пренася безрезултатна присъда) и какво
 не (че веригата би разпознала недостатъчността сама).
 
+### Оценката на причината · 2026-09-05 · троен преглед · $0.041
+
+Поискано от собственика: човек в нишката да оценява **дали причината е вярна**,
+и това да се записва, за да се подобрява агентът. Той избра най-силната от три
+форми — вярно/грешно **плюс** истинската причина **плюс** решаващото
+доказателство — и отворена реакция вместо прозорец, защото истината обикновено
+се разбира часове по-късно, след като някой е поправил проблема.
+
+Тройният преглед намери **осемнайсет** неща. Най-важното не е в кода.
+
+#### Инструментът плащаше на рецензента за грешния етикет
+
+Grok, дословно:
+
+*„Recording wrong is the expensive path: name the real cause and point at an
+in-slice observation that still exists… The true cause is usually known from
+evidence gathered while fixing, which is often not in the original observations
+— those wrong reviews are refused, so the reviewer must pick an unrelated
+surviving ref, mark unverifiable, or mark correct. Accuracy rises as hard
+post-fix cases disappear."*
+
+Бях направил „грешна" най-скъпия път и бях блокирал точно случаите, които учат.
+Честният рецензент е бил принуден да излъже или да мълчи, а числото щеше да расте
+без системата да се подобрява.
+
+Сега `evidence_source` има две стойности. `in_observations` иска път, който
+резолвира. `learned_after` иска описание с думи. **И двете са истински
+отговори**; само първото се проследява автоматично, и обобщението ги държи
+разделени, вместо да се прави, че са едно.
+
+#### Три начина точността да расте без подобрение
+
+Codex ги намери и трите:
+
+| Дефект | Дословно |
+|---|---|
+| дублирани оценки | *„five duplicate 'correct' reviews of one incident satisfy the minimum and report 100% accuracy"* |
+| супресията е декоративна | *„`summarise` never examines `supersedes`… reviews have no review ID, so it cannot reliably identify a record at all"* |
+| щемпелът не идентифицира системата | *„changing the model, version or temperature — or changing assembly without rebuilding this validator artifact — can change the answer while leaving both hashes unchanged"* |
+
+Сега: всяко ревю има id от съдържанието си; един инцидент дава **една** оценка на
+версия; заменените отпадат дори когато корекцията е по-ранна по часовник; и
+щемпелът покрива prompt-овете, целия `src/`, **и конфигурацията на модела**.
+
+#### Grok върху тестовете: почти всеки беше по-слаб от името си
+
+*„`readLog` is only ever called on a nonexistent path… `readLog = () => []`
+would pass the whole file."* — единственото съхранение на единствения сигнал, и
+тестовете не биха забелязали винаги празен четец.
+
+*„Refuse tests discard `lines`. Nothing asserts a refused review writes zero log
+lines."* — отказ съществува, за да не стане лоша оценка измерване; ако въпреки
+това попада в дневника, всяко число върху него описва нещо, което тестовете вече
+са нарекли невалидно.
+
+*„`many(n)` is n copies of one review… A score that needs six incidents can be
+manufactured from one."*
+
+Тестовете са пренаписани срещу **истинския път**: през `reviewVerdict`, с
+истински файл, с отделни инциденти, и с проверка, че отказът не пише нищо.
+
+#### И един дефект в собствения ми тест
+
+Помощникът `many(4)` произвеждаше инциденти, които се застъпваха с онзи от теста
+за супресия — и провалът изглеждаше като бъг в обобщението. Тестът беше грешен,
+не кодът.
+
 ## Отсъдите, дословно
 
 Подканите и суровите отговори на Codex **не влизат в repo-то** (CLAUDE.md §6).

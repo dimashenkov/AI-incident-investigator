@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-sre-mvp/schemas/verdict-review.schema.json",
+  "title": "VerdictReview",
+  "description": "A human's judgement of whether the system named the right cause.\n\nEverything else in this repository checks whether an answer is well FORMED. This is the only thing that can say whether it was RIGHT, and it is the only signal that can tell an improvement from a regression.\n\nAsked for by the owner on 2026-09-05, who chose the strongest of the three shapes offered: not merely right or wrong, but the true cause and the evidence that decided it. The extra thirty seconds it costs a reviewer buys the difference between knowing the score dropped and knowing why.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "incident_id",
+    "reviewed_at",
+    "reviewer",
+    "verdict_was",
+    "proposed_code",
+    "prompt_sha",
+    "core_sha",
+    "review_id"
+  ],
+  "properties": {
+    "incident_id": {
+      "type": "string",
+      "pattern": "^INC-[0-9]{4}-[0-9]{4}$",
+      "description": "Which incident was judged. A review that does not name one cannot be counted, compared or contradicted."
+    },
+    "reviewed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the judgement was made, which is often hours after the verdict. The owner chose an open reaction over a window on purpose: the true cause is usually understood after somebody has fixed the problem, and those are the cases worth learning from."
+    },
+    "reviewer": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Who judged. Not for blame — for weighting. Two reviews disagreeing is information, and it is invisible if the reviews are anonymous."
+    },
+    "verdict_was": {
+      "type": "string",
+      "enum": [
+        "correct",
+        "wrong",
+        "unverifiable"
+      ],
+      "description": "Three states, as everywhere here. `unverifiable` is not a shrug: it means the incident was never resolved well enough for anyone to know, and counting those as wrong would blame the system for the absence of an answer nobody had."
+    },
+    "proposed_code": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "What the system said, copied at review time. Recorded rather than looked up later, because the incident is a living document and the review must judge what was actually shown."
+    },
+    "proposed_confidence": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1,
+      "description": "The confidence the system attached. A pattern of high confidence on wrong causes is a different defect from low confidence on right ones, and only this field tells them apart."
+    },
+    "actual_code": {
+      "type": "string",
+      "description": "The cause it really was. Required when the verdict was wrong: without it the review is a complaint rather than a measurement, and no confusion matrix can be built."
+    },
+    "decisive_ref": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The observation path that settled it, in the same form an agent's source_ref takes. This is what separates 'looked in the wrong place' from 'looked in the right place and reasoned badly' — two defects with opposite fixes."
+    },
+    "note": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Anything the fields cannot hold. Optional, and deliberately last: a review that lives only in prose cannot be counted."
+    },
+    "prompt_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{12,64}$",
+      "description": "Which prompts produced the verdict. Without it a stack of reviews describes prompts that may no longer exist, and comparing versions — the one thing that says whether a change helped — becomes impossible."
+    },
+    "core_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{12,64}$",
+      "description": "Which deterministic core was in play. A change in assembly or promotion can move the answer without any prompt changing."
+    },
+    "supersedes": {
+      "type": "string",
+      "description": "The review_id this one corrects. Reviews are append-only: a mistaken judgement is fixed by a new record pointing at the old, never by editing it. The summary drops every superseded record — Codex, 2026-09-05: without that the mistake and its correction both counted, pulling a single incident's score toward the middle.",
+      "pattern": "^[0-9a-f]{16}$"
+    },
+    "decisive_was_cited": {
+      "type": "boolean",
+      "description": "Whether the decisive evidence was among what the agents actually cited. Computed when the review is recorded, while the incident is at hand, because it cannot be recovered afterwards from the review alone. This is the field that separates two defects with opposite fixes: an agent that never looked at the deciding evidence needs a different prompt; one that cited it and concluded wrongly needs different reasoning."
+    },
+    "review_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{16}$",
+      "description": "Identifies this record. Codex, 2026-09-05: supersedes could not reliably point at anything, because reviews had no id — it was an unconstrained string naming nothing. Computed from the content at record time, so two identical judgements are one record rather than two samples."
+    },
+    "evidence_source": {
+      "type": "string",
+      "enum": [
+        "in_observations",
+        "learned_after"
+      ],
+      "description": "Where the deciding evidence lives.\n\nGrok, 2026-09-05, on the instrument as an instrument: requiring the decisive evidence to resolve inside the original observations refused exactly the reviews worth having. The true cause is usually learned while fixing the problem, from data the incident never collected — so an honest reviewer was left to choose 'unverifiable' or 'correct', and accuracy would rise as the hard cases disappeared.\n\n`in_observations` means the evidence is there and `decisive_ref` must resolve. `learned_after` means it came from outside, and `what_settled_it` says what it was in words. Both are real answers; only the first can be traced automatically, and the summary keeps them apart rather than pretending otherwise."
+    },
+    "what_settled_it": {
+      "type": "string",
+      "minLength": 10,
+      "description": "What actually settled it, in words, when the evidence was not in the observations. Required in that case, because a claim with neither a traceable path nor a description is not a measurement."
+    }
+  },
+  "allOf": [
+    {
+      "description": "A wrong verdict must say what the cause really was, and must say where that was learned. Evidence in the observations is named by path; evidence learned afterwards is described in words. Neither is optional, and neither is privileged.",
+      "if": {
+        "type": "object",
+        "properties": {
+          "verdict_was": {
+            "const": "wrong"
+          }
+        },
+        "required": [
+          "verdict_was"
+        ]
+      },
+      "then": {
+        "type": "object",
+        "required": [
+          "actual_code",
+          "evidence_source"
+        ],
+        "properties": {
+          "actual_code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_source": {
+            "type": "string"
+          }
+        },
+        "allOf": [
+          {
+            "description": "Evidence claimed to be in the observations must name the path.",
+            "if": {
+              "type": "object",
+              "properties": {
+                "evidence_source": {
+                  "const": "in_observations"
+                }
+              },
+              "required": [
+                "evidence_source"
+              ]
+            },
+            "then": {
+              "type": "object",
+              "required": [
+                "decisive_ref"
+              ],
+              "properties": {
+                "decisive_ref": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "description": "Evidence learned afterwards must be described, since no path can be checked.",
+            "if": {
+              "type": "object",
+              "properties": {
+                "evidence_source": {
+                  "const": "learned_after"
+                }
+              },
+              "required": [
+                "evidence_source"
+              ]
+            },
+            "then": {
+              "type": "object",
+              "required": [
+                "what_settled_it"
+              ],
+              "properties": {
+                "what_settled_it": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "description": "A correct verdict must not also name a different actual cause. That is a contradiction, and it would corrupt every count built on these records.",
+      "if": {
+        "type": "object",
+        "properties": {
+          "verdict_was": {
+            "const": "correct"
+          }
+        },
+        "required": [
+          "verdict_was"
+        ]
+      },
+      "then": {
+        "type": "object",
+        "not": {
+          "required": [
+            "actual_code"
+          ]
+        }
+      }
+    },
+    {
+      "description": "Unverifiable means nobody could tell. Naming the true cause would mean somebody could.",
+      "if": {
+        "type": "object",
+        "properties": {
+          "verdict_was": {
+            "const": "unverifiable"
+          }
+        },
+        "required": [
+          "verdict_was"
+        ]
+      },
+      "then": {
+        "type": "object",
+        "not": {
+          "required": [
+            "actual_code"
+          ]
+        }
+      }
+    }
+  ]
+}

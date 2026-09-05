@@ -214,6 +214,69 @@ export const MUTATIONS = [
     mustFail: "lists every allowed code in the root cause prompt, including its own verdict",
   },
   {
+    // Codex, 2026-09-05: five duplicate reviews of one incident satisfied the
+    // minimum and reported 100% accuracy.
+    id: "one-incident-counted-many-times",
+    file: "src/core/review.ts",
+    from: "      if (held === undefined || r.reviewed_at > held.reviewed_at) latest.set(r.incident_id, r);",
+    to: "      latest.set(r.review_id, r);",
+    mustFail: "counts one incident once, however many times it is reviewed",
+  },
+  {
+    // Codex, 2026-09-05: supersession was decorative — the mistake and its
+    // correction both counted.
+    id: "superseded-reviews-keep-counting",
+    file: "src/core/review.ts",
+    from: "  const live = reviews.filter((r) => !superseded.has(r.review_id));",
+    to: "  const live = reviews;",
+    mustFail: "drops a superseded review even when the correction is older by the clock",
+  },
+  {
+    // Grok, 2026-09-05: requiring in-observation evidence refused exactly the
+    // reviews worth having, so accuracy would climb as hard cases vanished.
+    id: "honest-late-review-refused",
+    file: "src/core/review.ts",
+    from: '  if (review.evidence_source === "in_observations" && review.decisive_ref !== undefined) {',
+    to: "  if (review.decisive_ref !== undefined) {",
+    mustFail: "does not check a path against the observations when the evidence came from outside",
+  },
+  {
+    // Codex, 2026-09-05: the stamp hashed a build artifact made from schemas,
+    // so changing the model changed the answer and not the stamp.
+    id: "stamp-ignores-the-model",
+    file: "src/core/review.ts",
+    from: '  core.update(`model:${model.name}@${model.temperature}`);',
+    to: "  // no model in the stamp",
+    mustFail: "moves when the model or its temperature changes",
+  },
+  {
+    // A review that judges a different code than what was shown makes every
+    // count built on these records describe something that never happened.
+    id: "review-judges-something-other-than-what-was-shown",
+    file: "src/core/review.ts",
+    from: "  if (review.proposed_code !== actuallyProposed) {",
+    to: "  if (false) {",
+    mustFail: "refuses a review that disagrees about what the system proposed",
+  },
+  {
+    // A percentage from three cases is a number people quote and nobody can
+    // defend.
+    id: "accuracy-reported-from-too-few-cases",
+    file: "src/core/review.ts",
+    from: "      accuracy: gradable >= minimum ? correct / gradable : null,",
+    to: "      accuracy: gradable > 0 ? correct / gradable : null,",
+    mustFail: "reports no accuracy when too few incidents are gradable, however many rows exist",
+  },
+  {
+    // Counting unverifiable as wrong blames the system for an incident nobody
+    // resolved.
+    id: "unverifiable-counted-against-the-system",
+    file: "src/core/review.ts",
+    from: "    const gradable = correct + wrong;",
+    to: "    const gradable = correct + wrong + unverifiable;",
+    mustFail: "keeps unverifiable out of the denominator and says so in the counts",
+  },
+  {
     // could-not-read rendered as found-nothing in the one place a person reads.
     id: "thread-renders-an-error-as-an-empty-result",
     file: "src/core/report.ts",
