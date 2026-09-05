@@ -307,6 +307,22 @@ export const MUTATIONS = [
     mustFail: "refuses a nothing that hides an observation inside its provenance",
   },
   {
+    // A decision that stops being printed is a claim that shrank without anyone
+    // seeing it shrink.
+    id: "out-of-scope-items-stop-being-printed",
+    file: "scripts/acceptance-gate.mjs",
+    from: "    .filter((i) => !i.covered && typeof i.outOfScope === \"string\" && i.outOfScope.length > 0)",
+    to: "    .filter(() => false)",
+    mustFail: "prints every out-of-scope item as a gate limitation, so a decision is not a quiet deletion",
+  },
+  {
+    id: "decided-and-waiting-merged-again",
+    file: "scripts/definition-of-done.mjs",
+    from: '    outOfScope: "the owner decided on 2026-09-05 that there will be one provider; a second exists only as a shape in the code and is never run",',
+    to: "",
+    mustFail: "keeps a decision out of scope apart from a dependency still coming",
+  },
+  {
     id: "claimed-provider-not-compared",
     file: "src/providers/fixtures.ts",
     from: '        ["provider", `fake-${slot}`],',

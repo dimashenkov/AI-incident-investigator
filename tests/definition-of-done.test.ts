@@ -33,10 +33,16 @@ const DECLARED = new Set([...SUITE.matchAll(/\bit\(\s*(["'`])((?:\\.|(?!\1).)*)\
 
 // @ts-expect-error — plain .mjs, read by the gate as well as by these tests.
 import { DEFINITION_OF_DONE as RAW } from "../scripts/definition-of-done.mjs";
+// @ts-expect-error - plain .mjs script, no types
+import { LIMITATIONS } from "../scripts/acceptance-gate.mjs";
 
 type Item = { n: number; claim: string } & (
   | { covered: true; by: string[] }
-  | { covered: false; needs: string; why: string }
+  // `outOfScope` is optional because an uncovered item is one of two things: a
+  // dependency still coming, or a decision the owner made. Written as optional
+  // rather than as a fourth variant so that forgetting it reads as "still
+  // waiting" — the state that keeps being reported, not the one that goes quiet.
+  | { covered: false; needs: string; why: string; outOfScope?: string }
 );
 const DEFINITION_OF_DONE = RAW as Item[];
 
@@ -65,6 +71,32 @@ describe("the ten Definition-of-Done items", () => {
     }
   });
 
+  it("keeps a decision out of scope apart from a dependency still coming", () => {
+    // Three states, not two. The owner decided on 2026-09-05 that there will be
+    // one provider, so items 6 and 8 are not waiting for anything — and calling
+    // them "waiting" would be a promise nobody intends to keep, while the
+    // report reads as though work is on its way.
+    const decided = DEFINITION_OF_DONE.filter((i) => !i.covered && i.outOfScope !== undefined) as Array<Extract<Item, { covered: false }>>;
+    expect(decided.map((i) => i.n), "the decision moved, or an item lost it").toEqual([6, 8]);
+    for (const item of decided) {
+      expect(item.outOfScope!.length, `item ${item.n} says it is out of scope without saying who decided or when`)
+        .toBeGreaterThan(60);
+      expect(item.outOfScope, `item ${item.n} does not date the decision`).toContain("2026-09-05");
+    }
+  });
+
+  it("prints every out-of-scope item as a gate limitation, so a decision is not a quiet deletion", () => {
+    // The gate builds these from the decisions rather than a retyped list, and
+    // this is what holds that. An item decided out of scope and then invisible
+    // is exactly a claim shrinking without anyone seeing it shrink.
+    const decided = DEFINITION_OF_DONE.filter((i) => !i.covered && i.outOfScope !== undefined) as Array<Extract<Item, { covered: false }>>;
+    expect(decided.length, "this test is vacuous if nothing is out of scope").toBeGreaterThan(0);
+    for (const item of decided) {
+      const printed = (LIMITATIONS as string[]).some((l) => l.includes(`Definition of Done item ${item.n}`) && l.includes(item.outOfScope!));
+      expect(printed, `item ${item.n} is out of scope and the gate never prints it`).toBe(true);
+    }
+  });
+
   it("reports five of ten covered, and names the five that are not", () => {
     // The number is asserted so that quietly reclassifying an item as covered
     // fails here rather than improving a statistic nobody checks. It went from
@@ -74,6 +106,10 @@ describe("the ten Definition-of-Done items", () => {
     const outstanding = DEFINITION_OF_DONE.filter((i) => !i.covered).map((i) => i.n);
     expect(covered).toEqual([1, 4, 5, 7, 9]);
     expect(outstanding).toEqual([2, 3, 6, 8, 10]);
+    // Of the five, three are still waiting and two were decided. Asserted apart
+    // so that moving an item between the two fails here.
+    const waiting = DEFINITION_OF_DONE.filter((i) => !i.covered && i.outOfScope === undefined).map((i) => i.n);
+    expect(waiting, "all three remaining dependencies are one and the same: a model call").toEqual([2, 3, 10]);
   });
 
   it("names only dependencies that provably do not exist yet", () => {
