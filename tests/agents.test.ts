@@ -8,6 +8,8 @@
  * under test, and none of this costs anything to run.
  */
 import { describe, it, expect } from "vitest";
+import { resolveRef } from "../src/core/assemble.js";
+import { listScenarios, readSlot } from "../src/providers/fixtures.js";
 import { readFileSync } from "node:fs";
 import { validate } from "../src/schema/validate.js";
 import agentResultSchema from "../schemas/agent-result.schema.json" with { type: "json" };
@@ -54,6 +56,11 @@ const incident = (id: string, over: Record<string, unknown> = {}) => ({
  */
 const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
   kubernetes: [
+    // Codex, Grok and Grok agreed on 2026-09-05 that this is the likeliest way
+    // a real model's first answer is refused: the payload visibly wraps the
+    // observation, so a path beginning `observation.` is the natural thing to
+    // write, resolves to nothing, and the whole result is thrown away.
+    { id: "source-ref-is-relative-to-the-observation", prose: /never\n?begins with `observation\.`/ },
     { id: "finding-needs-source-ref", prose: /Every finding needs a `source_ref`/ },
     { id: "every-answer-carries-five-fields", prose: /All five, always|all five, always/ },
     { id: "hypothesis-code-from-the-list", prose: /A hypothesis `code` must be one of these, exactly/ },
@@ -63,6 +70,11 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
     { id: "hypothesis-cites-own-findings", prose: /Every hypothesis needs `supported_by`/ },
   ],
   logs: [
+    // Codex, Grok and Grok agreed on 2026-09-05 that this is the likeliest way
+    // a real model's first answer is refused: the payload visibly wraps the
+    // observation, so a path beginning `observation.` is the natural thing to
+    // write, resolves to nothing, and the whole result is thrown away.
+    { id: "source-ref-is-relative-to-the-observation", prose: /never\n?begins with `observation\.`/ },
     { id: "finding-needs-source-ref", prose: /Every finding needs a `source_ref`/ },
     { id: "every-answer-carries-five-fields", prose: /All five, always|all five, always/ },
     { id: "hypothesis-code-from-the-list", prose: /A hypothesis `code` must be one of these, exactly/ },
@@ -73,6 +85,11 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
     { id: "window-limits-conclusions", prose: /`window`/ },
   ],
   metrics: [
+    // Codex, Grok and Grok agreed on 2026-09-05 that this is the likeliest way
+    // a real model's first answer is refused: the payload visibly wraps the
+    // observation, so a path beginning `observation.` is the natural thing to
+    // write, resolves to nothing, and the whole result is thrown away.
+    { id: "source-ref-is-relative-to-the-observation", prose: /never\n?begins with `observation\.`/ },
     { id: "finding-needs-source-ref", prose: /Every finding needs a `source_ref`/ },
     { id: "every-answer-carries-five-fields", prose: /All five, always|all five, always/ },
     { id: "hypothesis-code-from-the-list", prose: /A hypothesis `code` must be one of these, exactly/ },
@@ -83,6 +100,7 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
     { id: "finding-has-three-fields", prose: /exactly three fields/ },
   ],
   "root-cause": [
+    { id: "source-ref-copied-verbatim-from-agent-results", prose: /Copy a `source_ref` verbatim/ },
     { id: "insufficient-evidence-is-an-answer", prose: /Not enough to tell is a real answer/ },
     { id: "every-answer-carries-five-fields", prose: /All five fields, always/ },
     { id: "cause-code-from-the-list", prose: /The `root_cause_code` must be one of these, exactly/ },
@@ -109,6 +127,90 @@ describe("every prompt carries the rules its schema will enforce", () => {
       }
     });
   }
+
+  it("shows no citation a model could copy into a refusal", () => {
+    /*
+     * Grok, 2026-09-05, before the first paid run: the kubernetes example wrote
+     * `"source_ref": "..."`. A model copying it produces something the schema
+     * accepts — minLength is 1 — and recordAgentResult then refuses, because
+     * the path resolves to nothing. The answer is thrown away for the shape of
+     * an example rather than for anything the model got wrong.
+     *
+     * So every citation shown in a prompt must look like a path. This is a
+     * check on the EXAMPLES, which are the part of a prompt a model copies
+     * most literally.
+     */
+    for (const agent of ["kubernetes", "logs", "metrics", "root-cause"] as AgentName[]) {
+      const text = readPrompt(agent)!;
+      const cited = [
+        ...text.matchAll(/"source_ref":\s*"([^"]*)"/g),
+        ...text.matchAll(/"supported_by":\s*\[\s*"([^"]*)"/g),
+      ].map((m) => m[1]!);
+      expect(cited.length, `${agent} shows no citation at all; this test would pass on nothing`).toBeGreaterThan(0);
+      for (const ref of cited) {
+        expect(ref, `${agent} shows a placeholder where a model expects a path`).not.toMatch(/^\.*$/);
+        expect(ref, `${agent} shows a citation that is not a path`).toMatch(/^[a-z_]+(\[\d+\])?(\.[a-z_]+(\[\d+\])?)*$/i);
+      }
+    }
+  });
+
+  it("shows only citations that resolve in every scenario, not merely in one", () => {
+    /*
+     * Grok, 2026-09-05, third round, on the fix for its own second-round
+     * finding: "the same defect one level up". A placeholder was replaced with
+     * a realistic path, and a realistic path resolves only where that thing
+     * happened. For an image-pull failure or a probe failure, the example in
+     * the prompt IS an answer that would be thrown away — so a model copying it
+     * is punished for following the instructions.
+     *
+     * The examples now cite `collected_at`, which every observation carries.
+     * This is what holds that: each shown citation is resolved against every
+     * scenario's real fixture for that agent's slot.
+     */
+    const slots: Record<string, string> = { kubernetes: "kubernetes", logs: "logs", metrics: "metrics" };
+    const scenarios = listScenarios(SCENARIOS);
+    expect(scenarios.length, "no scenarios; this test would pass on nothing").toBeGreaterThan(0);
+
+    for (const [agent, slot] of Object.entries(slots)) {
+      const cited = [
+        ...readPrompt(agent as AgentName)!.matchAll(/"source_ref":\s*"([^"]*)"/g),
+        ...readPrompt(agent as AgentName)!.matchAll(/"supported_by":\s*\[\s*"([^"]*)"/g),
+      ].map((m) => m[1]!);
+      expect(cited.length, `${agent} shows no citation`).toBeGreaterThan(0);
+
+      for (const scenario of scenarios) {
+        const o = readSlot(scenario, slot as never, SCENARIOS);
+        if (o.state !== "collected") continue;
+        for (const ref of cited) {
+          expect(resolveRef(o.data, ref), `${agent}'s example cites ${ref}, which does not resolve in ${scenario}`)
+            .not.toBeUndefined();
+        }
+      }
+    }
+  });
+
+  it("shows no example whose hypothesis cites something its own findings do not", () => {
+    /*
+     * Grok, 2026-09-05, fourth round: the kubernetes example paired a finding
+     * with a hypothesis citing it, and the natural way to answer is to rewrite
+     * the finding and leave the hypothesis alone — after which supported_by
+     * names a citation that is no longer in findings, and the answer is
+     * refused for a coupling the example created.
+     *
+     * The kubernetes example now shows an empty hypotheses list. Where an
+     * example does show one, as root-cause must, the two halves have to agree —
+     * otherwise the prompt ships an answer its own rules reject.
+     */
+    for (const agent of ["kubernetes", "logs", "metrics", "root-cause"] as AgentName[]) {
+      const text = readPrompt(agent)!;
+      const refs = new Set([...text.matchAll(/"source_ref":\s*"([^"]*)"/g)].map((m) => m[1]!));
+      const supported = [...text.matchAll(/"supported_by":\s*\[\s*"([^"]*)"/g)].map((m) => m[1]!);
+      for (const one of supported) {
+        expect(refs.has(one), `${agent}'s example supports a hypothesis with ${one}, which its findings never cite`)
+          .toBe(true);
+      }
+    }
+  });
 
   it("declares no rule id that no test knows about", () => {
     // A prompt could otherwise grow an id that looks checked and is not.

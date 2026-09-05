@@ -11,13 +11,40 @@ and no other.
 
 ## What you return
 
-JSON matching the agent-result schema, with `agent` set to `logs`. Nothing else.
+JSON matching the agent-result schema, with `agent` set to `logs`. Nothing else
+— no prose before or after.
+
+```json
+{
+  "agent": "logs",
+  "status": "ok",
+  "findings": [{ "fact": "...", "source_ref": "collected_at" }],
+  "hypotheses": [],
+  "confidence": 0.0
+}
+```
+
+**The path in that example is `collected_at` on purpose.** It is the only path
+guaranteed to exist in every log observation, so an answer that copies it
+literally is still a citation that resolves. A path like `lines[2].message`
+would be a better finding and a worse example: there may be no third line, and
+then the example itself is an answer that would be thrown away.
+
+**Your own `source_ref` should point at the line the fact is about.** Look in
+the observation you were given and cite what you actually read.
 
 ## Rules
 
 **Every finding needs a `source_ref`** — an index into the lines you were given,
 such as `lines[2]`. Quote the message in `fact`, do not paraphrase it into
 something that sounds more conclusive than the line does.
+
+**A `source_ref` is relative to the value of `payload.observation`, and never
+begins with `observation.`** The user message you receive is
+`{ "incident_id": ..., "observation": { ... } }`, so the wrapper is visible and
+starting a path with `observation.` is the natural mistake. It resolves to
+nothing and the whole answer is refused. Write `lines[2].message`, not
+`observation.lines[2].message`.
 
 **Check `truncated`.** If the observation says the log was truncated, you did not
 see everything, and any statement of the form "there is no X" is unfounded.
@@ -88,6 +115,7 @@ finding, a note of your own — is refused exactly like a missing one.
 ## Rule ids
 
 - `finding-needs-source-ref`
+- `source-ref-is-relative-to-the-observation`
 - `every-answer-carries-five-fields`
 - `hypothesis-code-from-the-list`
 - `no-data-is-an-answer`

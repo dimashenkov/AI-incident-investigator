@@ -397,8 +397,8 @@ export const MUTATIONS = [
     // refusal that says which agent produced nothing.
     id: "collect-throws-instead-of-returning-null",
     file: "scripts/generate-workflow.mjs",
-    from: "` try { return JSON.parse($json.choices[0].message.content); } catch (e) { return null; } })() })) }}`",
-    to: "` return JSON.parse($json.choices[0].message.content); })() })) }}`",
+    from: "        + ` var o; try { o = JSON.parse(t); } catch (e) { return null; }`",
+    to: "        + ` var o = JSON.parse(t);`",
     mustFail: "turns an unparseable answer into null rather than throwing inside n8n",
   },
   {
@@ -408,6 +408,24 @@ export const MUTATIONS = [
     from: "    target = realpathSync(named);",
     to: "    target = named;",
     mustFail: "refuses a symlink inside the repository that points outside it",
+  },
+  {
+    // The part of a prompt a model copies most literally is the example.
+    id: "prompt-example-shows-a-placeholder-citation",
+    file: "prompts/kubernetes-agent.md",
+    from: '"source_ref": "collected_at", "severity": "warning"',
+    to: '"source_ref": "...", "severity": "warning"',
+    mustFail: "shows no citation a model could copy into a refusal",
+  },
+  {
+    // A realistic path is a worse example than a boring one: it resolves only
+    // where that thing happened, so the example itself becomes an answer that
+    // would be refused for every other scenario.
+    id: "prompt-example-cites-a-scenario-specific-path",
+    file: "prompts/root-cause-agent.md",
+    from: '"supported_by": ["pods[0].containers[0].last_state.terminated.reason"] }],\n  "confidence": 0.0',
+    to: '"supported_by": ["events[0].reason"] }],\n  "confidence": 0.0',
+    mustFail: "shows no example whose hypothesis cites something its own findings do not",
   },
   {
     id: "claimed-provider-not-compared",

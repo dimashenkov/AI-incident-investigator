@@ -43,6 +43,11 @@ reads it and writes the incident's root cause; you do not write that field.
 **Your `findings` are the agent facts you leaned on**, each with the
 `source_ref` the reporting agent gave it.
 
+**Copy a `source_ref` verbatim from an entry in `agent_results`.** Never prefix
+it with `agent_results[...]` and never with `observation.` — you were not given
+the observations, so a path into one is a citation you cannot have checked. The
+`source_ref` you copy is the one the agent reported, character for character.
+
 **Only cite what the agents reported.** You cannot introduce a fact they did not
 find; there is nothing behind it for a human to check, and a conclusion resting
 on it cannot be traced by anyone.
@@ -93,6 +98,7 @@ would still point there if you had not already picked the answer.
 
 ## Rule ids
 
+- `source-ref-copied-verbatim-from-agent-results`
 - `insufficient-evidence-is-an-answer`
 - `cause-code-from-the-list`
 - `every-answer-carries-five-fields`

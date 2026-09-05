@@ -18,8 +18,8 @@ JSON matching the agent-result schema. Nothing else — no prose before or after
 {
   "agent": "kubernetes",
   "status": "ok",
-  "findings": [{ "fact": "...", "source_ref": "...", "severity": "warning" }],
-  "hypotheses": [{ "code": "CONTAINER_OOM", "statement": "...", "supported_by": ["..."] }],
+  "findings": [{ "fact": "...", "source_ref": "collected_at", "severity": "warning" }],
+  "hypotheses": [],
   "confidence": 0.0
 }
 ```
@@ -30,6 +30,38 @@ JSON matching the agent-result schema. Nothing else — no prose before or after
 were given, such as `pods[0].containers[0].last_state.terminated.reason` — copy the shape
 from the observation you were given, never from an example. A fact
 nobody can trace back to an observation is an opinion, and it will be refused.
+
+**The path in that example is `collected_at` on purpose.** It is the only path
+guaranteed to exist in every Kubernetes observation, so an answer that copies it
+literally is still a citation that resolves.
+
+Two rounds of review before the first paid run got here. First the example said
+`"..."`, which the schema accepts — `minLength` is 1 — and the citation check
+then refuses. Replacing it with a realistic path was the same defect one level
+up: `pods[0].containers[0].last_state.terminated.reason` exists only when a
+container has terminated, so for an image-pull failure or a probe failure the
+example itself is an answer that would be thrown away.
+
+**Your own `source_ref` should point at whatever the fact is about**, and
+`collected_at` almost never is. Look in the observation you were given and cite
+the value you actually read.
+
+**The example shows `"hypotheses": []` on purpose.** Grok, 2026-09-05, fourth
+round: a filled-in hypothesis in the example is a trap, because the natural way
+to answer is to rewrite the finding's `source_ref` and leave the hypothesis
+alone — and then `supported_by` names a citation that is no longer in your
+findings, and the whole answer is refused.
+
+When you do report a hypothesis, **every entry in its `supported_by` must be a
+`source_ref` you wrote in `findings` in this same answer**, character for
+character. Fill both, or neither.
+
+**A `source_ref` is relative to the value of `payload.observation`, and never
+begins with `observation.`** The user message you receive is
+`{ "incident_id": ..., "observation": { ... } }`, so the wrapper is visible and
+starting a path with `observation.` is the natural mistake. It resolves to
+nothing and the whole answer is refused. Write `pods[0].containers[0].last_state.terminated.reason`, not
+`observation.pods[0].containers[0].last_state.terminated.reason`.
 
 **Every hypothesis needs `supported_by`**, and each entry must be the
 `source_ref` of a finding you actually reported. Citing something you did not
@@ -92,6 +124,7 @@ finding, a note of your own — is refused exactly like a missing one.
 ## Rule ids
 
 - `finding-needs-source-ref`
+- `source-ref-is-relative-to-the-observation`
 - `every-answer-carries-five-fields`
 - `hypothesis-code-from-the-list`
 - `no-data-is-an-answer`

@@ -104,6 +104,36 @@ describe("the Set node that joins the answer back to the incident", () => {
     expect(out.reply).toEqual({ agent: "kubernetes", status: "ok" });
   });
 
+  it("accepts a fenced answer, which is the commonest way a correct one is thrown away", async () => {
+    // Grok, 2026-09-05, before the first paid run: a model wraps JSON in a
+    // markdown fence even under json_object mode, and a correct answer is then
+    // discarded for its packaging.
+    const node = await collectNode("kubernetes");
+    const answer = { agent: "kubernetes", status: "ok" };
+    const fenced = { choices: [{ message: { content: "```json\n" + JSON.stringify(answer) + "\n```" } }] };
+    const out = runSetExpression(node, fenced, "Assemble", { incident: {} });
+    expect(out.reply).toEqual(answer);
+  });
+
+  it("unwraps a single-key wrapper, because one key is never a whole agent result", async () => {
+    const node = await collectNode("logs");
+    const answer = { agent: "logs", status: "ok" };
+    const wrapped = envelope({ result: answer } as unknown as Record<string, unknown>);
+    expect(runSetExpression(node, wrapped, "Record kubernetes", {}).reply).toEqual(answer);
+
+    // A single key whose value is not an object is left alone: there is nothing
+    // inside it that could be a result.
+    const oneKey = envelope({ agent: "logs" });
+    expect(runSetExpression(node, oneKey, "Record kubernetes", {}).reply).toEqual({ agent: "logs" });
+  });
+
+  it("still refuses an array or a bare string, rather than guessing further", async () => {
+    // Guessing past this would be inventing an answer on the model's behalf.
+    const node = await collectNode("metrics");
+    expect(runSetExpression(node, envelope([{ agent: "metrics" }] as unknown as Record<string, unknown>), "Record logs", {}).reply).toBeNull();
+    expect(runSetExpression(node, { choices: [{ message: { content: "\"just a string\"" } }] }, "Record logs", {}).reply).toBeNull();
+  });
+
   it("turns an unparseable answer into null rather than throwing inside n8n", async () => {
     // A throwing expression stops the workflow with an n8n error, which is a
     // different and much worse report than "the agent returned nothing".

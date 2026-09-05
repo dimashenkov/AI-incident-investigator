@@ -91,8 +91,33 @@ function collectNode(agent, from, position) {
     position,
     parameters: {
       mode: "raw",
+      /*
+       * Unwraps the two shapes a model reaches for even under json_object mode.
+       *
+       * Grok, 2026-09-05, on the run about to be paid for: a fenced block and a
+       * single-key wrapper are the common ways an otherwise correct answer is
+       * thrown away. Both are cheap to accept and neither loosens the schema —
+       * whatever comes out still goes through recordAgentResult.
+       *
+       * Anything else still becomes null, which the next node reports as the
+       * agent returning nothing readable. Guessing further would be inventing
+       * an answer on the model's behalf.
+       */
       jsonOutput: `={{ JSON.stringify(Object.assign({}, $('${from}').item.json, { reply: (function () {`
-        + ` try { return JSON.parse($json.choices[0].message.content); } catch (e) { return null; } })() })) }}`,
+        + ` var t = $json.choices[0].message.content;`
+        + ` if (typeof t !== 'string') return null;`
+        + ` var f = t.match(/\`\`\`(?:json)?\\s*([\\s\\S]*?)\`\`\`/);`
+        + ` if (f) t = f[1];`
+        + ` var o; try { o = JSON.parse(t); } catch (e) { return null; }`
+        + ` if (o === null || typeof o !== 'object' || Array.isArray(o)) return null;`
+        // One key whose value is an object is never an agent result — a valid
+        // one carries five. So the wrapper can be unwrapped without asking
+        // whether the thing inside looks like a result: that question was a
+        // guard that could not change any outcome, and a guard that cannot
+        // change an outcome is a line that reads as protection and is not.
+        + ` var k = Object.keys(o);`
+        + ` if (k.length === 1 && o[k[0]] && typeof o[k[0]] === 'object' && !Array.isArray(o[k[0]])) return o[k[0]];`
+        + ` return o; })() })) }}`,
       options: {},
     },
   };
