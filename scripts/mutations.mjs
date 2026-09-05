@@ -214,6 +214,15 @@ export const MUTATIONS = [
     mustFail: "lists every allowed code in the root cause prompt, including its own verdict",
   },
   {
+    // Measured on a real call, 2026-09-05: told to state the unit without being
+    // told where, the model made it a field, and the reply was refused.
+    id: "metrics-prompt-stops-saying-where-the-unit-goes",
+    file: "prompts/metrics-agent.md",
+    from: "**Always state the unit, inside the `fact` text.**",
+    to: "**Always state the unit.**",
+    mustFail: "tells the metrics agent where the unit goes, not merely that it must appear",
+  },
+  {
     // Grok and Codex, independently, 2026-09-05: the root-cause prompt asked for
     // an object the validator refuses outright, so that call was guaranteed to
     // be wasted whatever the model said.

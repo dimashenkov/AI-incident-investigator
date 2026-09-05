@@ -592,6 +592,19 @@ export const LIMITATIONS = [
 
 export const DEBT = [
   {
+    // Not "someday" — it has a trigger. While one person deploys, the manual
+    // `npm run release` does everything an automated push would, and does it
+    // with the verification step that makes deployment mean anything. The day a
+    // second person can push, the manual step becomes something a human can
+    // forget, and forgetting it is invisible until drift is found later.
+    //
+    // If it is automated, it runs the whole chain — gate, deploy, verify, and a
+    // refusal on mismatch — never deploy alone. Deploying without verifying
+    // afterwards is the hole this project already closed once.
+    claim: "deployment happens through a chain nobody can skip, once more than one person can push",
+    dueFromChunk: 99,
+  },
+  {
     // Codex, 2026-09-05, naming the question neither content check can answer:
     // "Does this observation come from the trusted collection request that
     // created this incident? Content scanning cannot establish provenance. A

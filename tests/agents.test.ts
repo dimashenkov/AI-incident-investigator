@@ -79,7 +79,8 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
     { id: "no-data-is-an-answer", prose: /status: "no_data"/ },
     { id: "error-is-not-no-data", prose: /Could-not-read and found-nothing/ },
     { id: "do-not-diagnose", prose: /Do not diagnose/ },
-    { id: "state-the-unit", prose: /Always state the unit/ },
+    { id: "state-the-unit", prose: /Always state the unit, inside the `fact` text/ },
+    { id: "finding-has-three-fields", prose: /exactly three fields/ },
   ],
   "root-cause": [
     { id: "insufficient-evidence-is-an-answer", prose: /Not enough to tell is a real answer/ },
@@ -279,6 +280,16 @@ describe("the example in a prompt is the shape a model copies", () => {
       return null;
     }
   };
+
+  it("tells the metrics agent where the unit goes, not merely that it must appear", () => {
+    // Measured on 2026-09-05, on a real call: the model answered with `value`
+    // and `unit` as separate fields and no `fact`, refused twice over. The
+    // instruction said to state the unit and never said where, so the model put
+    // it where a schema would naturally have it — and this schema does not.
+    const p = readPrompt("metrics")!;
+    expect(p, "the prompt does not say the unit belongs in the fact text").toContain("inside the `fact` text");
+    expect(p, "the prompt does not say which fields a finding has").toMatch(/exactly three fields/);
+  });
 
   it("shows the root cause agent an example the validator would accept", () => {
     // Named statically because a mutation points at it. Grok and Codex, both on

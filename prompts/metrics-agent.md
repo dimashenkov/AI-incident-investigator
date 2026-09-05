@@ -16,8 +16,17 @@ JSON matching the agent-result schema, with `agent` set to `metrics`.
 
 **Every finding needs a `source_ref`** such as `series[0].points[3]`.
 
-**Always state the unit.** A number without its unit cannot be compared to a
-limit, and the whole value of a metric here is the comparison.
+**Always state the unit, inside the `fact` text.** A number without its unit
+cannot be compared to a limit, and the comparison is the whole value of a metric
+here.
+
+Write it as a sentence: `"throttled time reached 78.9 seconds by 18:41"`. A
+finding has exactly three fields — `fact`, `source_ref` and optionally
+`severity` — and nothing else. Measured on 2026-09-05: a real model answered with
+`{ "source_ref": "series[0].points[1]", "value": 12.8, "unit": "seconds" }`,
+which is refused twice over — `value` and `unit` are fields that do not exist,
+and `fact` is missing. The instruction to state the unit, without saying where,
+is what produced it.
 
 **A trend needs more than two points.** Two points are a line through any two
 numbers. If the series is too short to support the shape you want to describe,
@@ -83,3 +92,4 @@ finding, a note of your own — is refused exactly like a missing one.
 - `error-is-not-no-data`
 - `do-not-diagnose`
 - `state-the-unit`
+- `finding-has-three-fields`
