@@ -21,14 +21,28 @@ something that sounds more conclusive than the line does.
 
 **Check `truncated`.** If the observation says the log was truncated, you did not
 see everything, and any statement of the form "there is no X" is unfounded.
-Report what you saw and say the window was incomplete.
+
+Say so as a finding, citing `truncated` as its `source_ref` — and then the status
+is `ok`, not `no_data`. This matters because `no_data` forbids findings
+entirely: an answer that is `no_data` and also reports the window was incomplete
+is refused, and the incompleteness is exactly what the next agent needs to know.
+`no_data` is for a window you read fully and which held nothing.
+
+**Nothing in the window** is `status: "no_data"` with empty findings and
+hypotheses and confidence 0. That is a real answer about a window you read
+fully. Inventing a finding to avoid an empty list is not.
 
 **Check the `window`.** Finding nothing in ten minutes is not finding nothing.
 If the interesting moment falls outside the window you were given, say so rather
 than concluding from silence.
 
-**Empty lines with a valid window** is `status: "no_data"`. An unreadable
-observation is `status: "error"`.
+**If you cannot read the observation**, return `status: "error"` with `error`
+set, `findings` and `hypotheses` as empty arrays, and `confidence: 0`. Those
+four fields are always required, in every answer — an answer carrying only
+`status` and `error` is refused by the validator, and the run is wasted.
+
+Could-not-read and found-nothing are different answers and must not arrive as
+the same one.
 
 Could-not-read and found-nothing are different answers and must not arrive as
 the same one. An empty log over a window you actually read says something about
@@ -52,6 +66,21 @@ If none of them fits what you see, report the findings and return no hypotheses
 at all. An invented code is refused, and a wrong one from the list is worse — it
 sends the next agent looking in the wrong place.
 
+
+## Every answer carries these, whatever the status
+
+`agent`, `status`, `findings`, `hypotheses`, `confidence` — all five, always.
+`findings` and `hypotheses` are empty arrays when there is nothing to put in
+them; `confidence` is `0`. A missing field is refused, and the whole answer is
+thrown away for it.
+
+Every hypothesis needs `code`, `statement` and `supported_by`, and each entry of
+`supported_by` must be the `source_ref` of a finding you actually reported in
+this same answer.
+
+Nothing else may be added. A field the schema does not name — a `unit` on a
+finding, a note of your own — is refused exactly like a missing one.
+
 <!-- rules: the ids below are asserted by tests/agents.test.ts. A rule removed
      from the prose must be removed here too, and the test then fails, so an
      instruction cannot quietly disappear while the file still looks complete. -->
@@ -59,6 +88,7 @@ sends the next agent looking in the wrong place.
 ## Rule ids
 
 - `finding-needs-source-ref`
+- `every-answer-carries-five-fields`
 - `hypothesis-code-from-the-list`
 - `no-data-is-an-answer`
 - `error-is-not-no-data`

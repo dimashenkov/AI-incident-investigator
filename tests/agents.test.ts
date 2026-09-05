@@ -9,6 +9,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+import { validate } from "../src/schema/validate.js";
 import agentResultSchema from "../schemas/agent-result.schema.json" with { type: "json" };
 import incidentSchema from "../schemas/incident.schema.json" with { type: "json" };
 import commonSchema from "../schemas/common.schema.json" with { type: "json" };
@@ -54,6 +55,7 @@ const incident = (id: string, over: Record<string, unknown> = {}) => ({
 const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
   kubernetes: [
     { id: "finding-needs-source-ref", prose: /Every finding needs a `source_ref`/ },
+    { id: "every-answer-carries-five-fields", prose: /All five, always|all five, always/ },
     { id: "hypothesis-code-from-the-list", prose: /A hypothesis `code` must be one of these, exactly/ },
     { id: "no-data-is-an-answer", prose: /status: "no_data"/ },
     { id: "error-is-not-no-data", prose: /must not arrive as the same one|different answers/ },
@@ -62,6 +64,7 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
   ],
   logs: [
     { id: "finding-needs-source-ref", prose: /Every finding needs a `source_ref`/ },
+    { id: "every-answer-carries-five-fields", prose: /All five, always|all five, always/ },
     { id: "hypothesis-code-from-the-list", prose: /A hypothesis `code` must be one of these, exactly/ },
     { id: "no-data-is-an-answer", prose: /status: "no_data"/ },
     { id: "error-is-not-no-data", prose: /Could-not-read and found-nothing|different answers|must not arrive as the same/ },
@@ -71,6 +74,7 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
   ],
   metrics: [
     { id: "finding-needs-source-ref", prose: /Every finding needs a `source_ref`/ },
+    { id: "every-answer-carries-five-fields", prose: /All five, always|all five, always/ },
     { id: "hypothesis-code-from-the-list", prose: /A hypothesis `code` must be one of these, exactly/ },
     { id: "no-data-is-an-answer", prose: /status: "no_data"/ },
     { id: "error-is-not-no-data", prose: /Could-not-read and found-nothing/ },
@@ -78,7 +82,8 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
     { id: "state-the-unit", prose: /Always state the unit/ },
   ],
   "root-cause": [
-    { id: "insufficient-evidence-is-an-answer", prose: /`INSUFFICIENT_EVIDENCE` is a real answer/ },
+    { id: "insufficient-evidence-is-an-answer", prose: /Not enough to tell is a real answer/ },
+    { id: "every-answer-carries-five-fields", prose: /All five fields, always/ },
     { id: "cause-code-from-the-list", prose: /The `root_cause_code` must be one of these, exactly/ },
     { id: "record-contradicting-evidence", prose: /Contradicting evidence is recorded, not dropped/ },
     { id: "lower-confidence-on-conflict", prose: /Lower the confidence when evidence conflicts/ },
@@ -131,7 +136,11 @@ describe("every prompt carries the rules its schema will enforce", () => {
     // an identifier exactly as the first real call did.
     const p = readPrompt("root-cause")!;
     for (const code of CAUSE_CODES) expect(p, `root-cause prompt does not list ${code}`).toContain(`\`${code}\``);
-    expect(p, "root-cause prompt does not list its own verdict value").toContain("`INSUFFICIENT_EVIDENCE`");
+    // The verdict is no longer a value it may return: an empty hypothesis list
+    // is how insufficient evidence is expressed, because the shared code list
+    // does not contain it and the schema refuses anything outside that list.
+    expect(p, "root-cause prompt does not say how to express insufficient evidence")
+      .toContain("return **no hypotheses at all**");
   });
 
   it("never mentions INSUFFICIENT_EVIDENCE in an observing prompt at all", () => {
@@ -256,6 +265,50 @@ describe("an agent receives one incident and one slot", () => {
     expect(r.state).toBe("unavailable");
     if (r.state !== "unavailable") return;
     expect(r.reason).toContain("no agent results");
+  });
+});
+
+describe("the example in a prompt is the shape a model copies", () => {
+  /** The first fenced JSON block in a prompt, which is what a model imitates. */
+  const exampleIn = (agent: AgentName): unknown => {
+    const m = readPrompt(agent)!.match(/```json\n([\s\S]*?)```/);
+    if (m === null) return null;
+    try {
+      return JSON.parse(m[1]!.replace(/"\.\.\."/g, '"placeholder"').replace(/\[\s*"placeholder"\s*\]/g, '["placeholder"]'));
+    } catch {
+      return null;
+    }
+  };
+
+  it("shows the root cause agent an example the validator would accept", () => {
+    // Named statically because a mutation points at it. Grok and Codex, both on
+    // 2026-09-05: this prompt showed an object with root_cause_code at the top
+    // level, which agent-result refuses — the call was guaranteed wasted
+    // whatever the model answered. The example is the shape a model copies, and
+    // nothing checked it.
+    const example = exampleIn("root-cause");
+    expect(example, "root-cause has no parsable JSON example").not.toBeNull();
+    const r = validate("agent-result", example);
+    expect(r.state, `root-cause example: ${JSON.stringify(r)}`).not.toBe("invalid");
+  });
+
+  for (const agent of ["kubernetes"] as AgentName[]) {
+    it(`shows ${agent} an example the validator would accept`, () => {
+      // Grok and Codex, independently on 2026-09-05: the root-cause prompt
+      // showed an object with root_cause_code and evidence at the top level,
+      // which agent-result refuses outright — so that call was guaranteed
+      // wasted whatever the model answered. The example is the shape a model
+      // copies, and nothing checked it.
+      const example = exampleIn(agent);
+      expect(example, `${agent} has no parsable JSON example`).not.toBeNull();
+      const r = validate("agent-result", example);
+      expect(r.state, `${agent} example: ${JSON.stringify(r)}`).not.toBe("invalid");
+    });
+  }
+
+  it("names the agent in its own example, so a copied reply is not attributed elsewhere", () => {
+    expect((exampleIn("kubernetes") as { agent?: string }).agent).toBe("kubernetes");
+    expect((exampleIn("root-cause") as { agent?: string }).agent).toBe("root_cause");
   });
 });
 

@@ -7,7 +7,7 @@
  * valid incident, because "this is hard to diagnose" is not "this is malformed".
  */
 import { describe, it, expect } from "vitest";
-import { assembleIncident, incidentIdFor, readRegistry, recordAgentResult, runnableAgents, serviceFromTags } from "../src/core/assemble.js";
+import { assembleIncident, concludeIncident, incidentIdFor, readRegistry, recordAgentResult, resultBelongsHere, resolveRef, runnableAgents, serviceFromTags } from "../src/core/assemble.js";
 import { listScenarios } from "../src/providers/fixtures.js";
 import { validate } from "../src/schema/validate.js";
 import { assembleObservingContext, checkPayloadIsExactlyTheSlice } from "../src/agents/context.js";
@@ -234,5 +234,199 @@ describe("an agent result is checked before it is attached", () => {
     const r = recordAgentResult(base(), OK_RESULT);
     if (r.state !== "recorded") throw new Error("not recorded");
     expect(validate("incident", r.incident).state).toBe("valid");
+  });
+
+});
+
+describe("a reply must belong to the incident it is recorded on", () => {
+  const base = () => {
+    const a = assembleIncident("container-oom", 1, { root: SCENARIOS });
+    if (a.state !== "assembled") throw new Error("not assembled");
+    return a.incident;
+  };
+
+  it("refuses a finding citing a path that resolves to nothing in that observation", () => {
+    // Codex, 2026-09-05, verified before accepting: a reply citing
+    // "nowhere_at_all" was recorded. Schema-valid and about nothing.
+    const alien = { agent: "kubernetes", status: "ok",
+      findings: [{ fact: "from another incident entirely", source_ref: "nowhere_at_all" }],
+      hypotheses: [], confidence: 0.9 };
+    const r = recordAgentResult(base(), alien);
+    expect(r.state).toBe("refused");
+    if (r.state !== "refused") return;
+    expect(r.reason).toContain("resolves to nothing");
+  });
+
+  it("accepts a finding whose path does resolve", () => {
+    const good = { agent: "kubernetes", status: "ok",
+      findings: [{ fact: "OOMKilled", source_ref: "pods[0].containers[0].last_state.terminated.reason" }],
+      hypotheses: [], confidence: 0.5 };
+    expect(recordAgentResult(base(), good).state).toBe("recorded");
+  });
+
+  it("refuses a result for a slot where nothing was collected", () => {
+    // image-pull-failure states it has no metrics. An agent reporting on it
+    // never ran, whatever the reply says.
+    const a = assembleIncident("image-pull-failure", 2, { root: SCENARIOS });
+    if (a.state !== "assembled") throw new Error("not assembled");
+    const r = recordAgentResult(a.incident, { agent: "metrics", status: "ok",
+      findings: [{ fact: "x", source_ref: "series[0]" }], hypotheses: [], confidence: 0.5 });
+    expect(r.state).toBe("refused");
+    if (r.state !== "refused") return;
+    expect(r.reason).toContain("nothing was collected");
+  });
+
+  it("refuses a root cause result before any agent has reported", () => {
+    const r = recordAgentResult(base(), { agent: "root_cause", status: "ok",
+      findings: [{ fact: "memory", source_ref: "agents[0]" }],
+      hypotheses: [{ code: "CONTAINER_OOM", statement: "s", supported_by: ["agents[0]"] }], confidence: 0.9 });
+    expect(r.state).toBe("refused");
+    if (r.state !== "refused") return;
+    expect(r.reason).toContain("before any agent has reported");
+  });
+
+  it("refuses rather than throwing when the incident has no analysis", () => {
+    // Grok, 2026-09-05, verified: this threw a TypeError. A crash is not a
+    // refusal — no reason, no errors, nothing a human can read.
+    const r = recordAgentResult({ incident_id: "INC-2026-0101" }, { agent: "kubernetes", status: "no_data", findings: [], hypotheses: [], confidence: 0 });
+    expect(r.state).toBe("refused");
+  });
+
+  it("says the incident was already invalid rather than blaming the reply", () => {
+    // Grok, 2026-09-05: the refusal said the attach broke the incident even
+    // when the incident arrived broken, or when the validator could not run.
+    const broken = { ...base(), rootcause: "a typo that was there before" };
+    const r = recordAgentResult(broken, { agent: "kubernetes", status: "no_data", findings: [], hypotheses: [], confidence: 0 });
+    expect(r.state).toBe("refused");
+    if (r.state !== "refused") return;
+    expect(r.reason).toContain("already invalid");
+  });
+
+  it("refuses to replace an agents list that is not a list", () => {
+    // Replacing it would silently discard whatever turns were there.
+    const odd = { ...base(), analysis: { ...(base().analysis as object), agents: "not a list" } };
+    const r = recordAgentResult(odd, { agent: "kubernetes", status: "no_data", findings: [], hypotheses: [], confidence: 0 });
+    expect(r.state).toBe("refused");
+  });
+
+  it("resolves a path the way a source_ref is written", () => {
+    expect(resolveRef({ pods: [{ name: "p" }] }, "pods[0].name")).toBe("p");
+    expect(resolveRef({ a: { b: 1 } }, "a.b")).toBe(1);
+    expect(resolveRef({ a: 1 }, "a.b.c")).toBeUndefined();
+    expect(resolveRef(null, "a")).toBeUndefined();
+  });
+
+  it("names what is wrong rather than returning a bare boolean", () => {
+    expect(resultBelongsHere(base(), { agent: "kubernetes", findings: [] })).toBeNull();
+    expect(resultBelongsHere(base(), {})).toContain("names no agent");
+  });
+
+});
+
+describe("the verdict becomes the incident's own", () => {
+  const withAgents = (verdict: unknown) => {
+    const a = assembleIncident("container-oom", 1, { root: SCENARIOS });
+    if (a.state !== "assembled") throw new Error("not assembled");
+    const k = recordAgentResult(a.incident, { agent: "kubernetes", status: "ok",
+      findings: [{ fact: "OOMKilled", source_ref: "pods[0].containers[0].last_state.terminated.reason" }],
+      hypotheses: [{ code: "CONTAINER_OOM", statement: "memory limit exceeded", supported_by: ["pods[0].containers[0].last_state.terminated.reason"] }],
+      confidence: 0.9 });
+    if (k.state !== "recorded") throw new Error(`kubernetes: ${k.reason}`);
+    if (verdict === null) return k.incident;
+    const r = recordAgentResult(k.incident, verdict);
+    if (r.state !== "recorded") throw new Error(`verdict: ${r.reason} ${JSON.stringify(r.errors)}`);
+    return r.incident;
+  };
+
+  const VERDICT = {
+    agent: "root_cause", status: "ok",
+    findings: [{ fact: "container terminated OOMKilled", source_ref: "pods[0].containers[0].last_state.terminated.reason" }],
+    hypotheses: [{ code: "CONTAINER_OOM", statement: "the container exceeded its memory limit",
+      supported_by: ["pods[0].containers[0].last_state.terminated.reason"] }],
+    confidence: 0.9,
+  };
+
+  it("writes the cause, the confidence and the evidence onto the incident", () => {
+    // Codex, 2026-09-05: "nothing updates incident status or its root-cause
+    // fields" — the one answer the system exists to produce had no way to
+    // become the incident's own.
+    const r = concludeIncident(withAgents(VERDICT));
+    expect(r.state, r.state === "refused" ? `${r.reason} ${JSON.stringify(r.errors)}` : "").toBe("concluded");
+    if (r.state !== "concluded") return;
+    const analysis = r.incident.analysis as Record<string, unknown>;
+    expect(r.incident.status).toBe("diagnosed");
+    expect(analysis.root_cause_code).toBe("CONTAINER_OOM");
+    expect(analysis.confidence).toBe(0.9);
+    expect((analysis.evidence as unknown[]).length).toBeGreaterThan(0);
+  });
+
+  it("records no hypothesis as insufficient evidence, not as still investigating", () => {
+    // Leaving it at investigating would mean the run produced nothing, when in
+    // fact it produced the honest answer.
+    const r = concludeIncident(withAgents({ ...VERDICT, hypotheses: [], confidence: 0.2 }));
+    expect(r.state).toBe("concluded");
+    if (r.state !== "concluded") return;
+    expect(r.incident.status).toBe("insufficient_evidence");
+    expect((r.incident.analysis as Record<string, unknown>).root_cause_code).toBe("INSUFFICIENT_EVIDENCE");
+  });
+
+  it("refuses two hypotheses rather than picking one", () => {
+    const r = concludeIncident(withAgents({ ...VERDICT, hypotheses: [
+      VERDICT.hypotheses[0]!,
+      { code: "CPU_THROTTLING", statement: "or maybe cpu", supported_by: ["pods[0].containers[0].last_state.terminated.reason"] }] }));
+    expect(r.state).toBe("refused");
+    if (r.state !== "refused") return;
+    expect(r.reason).toContain("judgement it did not make");
+  });
+
+  it("refuses a hypothesis citing nothing the agent reported", () => {
+    // The validator's cross-field invariant already refuses this at recording
+    // time, so the incident is built by hand to reach the promotion step at
+    // all. The branch stays because the two checks answer to different owners:
+    // one guards what is stored, the other what becomes the verdict.
+    const incident = withAgents(null);
+    const analysis = incident.analysis as Record<string, unknown>;
+    const smuggled = {
+      ...incident,
+      analysis: { ...analysis, agents: [...(analysis.agents as unknown[]), {
+        agent: "root_cause", status: "ok",
+        findings: [{ fact: "f", source_ref: "pods[0].containers[0].last_state.terminated.reason" }],
+        hypotheses: [{ code: "CONTAINER_OOM", statement: "s", supported_by: ["events[0].reason"] }],
+        confidence: 0.9 }] },
+    };
+    const r = concludeIncident(smuggled);
+    expect(r.state).toBe("refused");
+    if (r.state !== "refused") return;
+    expect(r.reason).toContain("cites no finding");
+  });
+
+  it("leaves evidence empty when there is no conclusion for it to support", () => {
+    // Every entry must say whether it supports or contradicts the conclusion.
+    // With no conclusion, calling a fact "against" a cause nobody named would
+    // be an invented stance. The facts stay in analysis.agents, where they were
+    // reported — nothing is lost, and nothing is claimed.
+    const r = concludeIncident(withAgents({ ...VERDICT, hypotheses: [], confidence: 0.2 }));
+    expect(r.state).toBe("concluded");
+    if (r.state !== "concluded") return;
+    expect((r.incident.analysis as { evidence: unknown[] }).evidence).toEqual([]);
+    expect(((r.incident.analysis as { agents: unknown[] }).agents).length).toBeGreaterThan(1);
+  });
+
+  it("refuses to conclude before the root cause agent has reported", () => {
+    const r = concludeIncident(withAgents(null));
+    expect(r.state).toBe("refused");
+    if (r.state !== "refused") return;
+    expect(r.reason).toContain("has not reported");
+  });
+
+  it("keeps contradicting findings as evidence against, rather than dropping them", () => {
+    // A diagnosis that quietly discards what argues against it looks stronger
+    // than it is, and the schema has a slot for exactly this.
+    const r = concludeIncident(withAgents({ ...VERDICT,
+      findings: [...VERDICT.findings, { fact: "the deployment image did not change", source_ref: "deployment.image" }] }));
+    expect(r.state).toBe("concluded");
+    if (r.state !== "concluded") return;
+    const evidence = (r.incident.analysis as { evidence: Array<{ supports: string }> }).evidence;
+    expect(evidence.some((e) => e.supports === "against"), "the contradicting finding was dropped").toBe(true);
   });
 });

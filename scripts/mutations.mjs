@@ -214,6 +214,34 @@ export const MUTATIONS = [
     mustFail: "lists every allowed code in the root cause prompt, including its own verdict",
   },
   {
+    // Grok and Codex, independently, 2026-09-05: the root-cause prompt asked for
+    // an object the validator refuses outright, so that call was guaranteed to
+    // be wasted whatever the model said.
+    id: "root-cause-prompt-asks-for-a-shape-the-validator-refuses",
+    file: "prompts/root-cause-agent.md",
+    from: '"agent": "root_cause",',
+    to: '"root_cause_code": "CONTAINER_OOM",',
+    mustFail: "shows the root cause agent an example the validator would accept",
+  },
+  {
+    // Grok, 2026-09-05: a reply from another incident, citing a path that
+    // resolves to nothing, was recorded as a completed agent turn.
+    id: "reply-recorded-without-belonging-to-the-incident",
+    file: "src/core/assemble.ts",
+    from: "  const bound = resultBelongsHere(incident, result as Record<string, unknown>);",
+    to: "  const bound = null;",
+    mustFail: "refuses a finding citing a path that resolves to nothing in that observation",
+  },
+  {
+    // Codex, 2026-09-05: nothing updated the incident's own verdict, so the one
+    // answer the system exists to produce had no way to become the incident's.
+    id: "verdict-never-reaches-the-incident",
+    file: "src/core/assemble.ts",
+    from: '    status: "diagnosed",',
+    to: '    status: "investigating",',
+    mustFail: "writes the cause, the confidence and the evidence onto the incident",
+  },
+  {
     // Codex, 2026-09-05: both checks existed and neither was called outside the
     // tests — the appearance of a guard with nothing wiring it to the boundary.
     id: "checked-path-stops-checking-the-source",
