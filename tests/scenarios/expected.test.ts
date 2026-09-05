@@ -13,10 +13,16 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { listScenarios, readScenario } from "../../src/providers/fixtures.js";
-import incidentSchema from "../../schemas/incident.schema.json" with { type: "json" };
+import commonSchema from "../../schemas/common.schema.json" with { type: "json" };
 
 const ROOT = new URL("../../scenarios/", import.meta.url).pathname;
-const CAUSE_CODES: Array<string | null> = incidentSchema.properties.analysis.properties.root_cause_code.enum;
+
+/**
+ * What a scenario may expect: a named cause from the shared list, or the
+ * verdict that the evidence does not support one. Read from the carrier rather
+ * than from the incident schema, which now composes the two.
+ */
+const CAUSE_CODES: string[] = [...commonSchema.$defs.causeCode.enum, "INSUFFICIENT_EVIDENCE"];
 
 const expectedFor = (scenario: string) =>
   JSON.parse(readFileSync(`${ROOT}${scenario}/expected.json`, "utf8")) as {

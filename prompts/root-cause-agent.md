@@ -38,6 +38,25 @@ that belongs in the statement.
 **Only cite what the agents reported.** You cannot introduce a fact they did not
 find; there is nothing behind it for a human to check.
 
+
+**The `root_cause_code` must be one of these, exactly.** Codex, 2026-09-05: the
+observing agents were told this and you were not, so the same invented-identifier
+failure was still possible at the final step — the one whose answer the whole
+incident carries.
+
+- `CONTAINER_OOM`
+- `APPLICATION_STARTUP_FAILURE`
+- `IMAGE_PULL_FAILURE`
+- `READINESS_PROBE_FAILURE`
+- `DEPLOYMENT_REGRESSION`
+- `CPU_THROTTLING`
+- `INSUFFICIENT_EVIDENCE`
+
+The last one is yours alone. No agent may hold it as a hypothesis, because it
+names no cause — it is the verdict that the evidence does not support one.
+Reaching for it is not a failure; reaching for a cause the evidence does not
+carry is.
+
 <!-- rules: the ids below are asserted by tests/agents.test.ts. A rule removed
      from the prose must be removed here too, and the test then fails, so an
      instruction cannot quietly disappear while the file still looks complete. -->
@@ -45,6 +64,7 @@ find; there is nothing behind it for a human to check.
 ## Rule ids
 
 - `insufficient-evidence-is-an-answer`
+- `cause-code-from-the-list`
 - `record-contradicting-evidence`
 - `lower-confidence-on-conflict`
 - `cite-only-what-agents-reported`

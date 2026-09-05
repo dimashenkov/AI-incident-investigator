@@ -195,6 +195,25 @@ export const MUTATIONS = [
     mustFail: "names, for every covered item, tests that actually exist",
   },
   {
+    // Measured on the first real model call, 2026-09-05: the prompt showed the
+    // field and never said what may go in it, so the model answered "H1" and
+    // the schema refused an otherwise sound result.
+    id: "prompt-stops-listing-the-allowed-codes",
+    file: "prompts/kubernetes-agent.md",
+    from: "**A hypothesis `code` must be one of these, exactly.**",
+    to: "**A hypothesis code is whatever seems right.**",
+    mustFail: "states the code rule in the kubernetes prompt, in both id and prose",
+  },
+  {
+    // Codex, 2026-09-05: the fix covered the observing agents and left the final
+    // step able to invent an identifier exactly as the first real call did.
+    id: "root-cause-prompt-stops-listing-codes",
+    file: "prompts/root-cause-agent.md",
+    from: "**The `root_cause_code` must be one of these, exactly.**",
+    to: "**Pick a root_cause_code.**",
+    mustFail: "lists every allowed code in the root cause prompt, including its own verdict",
+  },
+  {
     id: "provenance-check-becomes-a-pattern-match",
     file: "src/agents/context.ts",
     from: "  const paths = deepDiffPaths(expected, result.payload);",

@@ -9,6 +9,12 @@
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+import agentResultSchema from "../schemas/agent-result.schema.json" with { type: "json" };
+import incidentSchema from "../schemas/incident.schema.json" with { type: "json" };
+import commonSchema from "../schemas/common.schema.json" with { type: "json" };
+
+/** The one list both schemas point at. */
+const CAUSE_CODES: string[] = commonSchema.$defs.causeCode.enum;
 import {
   assembleObservingContext, assembleRootCauseContext, checkProvenance,
   foreignIncidentIds, deepDiffPaths, readPrompt, OBSERVING_AGENTS, AGENT_SLOT, type AgentName,
@@ -46,6 +52,7 @@ const incident = (id: string, over: Record<string, unknown> = {}) => ({
 const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
   kubernetes: [
     { id: "finding-needs-source-ref", prose: /Every finding needs a `source_ref`/ },
+    { id: "hypothesis-code-from-the-list", prose: /A hypothesis `code` must be one of these, exactly/ },
     { id: "no-data-is-an-answer", prose: /status: "no_data"/ },
     { id: "error-is-not-no-data", prose: /must not arrive as the same one|different answers/ },
     { id: "do-not-diagnose", prose: /Do not diagnose/ },
@@ -53,6 +60,7 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
   ],
   logs: [
     { id: "finding-needs-source-ref", prose: /Every finding needs a `source_ref`/ },
+    { id: "hypothesis-code-from-the-list", prose: /A hypothesis `code` must be one of these, exactly/ },
     { id: "no-data-is-an-answer", prose: /status: "no_data"/ },
     { id: "error-is-not-no-data", prose: /status: "error"/ },
     { id: "do-not-diagnose", prose: /Do not diagnose/ },
@@ -61,6 +69,7 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
   ],
   metrics: [
     { id: "finding-needs-source-ref", prose: /Every finding needs a `source_ref`/ },
+    { id: "hypothesis-code-from-the-list", prose: /A hypothesis `code` must be one of these, exactly/ },
     { id: "no-data-is-an-answer", prose: /status: "no_data"/ },
     { id: "error-is-not-no-data", prose: /Could-not-read and found-nothing/ },
     { id: "do-not-diagnose", prose: /Do not diagnose/ },
@@ -68,6 +77,7 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
   ],
   "root-cause": [
     { id: "insufficient-evidence-is-an-answer", prose: /`INSUFFICIENT_EVIDENCE` is a real answer/ },
+    { id: "cause-code-from-the-list", prose: /The `root_cause_code` must be one of these, exactly/ },
     { id: "record-contradicting-evidence", prose: /Contradicting evidence is recorded, not dropped/ },
     { id: "lower-confidence-on-conflict", prose: /Lower the confidence when evidence conflicts/ },
     { id: "cite-only-what-agents-reported", prose: /Only cite what the agents reported/ },
@@ -98,6 +108,71 @@ describe("every prompt carries the rules its schema will enforce", () => {
       const declared = [...readPrompt(agent as AgentName)!.matchAll(/^- `([a-z-]+)`$/gm)].map((m) => m[1]);
       expect(declared.sort(), `${agent} declares ids no test covers`).toEqual(rules.map((r) => r.id).sort());
     }
+  });
+
+  it("states the code rule in the kubernetes prompt, in both id and prose", () => {
+    // Named statically because a mutation points at it. The generated per-agent
+    // test cannot be a mutation target: a name built inside a loop is not
+    // findable in the source, and the mutation would report as surviving.
+    const p = readPrompt("kubernetes")!;
+    expect(p, "the rule id is not declared").toContain("`hypothesis-code-from-the-list`");
+    expect(/A hypothesis `code` must be one of these, exactly/.test(p), "the id is declared but the prose is gone").toBe(true);
+  });
+
+  it("lists every allowed code in the root cause prompt, including its own verdict", () => {
+    // Also asserts the prose, so removing the heading fails here rather than
+    // leaving a bare list nobody introduced.
+    const heading = readPrompt("root-cause")!;
+    expect(/The `root_cause_code` must be one of these, exactly/.test(heading), "the heading that introduces the list is gone").toBe(true);
+    // Codex, 2026-09-05: the fix covered the observing agents and left the final
+    // step — the one whose answer the incident actually carries — able to invent
+    // an identifier exactly as the first real call did.
+    const p = readPrompt("root-cause")!;
+    for (const code of CAUSE_CODES) expect(p, `root-cause prompt does not list ${code}`).toContain(`\`${code}\``);
+    expect(p, "root-cause prompt does not list its own verdict value").toContain("`INSUFFICIENT_EVIDENCE`");
+  });
+
+  it("never mentions INSUFFICIENT_EVIDENCE in an observing prompt at all", () => {
+    // It names no cause. An observing agent holding it as a hypothesis would be
+    // asserting the absence of an explanation from one slot of evidence.
+    //
+    // Codex, 2026-09-05: this used to split on a heading and search what came
+    // after, which missed the value appearing BEFORE the heading, missed a
+    // changed heading entirely because the fallback was an empty string that
+    // contains nothing, and missed anything after a second occurrence. There is
+    // no legitimate reason for these prompts to mention the verdict anywhere,
+    // so the whole file is checked and the special case disappears.
+    for (const agent of OBSERVING_AGENTS) {
+      expect(readPrompt(agent)!, `${agent} mentions INSUFFICIENT_EVIDENCE, which is the root cause agent's alone`)
+        .not.toContain("INSUFFICIENT_EVIDENCE");
+    }
+  });
+
+  it("lists every allowed hypothesis code in every prompt that may propose one", () => {
+    // Measured 2026-09-05, on the first real model call: the answer used "H1",
+    // an identifier it invented, because the prompt showed the field and never
+    // said what may go in it. The schema refused the whole result. A prompt that
+    // omits the allowed values is asking for a guess.
+    const allowed = CAUSE_CODES;
+    for (const agent of OBSERVING_AGENTS) {
+      const p = readPrompt(agent)!;
+      for (const code of allowed) {
+        expect(p, `${agent} prompt does not list ${code}`).toContain(`\`${code}\``);
+      }
+    }
+  });
+
+  it("keeps one carrier for the cause codes, referenced rather than repeated", () => {
+    // Codex, 2026-09-05: two enums that a test compares can still be written
+    // apart and only caught afterwards — and one such drift had already made a
+    // scenario unsolvable. They are one list now, and both schemas point at it.
+    const hypothesisRef = agentResultSchema.properties.hypotheses.items.properties.code.$ref;
+    const anyOf = incidentSchema.properties.analysis.properties.root_cause_code.anyOf as Array<{ $ref?: string }>;
+    const causeRef = anyOf[0]?.$ref;
+    expect(hypothesisRef, "the hypothesis code is not a reference").toContain("common.schema.json#/$defs/causeCode");
+    expect(causeRef, "the root cause code is not a reference").toBe(hypothesisRef);
+    expect(CAUSE_CODES.length).toBeGreaterThan(0);
+    expect(CAUSE_CODES, "the shared list must not offer the verdict as a cause").not.toContain("INSUFFICIENT_EVIDENCE");
   });
 
   it("requires the root cause agent to cite only what agents reported", () => {

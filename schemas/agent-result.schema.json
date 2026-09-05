@@ -77,14 +77,8 @@
         ],
         "properties": {
           "code": {
-            "type": "string",
-            "enum": [
-              "CONTAINER_OOM",
-              "APPLICATION_STARTUP_FAILURE",
-              "IMAGE_PULL_FAILURE",
-              "READINESS_PROBE_FAILURE",
-              "DEPLOYMENT_REGRESSION"
-            ]
+            "$ref": "https://ai-sre-mvp/schemas/common.schema.json#/$defs/causeCode",
+            "description": "The named causes a hypothesis may propose. Kept equal to the incident schema's root_cause_code minus INSUFFICIENT_EVIDENCE, which is a verdict about a whole incident rather than a hypothesis an agent can hold. Two consequences of them drifting apart, both found on 2026-09-05: a code an incident cannot record makes a hypothesis nobody can act on, and a cause no agent may propose makes a scenario unsolvable - CPU_THROTTLING was recordable while no agent could suggest it. tests/agents.test.ts requires the two lists to agree in both directions, and requires the prompts to list them."
           },
           "statement": {
             "type": "string",
