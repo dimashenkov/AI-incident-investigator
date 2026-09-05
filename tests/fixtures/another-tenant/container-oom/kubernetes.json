@@ -1,0 +1,54 @@
+{
+  "collected_at": "2026-09-04T10:30:12Z",
+  "pods": [
+    {
+      "name": "acme-ledger-7d4b8c9f5-x2mnq",
+      "namespace": "acme-bank",
+      "phase": "Running",
+      "restart_count": 7,
+      "containers": [
+        {
+          "name": "acme-ledger",
+          "ready": false,
+          "restart_count": 7,
+          "limits": {
+            "memory": "512Mi",
+            "cpu": "500m"
+          },
+          "requests": {
+            "memory": "256Mi",
+            "cpu": "200m"
+          },
+          "last_state": {
+            "terminated": {
+              "reason": "OOMKilled",
+              "exit_code": 137,
+              "started_at": "2026-09-04T10:24:03Z",
+              "finished_at": "2026-09-04T10:28:41Z"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "type": "Warning",
+      "reason": "BackOff",
+      "message": "Back-off restarting failed container acme-ledger",
+      "count": 6,
+      "last_seen": "2026-09-04T10:29:50Z",
+      "involved_object": "pod/acme-ledger-7d4b8c9f5-x2mnq"
+    }
+  ],
+  "deployment": {
+    "name": "acme-ledger",
+    "namespace": "acme-bank",
+    "replicas": {
+      "desired": 3,
+      "ready": 2,
+      "available": 2
+    },
+    "image": "registry.internal/acme-ledger:2.14.0"
+  }
+}

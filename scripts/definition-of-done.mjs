@@ -68,8 +68,19 @@ export const DEFINITION_OF_DONE = [
     // under a request we made; it cannot establish that the provider answered
     // honestly. Both halves are needed for the claim as written.
     n: 6, claim: "No cross-incident data in assembled prompts.", covered: false,
-    needs: "a provider whose answers can be checked, not only requested",
-    why: "the assembler adds nothing beyond the slice, no foreign incident id appears, and every observation is stamped with the collection request we issued and refused otherwise — but a provider can return another tenant's data under a correct request, and nothing downstream can see it, so the claim as written is still larger than the evidence",
+    needs: "a way to tell whose data an unstamped answer is",
+    /*
+     * Marked covered on 2026-09-05 and reversed within the hour by Codex,
+     * whose objection is the reason the claim is written out in full here:
+     * "the named test expects an allegedly foreign answer to be ACCEPTED. No
+     * cross-incident data remains unproved and demonstrably unenforced."
+     *
+     * He is right, and the test he objected to has since been made honest —
+     * it now reads another customer's workload and shows it getting through.
+     * That is a demonstration of the limitation, not coverage of the claim.
+     * A test that proves the gap cannot also close it.
+     */
+    why: "an answer that carries no stamp is accepted and stamped as ours, because there is nothing to disagree with; a second provider proves the gap is real rather than theoretical, and proving a gap is the opposite of covering the item",
   },
 
 
@@ -84,15 +95,20 @@ export const DEFINITION_OF_DONE = [
   },
   {
     n: 8, claim: "Provider substitutability.", covered: false,
-    // Reversed on 2026-09-05, within the hour, by the owner: "we carry on with
-    // the original plan, in which it was to be built." Marking these two as
-    // decided rested on my reading of "the second provider is only a
-    // possibility"; the owner's reading was that the plan stands. The plan says
-    // one fake implementation per provider, and item 8 asks for substitutability
-    // to be PROVEN — the second provider is how that proof is made, not the task.
-    // So both go back to waiting, which is what they are.
-    needs: "a second provider implementation",
-    why: "there is one fixture-backed provider, so nothing establishes that another could take its place; substitutability claimed from a single implementation is a claim about a thing that does not exist yet",
+    needs: "the assembler to collect through the provider contract rather than through one implementation",
+    /*
+     * Also reversed on 2026-09-05, and for the sharper reason: "production,
+     * assembly and workflow code never consume Provider. Enumeration plus
+     * compatible TypeScript shapes is smaller than provider substitutability."
+     *
+     * Three implementations satisfy the contract and the tests exercise them,
+     * which is real and is why the contract exists. But nothing in the
+     * prototype's path holds a Provider, so nothing establishes that one could
+     * take another's place where it matters. Closing this is a change to
+     * assembleIncident, and it is not made while the priority is the prototype
+     * running end to end.
+     */
+    why: "three implementations satisfy the contract and are exercised, but assembleIncident still calls the fixture reader directly, so no alternative provider has ever taken its place anywhere the prototype actually runs",
   },
   {
     n: 9, claim: "Read-only/no-remediation behavior.", covered: true,

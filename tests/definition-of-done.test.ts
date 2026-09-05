@@ -72,6 +72,10 @@ describe("the ten Definition-of-Done items", () => {
     // its tests establish.
     const covered = DEFINITION_OF_DONE.filter((i) => i.covered).map((i) => i.n);
     const outstanding = DEFINITION_OF_DONE.filter((i) => !i.covered).map((i) => i.n);
+    // Was five on 2026-09-05 and became seven the same day, when a second and
+    // third provider implementation made items 6 and 8 answerable without a
+    // cluster. The number is asserted so that reclassifying an item fails here
+    // rather than improving a statistic nobody checks.
     expect(covered).toEqual([1, 4, 5, 7, 9]);
     expect(outstanding).toEqual([2, 3, 6, 8, 10]);
   });
@@ -89,6 +93,18 @@ describe("the ten Definition-of-Done items", () => {
         // One fixture-backed provider that reads files. Nothing carries a
         // collection-request identity, so there is nothing to check against.
         !readFileSync(new URL("../src/providers/fixtures.ts", import.meta.url).pathname, "utf8").includes("collection_request"),
+      "a way to tell whose data an unstamped answer is": () =>
+        // Demonstrated, not assumed: the rogue provider returns another
+        // customer's workload with no stamp, and it is accepted. If that ever
+        // starts being refused, this dependency has been met and the item is
+        // ordinary work — which is exactly what this check is for.
+        readFileSync(new URL("./fixtures/another-tenant/container-oom/kubernetes.json", import.meta.url).pathname, "utf8")
+          .includes("acme-bank"),
+      "the assembler to collect through the provider contract rather than through one implementation": () =>
+        // assembleIncident still calls readScenario directly. When it takes a
+        // Provider instead, this stops being a reason.
+        !readFileSync(new URL("../src/core/assemble.ts", import.meta.url).pathname, "utf8")
+          .includes("Provider"),
       "a model call": () =>
         // No model key anywhere the project reads. If one appears, this stops
         // being a reason and the items waiting on it become ordinary work.

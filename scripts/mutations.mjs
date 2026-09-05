@@ -272,8 +272,8 @@ export const MUTATIONS = [
     // the stamp, it is a way in that leaves no trace.
     id: "sentinel-read-before-the-stamp-is-checked",
     file: "src/providers/fixtures.ts",
-    from: "    const said = readSentinel(data as Record<string, unknown>, slot);\n    if (said !== null) return said;",
-    to: "    const said = null;\n    if (said !== null) return said;",
+    from: "  const said = readSentinel(data as Record<string, unknown>, slot);\n  if (said !== null) return said;",
+    to: "  const said = null;\n  if (said !== null) return said;",
     mustFail: "reports nothing under a request too, not only when read raw",
   },
   {
@@ -307,9 +307,26 @@ export const MUTATIONS = [
     mustFail: "refuses a nothing that hides an observation inside its provenance",
   },
   {
+    // The second provider exists to be refused. If it stops being refused the
+    // proof of substitutability turns into a demonstration that two things can
+    // both return data.
+    id: "rogue-provider-bypasses-the-shared-checker",
+    file: "src/providers/rogue.ts",
+    from: "      return readSlotWithPayload({ ...data, provenance: stamp }, slot, request);",
+    to: "      return { state: \"collected\", slot, data };",
+    mustFail: "refuses every rogue behaviour that claims something about itself",
+  },
+  {
+    id: "unrun-provider-counted-as-working",
+    file: "src/providers/kubernetes.ts",
+    from: "    exercised: false,",
+    to: "    exercised: true,",
+    mustFail: "says which implementations have never been run, rather than counting them as working",
+  },
+  {
     id: "claimed-provider-not-compared",
     file: "src/providers/fixtures.ts",
-    from: '        ["provider", `fake-${slot}`],',
+    from: '      ["provider", `fake-${slot}`],',
     to: "",
     mustFail: "refuses an answer that claims to come from another collector",
   },
@@ -337,8 +354,8 @@ export const MUTATIONS = [
     // said rather than hidden behind a mutation pointing somewhere convenient.
     id: "provider-normalises-a-disagreeing-stamp",
     file: "src/providers/fixtures.ts",
-    from: "      ] as const).filter(([k, want]) => c[k] !== want);",
-    to: "      ] as const).filter(() => false);",
+    from: "    ] as const).filter(([k, want]) => c[k] !== want);",
+    to: "    ] as const).filter(() => false);",
     mustFail: "refuses an answer whose stamp disagrees about the namespace",
   },
   {
@@ -346,8 +363,8 @@ export const MUTATIONS = [
     // The provider contradicting its own request — the path a real answer takes.
     id: "provider-stamp-overwritten-instead-of-refused",
     file: "src/providers/fixtures.ts",
-    from: "      if (disagreements.length > 0) {",
-    to: "      if (false) {",
+    from: "    if (disagreements.length > 0) {",
+    to: "    if (false) {",
     mustFail: "refuses a provider that stamps its answer with another collection",
   },
   {

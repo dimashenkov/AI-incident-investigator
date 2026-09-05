@@ -157,58 +157,7 @@ export function readSlot(
     return { state: "failed", slot, kind: "unreadable", reason: `not JSON: ${e instanceof Error ? e.message : String(e)}` };
   }
 
-  if (request !== undefined) {
-    if (typeof data !== "object" || data === null || Array.isArray(data)) {
-      return { state: "failed", slot, kind: "unreadable", reason: "the observation is not an object and cannot be stamped" };
-    }
-    const claimed = (data as Record<string, unknown>)["provenance"];
-    if (claimed !== undefined) {
-      // A provider that stamps its own answer is making a claim, and the claim
-      // is checked in full rather than overwritten. Overwriting would erase
-      // exactly the disagreement worth knowing about — an answer that agrees
-      // about the collection and names another tenant's namespace would have
-      // been silently normalised into ours.
-      if (typeof claimed !== "object" || claimed === null || Array.isArray(claimed)) {
-        return { state: "failed", slot, kind: "unreadable", reason: `the ${slot} response carries a provenance that is not an object` };
-      }
-      const c = claimed as Record<string, unknown>;
-      const disagreements = ([
-        ["collection_id", request.collection_id],
-        ["requested_for", request.incident_id],
-        ["cluster", request.cluster],
-        ["namespace", request.namespace],
-        // Codex, 2026-09-05: the fifth field was neither compared nor kept —
-        // whatever the answer called itself was overwritten with fake-slot, so
-        // an answer claiming to come from somewhere else said so and was
-        // silently renamed into one of ours.
-        //
-        // And, from the next round: this compares an untrusted claim against a
-        // predictable literal, so it establishes consistency, not authenticity.
-        // Anything can call itself fake-kubernetes. It catches a provider that
-        // says out loud that it is somebody else, and it is worth nothing
-        // against one that lies. Named here so nobody reads it as proof of who
-        // answered.
-        ["provider", `fake-${slot}`],
-      ] as const).filter(([k, want]) => c[k] !== want);
-      if (disagreements.length > 0) {
-        return { state: "failed", slot, kind: "contradiction",
-          reason: `the ${slot} response disagrees with the request it was gathered under: ` +
-            disagreements.map(([k, want]) => `${k} is ${String(c[k])}, not ${String(want)}`).join("; ") };
-      }
-    }
-    // The sentinel is read only after the stamp has been checked. Codex,
-    // 2026-09-05: it used to be recognised first, so an answer carrying both
-    // the sentinel and a foreign stamp became a trusted "nothing" — the one
-    // state that is believed without ever being looked at.
-    const said = readSentinel(data as Record<string, unknown>, slot);
-    if (said !== null) return said;
-
-    // Stamped by us, from the request we issued — never read back from the answer.
-    return { state: "collected", slot,
-      data: { ...(data as Record<string, unknown>),
-        provenance: { collection_id: request.collection_id, requested_for: request.incident_id,
-          cluster: request.cluster, namespace: request.namespace, provider: `fake-${slot}` } } };
-  }
+  if (request !== undefined) return stampOrRefuse(data, slot, request);
 
   if (typeof data === "object" && data !== null) {
     // The unstamped path — used by tests that read a fixture raw. Same
@@ -307,4 +256,97 @@ export function readAlert(scenario: string, root: string = SCENARIO_ROOT): unkno
   } catch {
     return null;
   }
+}
+
+/**
+ * Check what an answer claims about itself, then stamp it from the request.
+ *
+ * Extracted on 2026-09-05 so more than one provider routes through the same
+ * check rather than reimplementing it. Deliberately NOT exported: Codex, the
+ * same day, "extraction made request possession sufficient to manufacture
+ * trusted-looking observations". Providers reach it through readSlotWithPayload
+ * below, which is a named door rather than the whole wall.
+ */
+function stampOrRefuse(data: unknown, slot: Slot, request: CollectionRequest): Observation {
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    return { state: "failed", slot, kind: "unreadable", reason: "the observation is not an object and cannot be stamped" };
+  }
+  const claimed = (data as Record<string, unknown>)["provenance"];
+  if (claimed !== undefined) {
+    // A provider that stamps its own answer is making a claim, and the claim
+    // is checked in full rather than overwritten. Overwriting would erase
+    // exactly the disagreement worth knowing about — an answer that agrees
+    // about the collection and names another tenant's namespace would have
+    // been silently normalised into ours.
+    if (typeof claimed !== "object" || claimed === null || Array.isArray(claimed)) {
+      return { state: "failed", slot, kind: "unreadable", reason: `the ${slot} response carries a provenance that is not an object` };
+    }
+    const c = claimed as Record<string, unknown>;
+    const disagreements = ([
+      ["collection_id", request.collection_id],
+      ["requested_for", request.incident_id],
+      ["cluster", request.cluster],
+      ["namespace", request.namespace],
+      // Codex, 2026-09-05: the fifth field was neither compared nor kept —
+      // whatever the answer called itself was overwritten with fake-slot, so
+      // an answer claiming to come from somewhere else said so and was
+      // silently renamed into one of ours.
+      //
+      // And, from the next round: this compares an untrusted claim against a
+      // predictable literal, so it establishes consistency, not authenticity.
+      // Anything can call itself fake-kubernetes. It catches a provider that
+      // says out loud that it is somebody else, and it is worth nothing
+      // against one that lies. Named here so nobody reads it as proof of who
+      // answered.
+      ["provider", `fake-${slot}`],
+    ] as const).filter(([k, want]) => c[k] !== want);
+    if (disagreements.length > 0) {
+      return { state: "failed", slot, kind: "contradiction",
+        reason: `the ${slot} response disagrees with the request it was gathered under: ` +
+          disagreements.map(([k, want]) => `${k} is ${String(c[k])}, not ${String(want)}`).join("; ") };
+    }
+  }
+  // The sentinel is read only after the stamp has been checked. Codex,
+  // 2026-09-05: it used to be recognised first, so an answer carrying both
+  // the sentinel and a foreign stamp became a trusted "nothing" — the one
+  // state that is believed without ever being looked at.
+  const said = readSentinel(data as Record<string, unknown>, slot);
+  if (said !== null) return said;
+
+  // Stamped by us, from the request we issued — never read back from the answer.
+  return { state: "collected", slot,
+    data: { ...(data as Record<string, unknown>),
+      provenance: { collection_id: request.collection_id, requested_for: request.incident_id,
+        cluster: request.cluster, namespace: request.namespace, provider: `fake-${slot}` } } };
+}
+
+/**
+ * The fixture-backed provider, as a Provider.
+ *
+ * The functions above are kept as they are — the gate, the tests and the
+ * assembler all call readSlot directly — and this wraps them so the same
+ * implementation can be held through the contract in provider.ts. Item 8 asks
+ * whether another implementation could take its place; that question is only
+ * answerable if this one is reachable the same way.
+ */
+export function fixtureProvider(root: string = SCENARIO_ROOT): import("./provider.js").Provider {
+  return {
+    name: "fixtures",
+    exercised: true,
+    unexercisedBecause: "",
+    read: (scenario: string, slot: Slot, request: CollectionRequest): Observation =>
+      readSlot(scenario, slot, root, request),
+  };
+}
+
+/**
+ * Admit a payload a provider already holds, through the same check as a file.
+ *
+ * The one door for an implementation that does not read from this repository's
+ * scenario directories. It exists so a second provider cannot become a second
+ * carrier of the stamping rule — and it grants nothing readSlot does not: the
+ * payload is checked against the request, and refused when it disagrees.
+ */
+export function readSlotWithPayload(data: unknown, slot: Slot, request: CollectionRequest): Observation {
+  return stampOrRefuse(data, slot, request);
 }
