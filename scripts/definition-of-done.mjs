@@ -70,11 +70,6 @@ export const DEFINITION_OF_DONE = [
     n: 6, claim: "No cross-incident data in assembled prompts.", covered: false,
     needs: "a provider whose answers can be checked, not only requested",
     why: "the assembler adds nothing beyond the slice, no foreign incident id appears, and every observation is stamped with the collection request we issued and refused otherwise — but a provider can return another tenant's data under a correct request, and nothing downstream can see it, so the claim as written is still larger than the evidence",
-    // Owner, 2026-09-05: "the second provider will be only a possibility, a
-    // placeholder in the code, we will not test it." So the dependency this
-    // item waits on is not coming, and calling it "waiting" would be a promise
-    // nobody intends to keep. It moves to what this project can never decide.
-    outOfScope: "the owner decided on 2026-09-05 that the second provider stays hypothetical, so no provider answer will ever be checkable against another implementation",
   },
 
 
@@ -89,12 +84,15 @@ export const DEFINITION_OF_DONE = [
   },
   {
     n: 8, claim: "Provider substitutability.", covered: false,
+    // Reversed on 2026-09-05, within the hour, by the owner: "we carry on with
+    // the original plan, in which it was to be built." Marking these two as
+    // decided rested on my reading of "the second provider is only a
+    // possibility"; the owner's reading was that the plan stands. The plan says
+    // one fake implementation per provider, and item 8 asks for substitutability
+    // to be PROVEN — the second provider is how that proof is made, not the task.
+    // So both go back to waiting, which is what they are.
     needs: "a second provider implementation",
     why: "there is one fixture-backed provider, so nothing establishes that another could take its place; substitutability claimed from a single implementation is a claim about a thing that does not exist yet",
-    // Owner, 2026-09-05, same decision. An untested placeholder provider would
-    // be worse than none: the appearance of substitutability with nothing
-    // exercising it is exactly the defect this repository keeps finding.
-    outOfScope: "the owner decided on 2026-09-05 that there will be one provider; a second exists only as a shape in the code and is never run",
   },
   {
     n: 9, claim: "Read-only/no-remediation behavior.", covered: true,
