@@ -663,10 +663,36 @@ describe("a path spelled with the wrapper it came in", () => {
       hypotheses: [{ code: "IMAGE_PULL_FAILURE", statement: "s", supported_by: ["observation.events[0].message"] }],
       confidence: 0.8,
     };
-    const out = withResolvedRefs(observation, result) as typeof result;
+    const r = withResolvedRefs(observation, result);
+    expect(r.state).toBe("rewritten");
+    if (r.state !== "rewritten") return;
+    const out = r.result as typeof result;
     expect(out.findings[0]!.source_ref, "the stored citation must resolve").toBe("events[0].message");
     expect(out.hypotheses[0]!.supported_by, "supported_by must travel with it").toEqual(["events[0].message"]);
     expect(resolveRef(observation, out.findings[0]!.source_ref)).toBe("Failed to pull image");
+    expect(r.changed, "and it must say how many it rewrote").toBe(1);
+  });
+
+  it("counts every rewritten finding, not every distinct spelling", () => {
+    /*
+     * Codex, 2026-09-06: the count was `rewritten.size`, the number of distinct
+     * spellings. Two findings carrying the same wrapper-prefixed citation are
+     * both rewritten and reported one — the metric is how many citations the
+     * model wrote wrong, and it must not shrink because it repeated itself.
+     * The earlier test asserted only "greater than zero" and could not see it.
+     */
+    const twice = {
+      agent: "kubernetes", status: "ok",
+      findings: [
+        { fact: "one", source_ref: "observation.events[0].message" },
+        { fact: "and again", source_ref: "observation.events[0].message" },
+      ],
+      hypotheses: [], confidence: 0.5,
+    };
+    const r = withResolvedRefs(observation, twice);
+    expect(r.state).toBe("rewritten");
+    if (r.state !== "rewritten") return;
+    expect(r.changed, "two findings were rewritten, however many spellings that was").toBe(2);
   });
 
   it("stores the working spelling through recordAgentResult, not only in the helper", () => {
@@ -701,6 +727,46 @@ describe("a path spelled with the wrapper it came in", () => {
   it("leaves a result alone when nothing needed rewriting", () => {
     const result = { agent: "kubernetes", status: "ok",
       findings: [{ fact: "f", source_ref: "events[0].message" }], hypotheses: [], confidence: 0.5 };
-    expect(withResolvedRefs(observation, result)).toBe(result);
+    const r = withResolvedRefs(observation, result);
+    expect(r.state).toBe("rewritten");
+    if (r.state !== "rewritten") return;
+    expect(r.result).toBe(result);
+    expect(r.changed, "nothing changed, and it says so").toBe(0);
+  });
+
+  it("refuses rather than storing a citation it could not rewrite", () => {
+    /*
+     * Codex, 2026-09-06: this used to fail open. A citation that could not be
+     * normalised was left as it was, and the incident then carried a path
+     * nobody can follow. "Could not rewrite" is not "nothing to rewrite", and
+     * the case where they differ is exactly the case where silence is worst:
+     * being handed the wrong observation.
+     */
+    const result = { agent: "kubernetes", status: "ok",
+      findings: [{ fact: "f", source_ref: "observation.nowhere" }], hypotheses: [], confidence: 0.5 };
+    const r = withResolvedRefs(observation, result);
+    expect(r.state).toBe("refused");
+    if (r.state !== "refused") return;
+    expect(r.reason).toContain("observation.nowhere");
+  });
+
+  it("carries the rewrite into contradicted_by as well as supported_by", () => {
+    // Codex, same review: the comment promised both lists and the code moved
+    // one, so a normalised finding named in contradicted_by made the incident
+    // invalid the moment it was attached.
+    const result = {
+      agent: "kubernetes", status: "ok",
+      findings: [{ fact: "f", source_ref: "observation.events[0].message" }],
+      hypotheses: [{ code: "IMAGE_PULL_FAILURE", statement: "s",
+        supported_by: ["observation.events[0].message"],
+        contradicted_by: ["observation.events[0].message"] }],
+      confidence: 0.8,
+    };
+    const r = withResolvedRefs(observation, result);
+    expect(r.state).toBe("rewritten");
+    if (r.state !== "rewritten") return;
+    const h = (r.result.hypotheses as Array<Record<string, unknown>>)[0]!;
+    expect(h.supported_by).toEqual(["events[0].message"]);
+    expect(h.contradicted_by, "contradicted_by must travel too").toEqual(["events[0].message"]);
   });
 });

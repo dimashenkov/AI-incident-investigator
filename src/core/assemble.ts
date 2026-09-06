@@ -268,7 +268,8 @@ export function serviceFromTags(alert: Record<string, unknown>): string | null {
 export function recordAgentResult(
   incident: Record<string, unknown>,
   result: unknown,
-): { state: "recorded"; incident: Record<string, unknown> } | { state: "refused"; reason: string; errors?: string[] } {
+): { state: "recorded"; incident: Record<string, unknown>; normalised: number }
+  | { state: "refused"; reason: string; errors?: string[] } {
   return mergeRecordAgentResult(validate as Validate, incident, result);
 }
 

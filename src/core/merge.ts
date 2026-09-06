@@ -46,7 +46,8 @@ export function recordAgentResult(
   validate: Validate,
   incident: Record<string, unknown>,
   result: unknown,
-): { state: "recorded"; incident: Record<string, unknown> } | { state: "refused"; reason: string; errors?: string[] } {
+): { state: "recorded"; incident: Record<string, unknown>; normalised: number }
+  | { state: "refused"; reason: string; errors?: string[] } {
   // The incident is checked first, so a pre-existing problem is not reported as
   // something the reply did.
   const before = validate("incident", incident);
@@ -66,8 +67,10 @@ export function recordAgentResult(
     };
   }
 
-  const bound = resultBelongsHere(incident, result as Record<string, unknown>);
+  const checked: { observation?: unknown } = {};
+  const bound = resultBelongsHere(incident, result as Record<string, unknown>, checked);
   if (bound !== null) return { state: "refused", reason: bound };
+  const checkedAgainst = checked.observation;
 
   const analysis = incident["analysis"];
   if (typeof analysis !== "object" || analysis === null) {
@@ -82,11 +85,30 @@ export function recordAgentResult(
   // What goes into the incident is the result with its citations spelled the way
   // they resolve. The check above accepted them; storing the other spelling
   // would leave a human following a path that leads nowhere.
-  const observations = incident["observations"];
-  const slot = typeof observations === "object" && observations !== null
-    ? (observations as Record<string, unknown>)[String((result as Record<string, unknown>)["agent"])]
-    : undefined;
-  const stored = withResolvedRefs(slot, result as Record<string, unknown>);
+  /*
+   * The same observation the citation check used, not a second reading of it.
+   *
+   * Codex, 2026-09-06: resultBelongsHere resolved against one read of
+   * incident.observations[agent] and this read it again, so a getter or a
+   * mutation between the two could make the rewrite disagree with the check
+   * that passed. One lookup, used twice.
+   */
+  /*
+   * Only a result checked against an observation is rewritten against one.
+   *
+   * The root cause agent reads no slot: resultBelongsHere hands back nothing
+   * for it, because there is nothing its citations were resolved against. They
+   * are copied from the other agents' findings and were already normalised
+   * when those were recorded. Rewriting here would refuse every verdict.
+   */
+  let stored = result as Record<string, unknown>;
+  let normalised = 0;
+  if (checkedAgainst !== undefined) {
+    const rewrite = withResolvedRefs(checkedAgainst, stored);
+    if (rewrite.state === "refused") return { state: "refused", reason: rewrite.reason };
+    stored = rewrite.result;
+    normalised = rewrite.changed;
+  }
 
   const next = {
     ...incident,
@@ -100,7 +122,20 @@ export function recordAgentResult(
   if (whole.state === "unchecked") {
     return { state: "refused", reason: `could not validate the incident after attaching: ${whole.reason}` };
   }
-  return { state: "recorded", incident: next };
+  /*
+   * How many citations had to be rewritten, carried out with the result.
+   *
+   * Grok, 2026-09-06: a refused source_ref was the only evidence that a model
+   * had ignored an instruction given twice in its own words. Normalising it
+   * away makes obeyed and ignored produce the same stored finding — "two
+   * refused scenarios look clean, and later prompt changes cannot be measured
+   * against this failure."
+   *
+   * He is right, and the answer is not to go back to refusing: it is to keep
+   * counting. A run where this is zero and a run where it is four are different
+   * runs, and the number says which.
+   */
+  return { state: "recorded", incident: next, normalised };
 }
 
 /**
@@ -115,7 +150,19 @@ export function recordAgentResult(
  *
  * Verified before accepting: a reply citing `nowhere_at_all` was recorded.
  */
-export function resultBelongsHere(incident: Record<string, unknown>, result: Record<string, unknown>): string | null {
+export function resultBelongsHere(
+  incident: Record<string, unknown>,
+  result: Record<string, unknown>,
+  /**
+   * Where the observation this result was checked against is handed back.
+   *
+   * An out-parameter rather than a changed return type, so every existing
+   * caller keeps working — and rather than a module-level variable, which two
+   * concurrent calls would share.
+   */
+  out: { observation?: unknown } = {},
+): string | null {
+  let checkedAgainst: unknown;
   const agent = result["agent"];
   if (typeof agent !== "string") return "the result names no agent";
 
@@ -135,6 +182,8 @@ export function resultBelongsHere(incident: Record<string, unknown>, result: Rec
     : undefined;
   if (observation === undefined) return `the incident has no ${agent} observation slot`;
   if (observation === null) return `${agent} reported on a slot where nothing was collected`;
+  checkedAgainst = observation;
+  out.observation = checkedAgainst;
 
   const findings = result["findings"];
   if (!Array.isArray(findings)) return "the result carries no findings list";
@@ -161,33 +210,62 @@ export function resultBelongsHere(incident: Record<string, unknown>, result: Rec
  * findings report, and rewriting one without the other would break exactly that
  * rule while fixing a different one.
  */
-export function withResolvedRefs(observation: unknown, result: Record<string, unknown>): Record<string, unknown> {
+export function withResolvedRefs(
+  observation: unknown, result: Record<string, unknown>,
+): { state: "rewritten"; result: Record<string, unknown>; changed: number } | { state: "refused"; reason: string } {
   const rewritten = new Map<string, string>();
+  let changed = 0;
 
   const findings = Array.isArray(result["findings"]) ? (result["findings"] as unknown[]) : [];
-  const nextFindings = findings.map((f) => {
-    if (typeof f !== "object" || f === null) return f;
+  const nextFindings: unknown[] = [];
+  for (const f of findings) {
+    if (typeof f !== "object" || f === null) { nextFindings.push(f); continue; }
     const one = f as Record<string, unknown>;
     const ref = one["source_ref"];
-    if (typeof ref !== "string") return f;
+    if (typeof ref !== "string") { nextFindings.push(f); continue; }
     const good = normaliseRef(observation, ref);
-    if (good === null || good === ref) return f;
+    if (good === null) {
+      /*
+       * Codex, 2026-09-06: this used to fail open — a citation that could not be
+       * normalised was left as it was, and the incident then carried a path
+       * nobody can follow. "Could not rewrite" is not "nothing to rewrite".
+       *
+       * It cannot normally happen, because resultBelongsHere already refused
+       * such a result. It happens when this is handed the wrong observation,
+       * and that is exactly when silence is worst.
+       */
+      return { state: "refused",
+        reason: `a finding cites ${ref}, which resolves to nothing in the observation this result was recorded against` };
+    }
+    if (good === ref) { nextFindings.push(f); continue; }
     rewritten.set(ref, good);
-    return { ...one, source_ref: good };
-  });
+    // Counted per FINDING, not per distinct spelling. Codex, 2026-09-06: two
+    // findings carrying the same wrapper-prefixed citation are both rewritten
+    // and `rewritten.size` reports one — the metric is how many citations the
+    // model wrote wrong, and it must not shrink because it repeated itself.
+    changed += 1;
+    nextFindings.push({ ...one, source_ref: good });
+  }
 
-  if (rewritten.size === 0) return result;
+  if (changed === 0) return { state: "rewritten", result, changed: 0 };
+
+  // Both lists travel with the rewrite. Codex, same review: the comment
+  // promised both and the code moved one, so a normalised finding named in
+  // `contradicted_by` made the incident invalid after attaching.
+  const carry = (list: unknown) =>
+    Array.isArray(list) ? list.map((r) => (typeof r === "string" ? rewritten.get(r) ?? r : r)) : list;
 
   const hypotheses = Array.isArray(result["hypotheses"]) ? (result["hypotheses"] as unknown[]) : [];
   const nextHypotheses = hypotheses.map((h) => {
     if (typeof h !== "object" || h === null) return h;
     const one = h as Record<string, unknown>;
-    const supported = one["supported_by"];
-    if (!Array.isArray(supported)) return h;
-    return { ...one, supported_by: supported.map((r) => (typeof r === "string" ? rewritten.get(r) ?? r : r)) };
+    const next: Record<string, unknown> = { ...one };
+    if (one["supported_by"] !== undefined) next["supported_by"] = carry(one["supported_by"]);
+    if (one["contradicted_by"] !== undefined) next["contradicted_by"] = carry(one["contradicted_by"]);
+    return next;
   });
 
-  return { ...result, findings: nextFindings, hypotheses: nextHypotheses };
+  return { state: "rewritten", result: { ...result, findings: nextFindings, hypotheses: nextHypotheses }, changed };
 }
 
 /** Follow a path like `pods[0].containers[0].limits.memory` into an observation. */

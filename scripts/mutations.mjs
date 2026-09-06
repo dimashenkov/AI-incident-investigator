@@ -566,8 +566,8 @@ export const MUTATIONS = [
     // refusal: the refusal at least says something is wrong.
     id: "the-stored-citation-is-not-the-one-that-resolves",
     file: "src/core/merge.ts",
-    from: "  const stored = withResolvedRefs(slot, result as Record<string, unknown>);",
-    to: "  const stored = result;",
+    from: "    stored = rewrite.result;",
+    to: "    stored = stored;",
     mustFail: "stores the working spelling through recordAgentResult, not only in the helper",
   },
   {
@@ -576,6 +576,40 @@ export const MUTATIONS = [
     from: "  if (rest.length === 0) return null;",
     to: "  if (false) return null;",
     mustFail: "refuses the wrapper on its own, which names everything and so names nothing",
+  },
+  {
+    // "Could not rewrite" is not "nothing to rewrite", and the case where they
+    // differ is the case where silence is worst.
+    id: "unrewritable-citation-stored-as-it-came",
+    file: "src/core/merge.ts",
+    from: '      return { state: "refused",',
+    to: '      { nextFindings.push(f); continue; }\n      return { state: "refused",',
+    mustFail: "refuses rather than storing a citation it could not rewrite",
+  },
+  {
+    id: "contradicted-by-left-behind-by-the-rewrite",
+    file: "src/core/merge.ts",
+    from: '    if (one["contradicted_by"] !== undefined) next["contradicted_by"] = carry(one["contradicted_by"]);',
+    to: "",
+    mustFail: "carries the rewrite into contradicted_by as well as supported_by",
+  },
+  {
+    // Without the count, a model that ignored an instruction and one that
+    // followed it produce the same stored finding.
+    id: "normalisation-count-not-carried-out-of-the-run",
+    file: "scripts/workflow-runtime.mjs",
+    from: "    j.normalised = (j.normalised || 0) + (recorded.normalised || 0);",
+    to: "",
+    mustFail: "counts the citations it had to normalise, so an ignored instruction still shows",
+  },
+  {
+    // The metric is how many citations the model wrote wrong; counting distinct
+    // spellings makes it shrink when the model repeats itself.
+    id: "normalisation-counted-per-spelling-not-per-finding",
+    file: "src/core/merge.ts",
+    from: "    changed += 1;",
+    to: "    changed = rewritten.size;",
+    mustFail: "counts every rewritten finding, not every distinct spelling",
   },
   {
     id: "claimed-provider-not-compared",
@@ -688,7 +722,7 @@ export const MUTATIONS = [
     // resolves to nothing, was recorded as a completed agent turn.
     id: "reply-recorded-without-belonging-to-the-incident",
     file: "src/core/merge.ts",
-    from: "  const bound = resultBelongsHere(incident, result as Record<string, unknown>);",
+    from: "  const bound = resultBelongsHere(incident, result as Record<string, unknown>, checked);",
     to: "  const bound = null;",
     mustFail: "refuses a finding citing a path that resolves to nothing in that observation",
   },

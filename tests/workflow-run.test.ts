@@ -124,6 +124,30 @@ describe("the generated workflow investigates, not merely validates", () => {
     expect(String(out.reason)).toContain("reads no observation slot");
   });
 
+  it("counts the citations it had to normalise, so an ignored instruction still shows", async () => {
+    /*
+     * Grok, 2026-09-06: a refused source_ref used to be the only evidence that
+     * a model had ignored an instruction given twice in its own words.
+     * Normalising it away makes obeyed and ignored look identical. The answer
+     * is not to go back to refusing — it is to keep counting.
+     */
+    const obedient = await runScenario("container-oom");
+    expect(obedient.state).toBe("concluded");
+    expect(obedient.normalised, "the stub writes plain paths").toBe(0);
+
+    const wrapping = await runScenario("container-oom", {
+      ...STUB_AGENTS,
+      kubernetes: (payload) => {
+        const answer = STUB_AGENTS.kubernetes!(payload) as Record<string, unknown>;
+        const findings = (answer.findings as Array<Record<string, unknown>>)
+          .map((f) => ({ ...f, source_ref: `observation.${String(f.source_ref)}` }));
+        return { ...answer, findings, hypotheses: [] };
+      },
+    });
+    expect(wrapping.state, wrapping.state === "refused" ? String(wrapping.reason) : "").toBe("concluded");
+    expect(wrapping.normalised, "a wrapper-spelled citation must still be counted").toBeGreaterThan(0);
+  });
+
   it("stops when the model answers with something that is not JSON", async () => {
     // The most likely real failure, and the one a stub that always returns an
     // object cannot produce: the model writes prose, or fences the JSON.

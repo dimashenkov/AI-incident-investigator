@@ -272,16 +272,21 @@ return items.map(function (item, index) {
         reason: AGENT + ": " + recorded.reason, errors: recorded.errors || [] } };
     }
     j.incident = recorded.incident;
+    // Carried out of the run: how many citations the model wrote in a spelling
+    // that had to be normalised. Zero and four are different runs.
+    j.normalised = (j.normalised || 0) + (recorded.normalised || 0);
   }
 
   if (NEXT === null) {
-    return { json: { index, state: "recorded", agent: AGENT, scenario: j.scenario, incident: j.incident } };
+    return { json: { index, state: "recorded", agent: AGENT, scenario: j.scenario,
+      incident: j.incident, normalised: j.normalised || 0 } };
   }
 
   const ctx = buildCheckedContext(NEXT, j.incident, PROMPTS[NEXT]);
   if (ctx.state === "assembled") {
     return { json: { index, state: "asking", agent: NEXT, scenario: j.scenario,
-      incident: j.incident, prompt: ctx.prompt, payload: ctx.payload } };
+      incident: j.incident, prompt: ctx.prompt, payload: ctx.payload,
+      normalised: j.normalised || 0 } };
   }
 
   /*
@@ -318,7 +323,8 @@ return items.map(function (item, index) {
   const record = collection[slot] || {};
   if (record.state === "nothing") {
     return { json: { index, state: "skipped", agent: NEXT, scenario: j.scenario,
-      incident: j.incident, skipped_because: NEXT + " had nothing to read: the provider reported an established absence" } };
+      incident: j.incident, normalised: j.normalised || 0,
+      skipped_because: NEXT + " had nothing to read: the provider reported an established absence" } };
   }
   return { json: { index, state: "refused", agent: NEXT, reason: NEXT + ": " + ctx.reason } };
 });
@@ -375,6 +381,7 @@ return items.map(function (item, index) {
 
   const analysis = concluded.incident.analysis || {};
   return { json: { index, state: "concluded", scenario: j.scenario,
+    normalised: j.normalised || 0,
     root_cause_code: analysis.root_cause_code,
     root_cause: analysis.root_cause,
     confidence: analysis.confidence,
