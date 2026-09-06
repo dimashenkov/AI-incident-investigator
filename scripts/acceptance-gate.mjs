@@ -687,6 +687,15 @@ export const LIMITATIONS = [
   // The harness executes the strings that ship, which is far more than it did.
   // It is still not n8n, and the day those differ, only a live run says so.
   "that the local harness runs the workflow the way n8n does — it executes the same strings, in one line, one item at a time",
+  // Codex, 2026-09-06, on the citations a scenario is built around: "this
+  // remains prompt-only compliance. A schema-valid answer can omit the required
+  // configuration citation, so stochastic omission survives."
+  //
+  // True, and deliberately not closed here. must_cite says what a human should
+  // look for; a validator refusing an answer for missing one would turn a note
+  // into a rule nobody agreed, and scripts/score-run.mjs already reports the
+  // omission as its own verdict rather than hiding it inside "correct".
+  "that an agent cites what a scenario was built around — the prompt asks, nothing enforces, and the scorer reports the miss rather than refusing the answer",
   "that every diff went through external review before commit",
   "that each review objection was recorded verbatim rather than paraphrased",
   "that memory was written after each step",

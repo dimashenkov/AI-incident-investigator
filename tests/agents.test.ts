@@ -317,8 +317,22 @@ describe("every prompt carries the rules its schema will enforce", () => {
     }
     // And the one that CAN see it is told to report it even when nothing looks
     // wrong, because that is the case where nobody thought to.
-    expect(readPrompt("kubernetes")!, "the kubernetes prompt must ask for it when the cluster looks healthy")
+    const kube = readPrompt("kubernetes")!;
+    expect(kube, "the kubernetes prompt must ask for it when the cluster looks healthy")
       .toMatch(/nothing wrong at all/);
+
+    /*
+     * And the two rules must not fight. Grok, 2026-09-06: the configuration row
+     * collided with "if the observation shows nothing relevant, return no_data
+     * — inventing a finding to avoid an empty list is not an answer", and a
+     * model reading both returns no_data for a healthy cluster. That is exactly
+     * the CPU-throttling case. The distinction is symptom versus emptiness.
+     */
+    expect(kube, "the old wording makes a healthy cluster report nothing")
+      .not.toMatch(/If the observation shows nothing relevant/);
+    expect(kube).toMatch(/no SYMPTOM/);
+    expect(kube, "and reporting a real limit must be named as not inventing")
+      .toMatch(/is not inventing a finding/);
   });
 
   it("declares no rule id that no test knows about", () => {

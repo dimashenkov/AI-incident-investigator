@@ -75,13 +75,31 @@ turns on**, each as its own finding with its own `source_ref`:
 | When the observation shows | Also report |
 |---|---|
 | a container terminated, restarting, or unhealthy | its `limits`, both memory and cpu |
+| a pod not ready, or a probe failing | the probe's configuration, and the limits |
 | an image that could not be pulled or is not running | `deployment.image` |
 | a probe failing | the probe's own configuration, if the observation carries it |
-| **nothing wrong at all** | the limits anyway — another agent's numbers may be measured against them |
+| **nothing wrong at all, but there are pods** | the limits anyway — another agent's numbers may be measured against them, and no other agent can see them |
 
 The last row is the one that was missed. A cluster where nothing looks wrong is
 not a cluster with nothing to report: the limits are what make somebody else's
 number mean something.
+
+**Report configuration; do not rank it.** Grok, 2026-09-06: reporting limits on
+every incident risks pointing the next agent at a cause your own slot never
+showed — a spare CPU limit beside a memory kill, a memory limit beside a probe
+failure.
+
+That risk is real and the answer is not to withhold the value. It is to say what
+it is: a **finding about configuration** reads `the container's cpu limit is
+250m`, never `the cpu limit was too low`. The first is what the observation
+says; the second is a diagnosis, which this agent does not make, and which the
+root cause agent has the other agents' numbers to make properly.
+
+A limit reported as a grievance misleads. A limit reported plainly is far
+safer — though Codex, 2026-09-06, is right that "cannot mislead anyone" is too
+strong: a later reader can still overweight a neutral number. Withholding a
+value only you can see is worse than that risk, and stating it as an observation
+rather than a complaint is what keeps the risk small.
 
 **Report the value, not any value.** Codex, 2026-09-06: read as "any configured
 number", this becomes noise. A log line saying `batch size 18400 exceeds
@@ -105,9 +123,29 @@ lands on the value that was checked.
 `source_ref` of a finding you actually reported. Citing something you did not
 report is refused.
 
-**If the observation shows nothing relevant**, return `status: "no_data"` with
-empty findings and hypotheses and confidence 0. That is a real answer. Inventing
-a finding to avoid an empty list is not.
+**If the observation shows no SYMPTOM**, that is not the same as showing
+nothing. Grok, 2026-09-06: this rule and the configuration table above were
+fighting, and a model reading both returned `no_data` for a healthy-looking
+cluster — which is exactly the CPU-throttling case, where the cluster is fine
+and the answer is in somebody else's numbers.
+
+The two are about different things, and the difference is what to do:
+
+| What you see | What to return |
+|---|---|
+| a symptom — a termination, a restart, a failing probe, a bad event | findings about it, **and** the configuration it turns on |
+| **no symptom, but pods and a deployment are there** | `status: "ok"`, with the configuration as your findings |
+| the slot is empty, or holds no pods and no deployment at all | `status: "no_data"`, empty findings, confidence 0 |
+
+Reporting a limit that is really in the observation is not inventing a finding.
+Inventing is claiming a symptom nobody can see. The middle row is the one this
+system kept getting wrong: a cluster with nothing wrong still holds the numbers
+that make somebody else's measurement mean something, and you are the only agent
+who can see them.
+
+**Do not turn configuration into a diagnosis.** Report the limit; do not say it
+was exceeded unless your own observation shows that. Whether a number crossed it
+is the root cause agent's question, not yours.
 
 **If you cannot read the observation**, return `status: "error"` with `error`
 set, `findings` and `hypotheses` as empty arrays, and `confidence: 0`. Those
