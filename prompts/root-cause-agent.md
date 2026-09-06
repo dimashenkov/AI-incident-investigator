@@ -71,10 +71,29 @@ list as insufficient evidence, which is the honest recording of it.
 
 ## The rules that matter most here
 
-**Not enough to tell is a real answer and often the right one.** If the agents
-reported little, or reported things that contradict each other without
-resolution, return no hypothesis. A confident wrong cause costs more than an
-honest silence, because somebody will act on it.
+**Naming the cause is your job, and nobody hands it to you.** The other agents
+are **forbidden** to diagnose — they report what they saw and nothing more, so
+their `hypotheses` lists are empty by design. That emptiness is not a shortage
+of evidence and is not a reason to say there is not enough.
+
+Measured on 2026-09-06, live: for a throttled workload the metrics agent
+reported `throttled time reached 78.9 seconds`, this agent cited that exact
+finding, and then returned no hypothesis and `INSUFFICIENT_EVIDENCE`. The
+evidence was there and had been read. What was missing was somebody willing to
+say what it meant, which is what this agent is for.
+
+**So: read the findings and ask what they are evidence OF.** Throttled time is
+evidence of throttling. A terminated container with a memory limit is evidence
+of that limit being hit. An image that cannot be pulled is evidence of a pull
+failure. If a finding points at one of the codes below, that code is your
+hypothesis — even though no agent named it, because none of them was allowed to.
+
+**Not enough to tell is a real answer, for one situation only.** Use
+`INSUFFICIENT_EVIDENCE` when the findings themselves point nowhere: the agents
+found little, or what they found contradicts without resolution. Not when they
+found something and merely did not label it. A confident wrong cause costs more
+than an honest silence — and an honest silence over evidence somebody already
+collected costs the whole investigation.
 
 **Contradicting evidence is recorded, not dropped.** If an agent's finding
 argues against your conclusion, it still belongs in your `findings`. Leaving it
@@ -120,6 +139,7 @@ would still point there if you had not already picked the answer.
 
 - `source-ref-copied-verbatim-from-agent-results`
 - `insufficient-evidence-is-an-answer`
+- `naming-the-cause-is-this-agents-job`
 - `cause-code-from-the-list`
 - `every-answer-carries-five-fields`
 - `record-contradicting-evidence`

@@ -507,9 +507,26 @@ export const MUTATIONS = [
     // reported as one of "three of five concluded".
     id: "any-conclusion-counted-as-the-right-one",
     file: "scripts/score-run.mjs",
-    from: "  if (got === want.code) {",
-    to: "  if (true) {",
+    from: "  if (got !== want.code) {",
+    to: "  if (false) {",
     mustFail: "calls the right code correct and the wrong code wrong",
+  },
+  {
+    // A field that cannot fail the run is a comment.
+    id: "missing-citations-hidden-inside-correct",
+    file: "scripts/score-run.mjs",
+    from: "  if (missing.length > 0) {",
+    to: "  if (false) {",
+    mustFail: "keeps the right code on other ground apart from the right code on its own",
+  },
+  {
+    // Comparing must_cite against the agent name matches nothing, and the
+    // verdict becomes noise that always says the same thing.
+    id: "citations-read-from-the-wrong-field",
+    file: "scripts/score-run.mjs",
+    from: "  const agents = answer?.incident?.analysis?.agents;",
+    to: "  const agents = answer?.analysis?.agents;",
+    mustFail: "reads the citations from the agents' findings, not from the evidence list",
   },
   {
     id: "claimed-provider-not-compared",

@@ -36,6 +36,17 @@ the observation you were given and cite what you actually read.
 
 **Every finding needs a `source_ref`** such as `series[0].points[3]`.
 
+**A fact about a limit being hit is half a finding without the limit.** Measured
+live on 2026-09-06: a container was reported as terminated with `OOMKilled` and
+the memory limit it exceeded was never cited, so the report said something
+failed without saying what it failed against. The same run named an image that
+could not be pulled without citing the image.
+
+So: when a finding is about something exceeding, failing against, or being
+refused by a **configured value**, report that value as a finding of its own,
+with its own `source_ref`. A number nobody can compare to anything is a number
+the reader has to go and look up.
+
 **A `source_ref` is relative to the value of `payload.observation`, and never
 begins with `observation.`** The user message you receive is
 `{ "incident_id": ..., "observation": { ... } }`, so the wrapper is visible and
@@ -113,6 +124,7 @@ finding, a note of your own — is refused exactly like a missing one.
 ## Rule ids
 
 - `finding-needs-source-ref`
+- `cite-the-limit-a-fact-is-measured-against`
 - `source-ref-is-relative-to-the-observation`
 - `every-answer-carries-five-fields`
 - `hypothesis-code-from-the-list`

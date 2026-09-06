@@ -56,15 +56,52 @@ export function score(scenario, answer, root = SCENARIOS) {
   }
 
   const got = answer.root_cause_code;
-  if (got === want.code) {
-    // Cited evidence is reported, never scored: expected.json's must_cite says
-    // what a human should look for, and a run that reaches the right code by
-    // other evidence is not thereby wrong.
-    const cited = Array.isArray(answer.evidence) ? answer.evidence.map((e) => e?.source ?? e?.source_ref) : [];
-    const missing = want.mustCite.filter((c) => !cited.includes(c));
-    return { scenario, state: "correct", code: got, missingCitations: missing };
+  if (got !== want.code) {
+    return { scenario, state: "wrong", expected: want.code, got: got ?? "(none)" };
   }
-  return { scenario, state: "wrong", expected: want.code, got: got ?? "(none)" };
+
+  /*
+   * The right code, and whether it rests on what the scenario was built around.
+   *
+   * Grok, 2026-09-06: reporting must_cite without letting it change the verdict
+   * is "a field that cannot fail the run is a comment", and report-without-score
+   * is exactly how "three of five concluded" came to be called a success one
+   * field over. He is right that it was quietly weakened.
+   *
+   * But scoring a missing citation as WRONG would be this file inventing a rule
+   * — the code is right, and expected.json's note says must_cite is what a
+   * human should look for. So it is a fourth answer with its own name, which
+   * cannot hide inside "correct" and cannot be quoted as a clean result.
+   */
+  /*
+   * The paths live in the agents' findings, not in analysis.evidence.
+   *
+   * The first version compared must_cite against evidence[].source, which holds
+   * the AGENT NAME — "kubernetes", not a path. Nothing could ever match, so
+   * every correct answer was reported as resting on other ground, and the new
+   * state would have been noise from its first day. Caught by looking at one
+   * recorded answer instead of trusting the field name.
+   */
+  const cited = citedPaths(answer);
+  const missing = want.mustCite.filter((c) => !cited.includes(c));
+  if (missing.length > 0) {
+    return { scenario, state: "correct-without-its-evidence", code: got, missingCitations: missing };
+  }
+  return { scenario, state: "correct", code: got, missingCitations: [] };
+}
+
+/**
+ * Every source_ref any agent reported, which is where a path can actually be.
+ *
+ * `analysis.evidence` names which AGENT a fact came from; the path is on the
+ * finding. Both are needed to trace a conclusion, and only one of them is a
+ * citation in the sense must_cite means.
+ */
+export function citedPaths(answer) {
+  const agents = answer?.incident?.analysis?.agents;
+  if (!Array.isArray(agents)) return [];
+  return agents.flatMap((a) => (Array.isArray(a?.findings) ? a.findings : []).map((f) => f?.source_ref))
+    .filter((r) => typeof r === "string");
 }
 
 export function scoreAll(answers, root = SCENARIOS) {
@@ -78,8 +115,10 @@ export function format(results) {
   const lines = ["", "WHAT THE RUN ANSWERED", ""];
   for (const r of results) {
     if (r.state === "correct") {
-      lines.push(`  CORRECT        ${r.scenario} → ${r.code}` +
-        (r.missingCitations.length > 0 ? `  (did not cite ${r.missingCitations.join(", ")})` : ""));
+      lines.push(`  CORRECT        ${r.scenario} → ${r.code}`);
+    } else if (r.state === "correct-without-its-evidence") {
+      lines.push(`  RIGHT CODE,    ${r.scenario} → ${r.code}`);
+      lines.push(`  WRONG GROUND     it never cited ${r.missingCitations.join(", ")}, which is what this scenario was built around`);
     } else if (r.state === "wrong") {
       lines.push(`  WRONG          ${r.scenario} → ${r.got}, expected ${r.expected}`);
     } else {
@@ -87,9 +126,11 @@ export function format(results) {
     }
   }
   const correct = results.filter((r) => r.state === "correct").length;
+  const ungrounded = results.filter((r) => r.state === "correct-without-its-evidence").length;
   const wrong = results.filter((r) => r.state === "wrong").length;
   const unestablished = results.filter((r) => r.state === "unestablished").length;
-  lines.push("", `  ${correct} correct, ${wrong} wrong, ${unestablished} not established, of ${results.length}`);
+  lines.push("", `  ${correct} correct, ${ungrounded} right code on other ground, ${wrong} wrong, ` +
+    `${unestablished} not established, of ${results.length}`);
   lines.push("", "  Concluding and being right are different things. A run that did not conclude is",
     "  not a wrong answer — it gave none.", "");
   return lines.join("\n");
@@ -106,7 +147,8 @@ function main() {
   const results = scoreAll(answers);
   process.stdout.write(format(results));
   // Wrong is a failure; not established is not the same failure.
-  process.exit((results.some((r) => r.state === "wrong") ? 1 : 0) +
+  // The right code on other ground is not a clean result and does not exit 0.
+  process.exit((results.some((r) => r.state === "wrong" || r.state === "correct-without-its-evidence") ? 1 : 0) +
     (results.some((r) => r.state === "unestablished") ? 2 : 0));
 }
 

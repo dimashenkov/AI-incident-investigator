@@ -61,6 +61,10 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
     // observation, so a path beginning `observation.` is the natural thing to
     // write, resolves to nothing, and the whole result is thrown away.
     { id: "source-ref-is-relative-to-the-observation", prose: /never\n?begins with `observation\.`/ },
+    // Measured live on 2026-09-06: a container reported as OOMKilled without
+    // the memory limit it exceeded, and an image that could not be pulled
+    // without the image. The right code on ground the scenario was not built on.
+    { id: "cite-the-limit-a-fact-is-measured-against", prose: /half a finding without the limit/ },
     { id: "finding-needs-source-ref", prose: /Every finding needs a `source_ref`/ },
     { id: "every-answer-carries-five-fields", prose: /All five, always|all five, always/ },
     { id: "hypothesis-code-from-the-list", prose: /A hypothesis `code` must be one of these, exactly/ },
@@ -75,6 +79,10 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
     // observation, so a path beginning `observation.` is the natural thing to
     // write, resolves to nothing, and the whole result is thrown away.
     { id: "source-ref-is-relative-to-the-observation", prose: /never\n?begins with `observation\.`/ },
+    // Measured live on 2026-09-06: a container reported as OOMKilled without
+    // the memory limit it exceeded, and an image that could not be pulled
+    // without the image. The right code on ground the scenario was not built on.
+    { id: "cite-the-limit-a-fact-is-measured-against", prose: /half a finding without the limit/ },
     { id: "finding-needs-source-ref", prose: /Every finding needs a `source_ref`/ },
     { id: "every-answer-carries-five-fields", prose: /All five, always|all five, always/ },
     { id: "hypothesis-code-from-the-list", prose: /A hypothesis `code` must be one of these, exactly/ },
@@ -90,6 +98,10 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
     // observation, so a path beginning `observation.` is the natural thing to
     // write, resolves to nothing, and the whole result is thrown away.
     { id: "source-ref-is-relative-to-the-observation", prose: /never\n?begins with `observation\.`/ },
+    // Measured live on 2026-09-06: a container reported as OOMKilled without
+    // the memory limit it exceeded, and an image that could not be pulled
+    // without the image. The right code on ground the scenario was not built on.
+    { id: "cite-the-limit-a-fact-is-measured-against", prose: /half a finding without the limit/ },
     { id: "finding-needs-source-ref", prose: /Every finding needs a `source_ref`/ },
     { id: "every-answer-carries-five-fields", prose: /All five, always|all five, always/ },
     { id: "hypothesis-code-from-the-list", prose: /A hypothesis `code` must be one of these, exactly/ },
@@ -106,6 +118,10 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
     // earns a high one. A scale that only descends is read as "stay low".
     { id: "confidence-reads-both-directions", prose: /0\.8 to 0\.95/ },
     { id: "insufficient-evidence-is-an-answer", prose: /Not enough to tell is a real answer/ },
+    // Measured live on 2026-09-06: the metrics agent found the throttling, this
+    // agent cited it, and then said there was not enough evidence — because no
+    // agent had named a cause, and none of them is allowed to.
+    { id: "naming-the-cause-is-this-agents-job", prose: /forbidden\*\* to diagnose|are \*\*forbidden\*\*/ },
     { id: "every-answer-carries-five-fields", prose: /All five fields, always/ },
     { id: "cause-code-from-the-list", prose: /The `root_cause_code` must be one of these, exactly/ },
     { id: "record-contradicting-evidence", prose: /Contradicting evidence is recorded, not dropped/ },

@@ -12,7 +12,21 @@ import { readdirSync } from "node:fs";
 import { score, scoreAll, expectedFor, format } from "../scripts/score-run.mjs";
 
 const SCENARIOS = new URL("../scenarios/", import.meta.url).pathname;
-const concluded = (code: string) => ({ state: "concluded", root_cause_code: code, evidence: [] });
+/**
+ * A concluded answer, with the paths its agents reported.
+ *
+ * The paths live on the agents' findings. The first version of the scorer read
+ * analysis.evidence[].source, which holds the agent NAME — so nothing could
+ * ever match must_cite and the citation verdict was noise. Caught by looking at
+ * a recorded answer instead of trusting a field name.
+ */
+const concluded = (code: string, cited: string[] = []) => ({
+  state: "concluded",
+  root_cause_code: code,
+  incident: { analysis: { agents: [{ agent: "kubernetes", findings: cited.map((r) => ({ fact: "f", source_ref: r })) }] } },
+});
+
+const mustCiteOf = (scenario: string): string[] => expectedFor(scenario, SCENARIOS).mustCite;
 
 describe("scoring a run against what the scenario is for", () => {
   it("knows what every scenario on disk expects", () => {
@@ -28,7 +42,7 @@ describe("scoring a run against what the scenario is for", () => {
   });
 
   it("calls the right code correct and the wrong code wrong", () => {
-    expect(score("cpu-throttling", concluded("CPU_THROTTLING"), SCENARIOS).state).toBe("correct");
+    expect(score("cpu-throttling", concluded("CPU_THROTTLING", mustCiteOf("cpu-throttling")), SCENARIOS).state).toBe("correct");
     const bad = score("cpu-throttling", concluded("INSUFFICIENT_EVIDENCE"), SCENARIOS);
     expect(bad.state).toBe("wrong");
     expect(bad.expected).toBe("CPU_THROTTLING");
@@ -53,20 +67,50 @@ describe("scoring a run against what the scenario is for", () => {
     }
   });
 
-  it("reports missing citations without failing the answer for them", () => {
-    // expected.json's must_cite says what a human should look for. A run that
-    // reaches the right code by other evidence is not thereby wrong, and
-    // scoring it wrong would be this file inventing a rule nobody agreed.
-    const r = score("cpu-throttling", concluded("CPU_THROTTLING"), SCENARIOS);
-    expect(r.state).toBe("correct");
-    expect(r.missingCitations.length, "the fixture lists citations, so this is not vacuous").toBeGreaterThan(0);
+  it("keeps the right code on other ground apart from the right code on its own", () => {
+    /*
+     * Grok, 2026-09-06: reporting must_cite without letting it change the
+     * verdict makes it "a field that cannot fail the run", which is a comment.
+     * Scoring it WRONG would invent a rule — the code is right. So it is a
+     * fourth answer with its own name, which cannot hide inside "correct".
+     */
+    const needed = mustCiteOf("cpu-throttling");
+    expect(needed.length, "the fixture lists citations, so this is not vacuous").toBeGreaterThan(0);
+
+    const grounded = score("cpu-throttling", concluded("CPU_THROTTLING", needed), SCENARIOS);
+    expect(grounded.state).toBe("correct");
+    expect(grounded.missingCitations).toEqual([]);
+
+    const ungrounded = score("cpu-throttling", concluded("CPU_THROTTLING", []), SCENARIOS);
+    expect(ungrounded.state).toBe("correct-without-its-evidence");
+    expect(ungrounded.missingCitations).toEqual(needed);
+  });
+
+  it("reads the citations from the agents' findings, not from the evidence list", () => {
+    // analysis.evidence names which AGENT a fact came from; the path is on the
+    // finding. Comparing must_cite against the agent name matches nothing, and
+    // the verdict becomes noise that always says the same thing.
+    const needed = mustCiteOf("cpu-throttling");
+    const wrongPlace = { state: "concluded", root_cause_code: "CPU_THROTTLING",
+      evidence: needed.map((r) => ({ source: r, fact: "f", supports: "for" })) };
+    expect(score("cpu-throttling", wrongPlace, SCENARIOS).state,
+      "citations in the evidence list are not the agents' source_refs").toBe("correct-without-its-evidence");
+
+    // And the paths must come from the incident's agents, not from an analysis
+    // hung anywhere else on the answer. Without this the two readings agree on
+    // every input the other cases use, and the difference is untested.
+    const outsideTheIncident = { state: "concluded", root_cause_code: "CPU_THROTTLING",
+      analysis: { agents: [{ findings: needed.map((r) => ({ fact: "f", source_ref: r })) }] },
+      incident: { analysis: { agents: [] } } };
+    expect(score("cpu-throttling", outsideTheIncident, SCENARIOS).state,
+      "findings outside the incident are not the incident's citations").toBe("correct-without-its-evidence");
   });
 
   it("scores every scenario on disk, so one cannot be quietly left out", () => {
     const results = scoreAll({ "container-oom": concluded("CONTAINER_OOM") }, SCENARIOS);
     const names = readdirSync(SCENARIOS, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
     expect(results).toHaveLength(names.length);
-    expect(results.filter((r: { state: string }) => r.state === "correct")).toHaveLength(1);
+    expect(results.filter((r: { state: string }) => r.state.startsWith("correct"))).toHaveLength(1);
     expect(results.filter((r: { state: string }) => r.state === "unestablished")).toHaveLength(names.length - 1);
   });
 
