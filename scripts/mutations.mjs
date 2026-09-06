@@ -465,6 +465,26 @@ export const MUTATIONS = [
     mustFail: "refuses a slot that could not be read, rather than skipping it like an absence",
   },
   {
+    // Measured live on 2026-09-06: routing a gate's false branch past the node
+    // that prepares the next question skipped the agent AND everything after
+    // it, so an incident with no metrics reached the end having never asked the
+    // root cause agent. Every test passed, because the harness walked the order
+    // it remembered instead of the connections the workflow declares.
+    id: "skip-routes-past-the-node-that-asks-the-next-question",
+    file: "scripts/generate-workflow.mjs",
+    from: '    connections[gate].main[1] = [{ node: record, type: "main", index: 0 }];',
+    to: '    connections[gate].main[1] = [{ node: "Conclude", type: "main", index: 0 }];',
+    mustFail: "skips an agent whose slot holds an established absence, rather than refusing the incident",
+  },
+  {
+    // A history shared between runs lets one scenario read another's incident.
+    id: "harness-history-shared-between-runs",
+    file: "tests/helpers/run-workflow.ts",
+    from: "  const seen = new Map<string, Record<string, unknown>>();",
+    to: "  const seen = SHARED_HISTORY;",
+    mustFail: "keeps each run's node outputs to itself",
+  },
+  {
     id: "claimed-provider-not-compared",
     file: "src/providers/fixtures.ts",
     from: '      ["provider", `fake-${slot}`],',

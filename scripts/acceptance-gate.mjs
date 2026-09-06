@@ -678,6 +678,15 @@ export const LIMITATIONS = [
   // So it is said instead: the number is what the model said, and a reader who
   // takes it for a measurement is taking it for something it is not.
   "that a confidence figure means anything beyond what the model asserted — the prompt asks for bands and nothing enforces them",
+  // Codex, 2026-09-06, listing what local and live can still differ in after
+  // the harness was made to walk the real connections: n8n's item-linking
+  // semantics for $().item, which a name map does not reproduce; node and
+  // expression versions against `new Function`; multiple webhook items or
+  // concurrent executions, where the harness models one item synchronously.
+  //
+  // The harness executes the strings that ship, which is far more than it did.
+  // It is still not n8n, and the day those differ, only a live run says so.
+  "that the local harness runs the workflow the way n8n does — it executes the same strings, in one line, one item at a time",
   "that every diff went through external review before commit",
   "that each review objection was recorded verbatim rather than paraphrased",
   "that memory was written after each step",

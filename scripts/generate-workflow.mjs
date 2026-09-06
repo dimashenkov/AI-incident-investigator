@@ -212,7 +212,6 @@ export function buildWorkflow(runtime, { name = "AI SRE — incident investigati
 
   let previous = "Assemble";
   let x = 440;
-  const gates = [];
   AGENT_ORDER.forEach((agent, i) => {
     const next = AGENT_ORDER[i + 1] ?? null;
     const gate = `Ask ${agent}?`;
@@ -232,7 +231,16 @@ export function buildWorkflow(runtime, { name = "AI SRE — incident investigati
     connections[ask] = { main: [[{ node: collect, type: "main", index: 0 }]] };
     connections[collect] = { main: [[{ node: record, type: "main", index: 0 }]] };
 
-    gates.push(gate);
+    // False goes to this agent's Record node, not past it.
+    //
+    // Measured on the second live run, 2026-09-06: routing false to the NEXT
+    // gate skipped the agent AND everything after it, so an incident whose
+    // metrics were absent reached Conclude having never asked the root cause
+    // agent. Record is what prepares the next question; a skipped agent still
+    // has to pass through it, which is exactly what it does with state
+    // "skipped" — it records nothing and builds the next context.
+    connections[gate].main[1] = [{ node: record, type: "main", index: 0 }];
+
     previous = record;
     x += 740;
   });
@@ -240,12 +248,7 @@ export function buildWorkflow(runtime, { name = "AI SRE — incident investigati
   nodes.push(code("conclude", "Conclude", concludeNodeCode(), [x, 0]));
   connections[previous] = { main: [[{ node: "Conclude", type: "main", index: 0 }]] };
 
-  // Each gate's false branch jumps to the NEXT gate, so several skips in a row
-  // still reach the end; the last one goes straight to Conclude.
-  gates.forEach((gate, i) => {
-    const onward = gates[i + 1] ?? "Conclude";
-    connections[gate].main[1] = [{ node: onward, type: "main", index: 0 }];
-  });
+
 
   return { name, nodes, connections, settings: { executionOrder: "v1" } };
 }

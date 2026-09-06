@@ -437,7 +437,7 @@
         ],
         [
           {
-            "node": "Ask logs?",
+            "node": "Record kubernetes",
             "type": "main",
             "index": 0
           }
@@ -488,7 +488,7 @@
         ],
         [
           {
-            "node": "Ask metrics?",
+            "node": "Record logs",
             "type": "main",
             "index": 0
           }
@@ -539,7 +539,7 @@
         ],
         [
           {
-            "node": "Ask root-cause?",
+            "node": "Record metrics",
             "type": "main",
             "index": 0
           }
@@ -590,7 +590,7 @@
         ],
         [
           {
-            "node": "Conclude",
+            "node": "Record root-cause",
             "type": "main",
             "index": 0
           }

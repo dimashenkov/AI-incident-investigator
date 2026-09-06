@@ -3,12 +3,12 @@
   "name": "AI SRE — incident investigation",
   "description": null,
   "active": true,
-  "activeVersionId": "732daf15-80d2-4f41-b43b-720e6482b47d",
+  "activeVersionId": "8eb6f954-3b9e-4b5f-92df-a52261baa11f",
   "createdAt": "2026-09-04T13:44:43.103Z",
-  "updatedAt": "2026-09-05T19:39:13.774Z",
+  "updatedAt": "2026-09-06T05:31:03.454Z",
   "isArchived": false,
-  "versionId": "732daf15-80d2-4f41-b43b-720e6482b47d",
-  "versionCounter": 14,
+  "versionId": "8eb6f954-3b9e-4b5f-92df-a52261baa11f",
+  "versionCounter": 15,
   "sourceWorkflowId": null,
   "triggerCount": 1,
   "nodes": [
@@ -26,7 +26,7 @@
         "httpMethod": "POST",
         "responseMode": "lastNode"
       },
-      "webhookId": "861b8076-70da-4955-94f2-7c86d2ad2bf1"
+      "webhookId": "a6b28213-81fe-4ed0-9bd0-581a9f9d4902"
     },
     {
       "id": "assemble",
@@ -467,7 +467,7 @@
         ],
         [
           {
-            "node": "Ask logs?",
+            "node": "Record kubernetes",
             "type": "main",
             "index": 0
           }
@@ -518,7 +518,7 @@
         ],
         [
           {
-            "node": "Ask metrics?",
+            "node": "Record logs",
             "type": "main",
             "index": 0
           }
@@ -569,7 +569,7 @@
         ],
         [
           {
-            "node": "Ask root-cause?",
+            "node": "Record metrics",
             "type": "main",
             "index": 0
           }
@@ -620,7 +620,7 @@
         ],
         [
           {
-            "node": "Conclude",
+            "node": "Record root-cause",
             "type": "main",
             "index": 0
           }
@@ -670,7 +670,7 @@
   "meta": null,
   "tags": [],
   "activeVersion": {
-    "versionId": "732daf15-80d2-4f41-b43b-720e6482b47d",
+    "versionId": "8eb6f954-3b9e-4b5f-92df-a52261baa11f",
     "workflowId": "49T3pwFvfumqTdo7",
     "nodes": [
       {
@@ -687,7 +687,7 @@
           "httpMethod": "POST",
           "responseMode": "lastNode"
         },
-        "webhookId": "861b8076-70da-4955-94f2-7c86d2ad2bf1"
+        "webhookId": "a6b28213-81fe-4ed0-9bd0-581a9f9d4902"
       },
       {
         "id": "assemble",
@@ -1110,7 +1110,7 @@
           ],
           [
             {
-              "node": "Ask logs?",
+              "node": "Record kubernetes",
               "type": "main",
               "index": 0
             }
@@ -1161,7 +1161,7 @@
           ],
           [
             {
-              "node": "Ask metrics?",
+              "node": "Record logs",
               "type": "main",
               "index": 0
             }
@@ -1212,7 +1212,7 @@
           ],
           [
             {
-              "node": "Ask root-cause?",
+              "node": "Record metrics",
               "type": "main",
               "index": 0
             }
@@ -1263,7 +1263,7 @@
           ],
           [
             {
-              "node": "Conclude",
+              "node": "Record root-cause",
               "type": "main",
               "index": 0
             }
@@ -1309,16 +1309,16 @@
     "name": null,
     "description": null,
     "autosaved": false,
-    "createdAt": "2026-09-05T19:39:13.810Z",
-    "updatedAt": "2026-09-05T19:39:13.810Z",
+    "createdAt": "2026-09-06T05:31:03.483Z",
+    "updatedAt": "2026-09-06T05:31:03.483Z",
     "workflowPublishHistory": [
       {
-        "id": 12,
+        "id": 16,
         "workflowId": "49T3pwFvfumqTdo7",
-        "versionId": "732daf15-80d2-4f41-b43b-720e6482b47d",
+        "versionId": "8eb6f954-3b9e-4b5f-92df-a52261baa11f",
         "event": "activated",
         "userId": "6e8e3eb9-d8db-4e7f-bdb3-3318d80dee5a",
-        "createdAt": "2026-09-05T19:39:14.347Z"
+        "createdAt": "2026-09-06T05:31:04.012Z"
       }
     ]
   },

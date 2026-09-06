@@ -146,8 +146,9 @@ export function runIfExpression(node: { parameters?: { conditions?: { conditions
 export function runSetExpression(
   node: { parameters: { jsonOutput?: string } },
   current: Record<string, unknown>,
-  previousName: string,
-  previousItem: Record<string, unknown>,
+  /** What each earlier node produced, by name — the same thing $() reaches for. */
+  earlier: ((name: string) => Record<string, unknown>) | Record<string, unknown>,
+  previousName?: string,
 ): Record<string, unknown> {
   const raw = node?.parameters?.jsonOutput;
   if (typeof raw !== "string" || !raw.startsWith("={{") || !raw.trimEnd().endsWith("}}")) {
@@ -155,8 +156,11 @@ export function runSetExpression(
   }
   const body = raw.slice(raw.indexOf("{{") + 2, raw.lastIndexOf("}}"));
   const $ = (name: string) => {
-    if (name !== previousName) throw new Error(`the expression reaches for ${name}, which is not the node before it`);
-    return { item: { json: previousItem } };
+    if (typeof earlier === "function") return { item: { json: earlier(name) } };
+    if (previousName !== undefined && name !== previousName) {
+      throw new Error(`the expression reaches for ${name}, which is not the node before it`);
+    }
+    return { item: { json: earlier } };
   };
   const fn = new Function("$json", "$", `"use strict"; return (${body});`) as
     (j: unknown, d: unknown) => string;
@@ -180,79 +184,135 @@ export async function runScenario(
    * A fixture root to assemble from instead of the real scenarios.
    *
    * The generated Assemble node carries the incidents built at generate time,
-   * so exercising a different set means building them here and substituting
-   * them into the item the node produces — which is what the webhook body would
-   * have selected. Only the incident changes; every node still runs as written.
+   * so exercising a different set means substituting the incident it produces.
+   * Only that changes; every node still runs as written.
    */
   fixtureRoot?: string,
 ): Promise<Record<string, unknown> & { state: string }> {
   const { workflow } = await generate();
-  const byName: Record<string, { parameters: { jsCode?: string; jsonOutput?: string; conditions?: { conditions?: Array<Record<string, unknown>> } } } | undefined> = Object.fromEntries(
-    workflow.nodes.map((n: { name: string }) => [n.name, n]),
+  const byName: Record<string, WorkflowNode | undefined> = Object.fromEntries(
+    workflow.nodes.map((n: WorkflowNode) => [n.name, n]),
   );
+  const connections: Connections = workflow.connections;
 
-  const codeOf = (name: string) => {
-    const c = byName[name]?.parameters?.jsCode;
-    if (typeof c !== "string") throw new Error(`node ${name} carries no code; the workflow shape changed`);
-    return c;
-  };
-
-  let items = runCode(codeOf("Assemble"), [{ json: { body: { scenario } } }]);
-  let previousName = "Assemble";
+  /*
+   * The chain is walked through its own connections, not through an order this
+   * file remembers.
+   *
+   * Three times now a harness that assumed the order hid a defect in the
+   * wiring — most recently on 2026-09-06, when a gate's false branch jumped
+   * past the node that prepares the next question, so an incident with no
+   * metrics reached the end having never asked the root cause agent. Every test
+   * passed, because the harness went where the workflow was supposed to go.
+   */
+  let at = "Assemble";
+  let item: Record<string, unknown> = runCode(nodeCode(byName, "Assemble"),
+    [{ json: { body: { scenario } } }])[0]!.json;
 
   if (fixtureRoot !== undefined) {
     const root = new URL(fixtureRoot, import.meta.url).pathname;
     const a = assembleIncident(scenario, 1, { root });
     if (a.state !== "assembled") throw new Error(`the fixture root does not assemble: ${a.reason}`);
-    // Re-run Assemble's own logic on the substituted incident by handing the
-    // first Record node the shape Assemble would have produced.
     const ctx = assembleCheckedContext("kubernetes", a.incident);
     if (ctx.state !== "assembled") throw new Error(`kubernetes context: ${ctx.reason}`);
-    items = [{ json: { index: 0, state: "asking", agent: "kubernetes", scenario,
-      incident: a.incident, prompt: ctx.prompt, payload: ctx.payload } }];
+    item = { index: 0, state: "asking", agent: "kubernetes", scenario,
+      incident: a.incident, prompt: ctx.prompt, payload: ctx.payload };
   }
 
-  for (const agent of ["kubernetes", "logs", "metrics", "root-cause"]) {
-    const cur = items[0]?.json ?? {};
-    if (cur.state === "refused") break;
+  let previousName = at;
+  const { remember, lastOf } = newHistory();
+  // The Set node reaches back to the node before it, and Assemble is the first
+  // such node. Without this the very first lookup finds nothing.
+  remember("Assemble", item);
+
+  for (let step = 0; step < 60; step += 1) {
+    const outgoing = connections[at];
+    if (outgoing === undefined) break;
+
+    let branch = 0;
+    const node = byName[at];
+    if (node?.type === "n8n-nodes-base.if") branch = runIfExpression(node, item) ? 0 : 1;
 
     /*
-     * The gate's own expression decides, not this harness. Measured on the
-     * first live run: a refused item flowed into the next HTTP node and was
-     * charged for the agents before it.
+     * One target per branch, refused rather than assumed.
+     *
+     * Codex, 2026-09-06: following only [0] would walk a fan-out wrongly and
+     * say nothing about it. This chain is deliberately a single line; the day
+     * it is not, this throws instead of quietly testing one half of it.
      */
-    const gate = byName[`Ask ${agent}?`];
-    if (gate === undefined) throw new Error(`no gate before Ask ${agent}; the workflow shape changed`);
-    if (!runIfExpression(gate, cur)) {
-      items = runCode(codeOf(`Record ${agent}`), [{ json: cur }]);
-      previousName = `Record ${agent}`;
-      continue;
+    const targets = outgoing.main[branch] ?? [];
+    if (targets.length > 1) {
+      throw new Error(`${at} branch ${branch} fans out to ${targets.length} nodes; this harness walks one line and would test only the first`);
+    }
+    const target = targets[0]?.node;
+    if (target === undefined) throw new Error(`${at} has no branch ${branch}; the run would stop with no answer`);
+
+    const next = byName[target];
+    if (next === undefined) throw new Error(`${at} points at ${target}, which does not exist`);
+
+    if (next.type === "n8n-nodes-base.httpRequest") {
+      // The model, replaced by a stub answering from the payload it is handed.
+      const agent = target.replace(/^Ask /, "");
+      const stub = stubs[agent];
+      item = envelope(stub === undefined ? null : stub(item.payload as Record<string, unknown>));
+    } else if (next.type === "n8n-nodes-base.set") {
+      item = runSetExpression(next, item, lastOf);
+    } else if (next.type === "n8n-nodes-base.code") {
+      item = runCode(nodeCode(byName, target), [{ json: item }])[0]!.json;
+      previousName = target;
+    } else if (next.type !== "n8n-nodes-base.if") {
+      // An IF changes nothing about the item, only where it goes. Anything else
+      // is a node type this harness does not execute, and passing the item
+      // through it would be the harness pretending the node did nothing.
+      throw new Error(`${target} is a ${next.type}, which this harness does not execute`);
     }
 
-    /*
-     * The Ask node is an HTTP call, so the stub stands in for the model — but
-     * the Collect node in between is OURS, and it used to be stood in for as
-     * well. Codex, 2026-09-05: "this bypasses both actual HTTP-node execution
-     * and the Collect Set expression", so an expression error, a changed
-     * response envelope or a broken item link was untested.
-     *
-     * The stub now returns the API's envelope, and the Set expression is
-     * evaluated as written, with $json and $() supplied the way n8n does.
-     */
-    const stub = stubs[agent];
-    const answer = stub === undefined ? null : stub(cur.payload as Record<string, unknown>);
-    const httpResponse = envelope(answer);
-    const collect = byName[`Collect ${agent}`];
-    if (collect === undefined) throw new Error(`no Collect ${agent} node; the workflow shape changed`);
-    items = [{ json: runSetExpression(collect, httpResponse, previousName, cur) }];
-    items = runCode(codeOf(`Record ${agent}`), items);
-    previousName = `Record ${agent}`;
+    // Remembered under the node that produced it. Keyed by previousName it
+    // clobbered Assemble's output with the HTTP envelope, and the incident
+    // disappeared two steps later.
+    remember(target, item);
+    at = target;
+    if (target === "Conclude") break;
   }
 
-  const cur = items[0]?.json ?? {};
-  if (cur.state === "refused") return cur as Record<string, unknown> & { state: string };
-  const out = runCode(codeOf("Conclude"), [{ json: cur }]);
-  return (out[0]?.json ?? { state: "empty" }) as Record<string, unknown> & { state: string };
+  return item as Record<string, unknown> & { state: string };
+}
+
+type WorkflowNode = { name: string; type: string; parameters: Record<string, unknown> };
+type Connections = Record<string, { main: Array<Array<{ node: string }>> }>;
+
+/*
+ * What each node produced, for THIS run only.
+ *
+ * Codex, 2026-09-06: a module-level object is shared between runs, so two
+ * scenarios executing together overwrite each other's named outputs and
+ * $("Assemble") reads another incident. And a lookup that returns {} for a node
+ * which never ran turns a wiring mistake into a quietly empty object — the
+ * defect this file exists to catch, inside the thing catching it.
+ */
+type History = { remember(name: string, item: Record<string, unknown>): void; lastOf(name: string): Record<string, unknown> };
+
+/** Only a mutation uses this: the shared map the per-run one replaced. */
+const SHARED_HISTORY = new Map<string, Record<string, unknown>>();
+
+export function newHistory(): History {
+  const seen = new Map<string, Record<string, unknown>>();
+  return {
+    remember: (name, item) => { seen.set(name, item); },
+    lastOf: (name) => {
+      const found = seen.get(name);
+      if (found === undefined) {
+        throw new Error(`the expression reaches for ${name}, which has not run in this execution`);
+      }
+      return found;
+    },
+  };
+}
+
+function nodeCode(byName: Record<string, WorkflowNode | undefined>, name: string): string {
+  const c = byName[name]?.parameters?.jsCode;
+  if (typeof c !== "string") throw new Error(`node ${name} carries no code; the workflow shape changed`);
+  return c;
 }
 
 runScenario.runtime = runtimeOnce;

@@ -11,7 +11,7 @@
  * "passes" because the answer was planted cannot happen.
  */
 import { describe, it, expect } from "vitest";
-import { runScenario, STUB_AGENTS, envelope, runSetExpression } from "./helpers/run-workflow.js";
+import { runScenario, STUB_AGENTS, envelope, runSetExpression, newHistory } from "./helpers/run-workflow.js";
 import { listScenarios } from "../src/providers/fixtures.js";
 
 const SCENARIOS = new URL("../scenarios/", import.meta.url).pathname;
@@ -129,7 +129,7 @@ describe("the Set node that joins the answer back to the incident", () => {
   it("puts the previous item back and hangs the parsed answer beside it", async () => {
     const node = await collectNode("kubernetes");
     const before = { incident: { incident_id: "INC-2026-0101" }, scenario: "container-oom", state: "asking" };
-    const out = runSetExpression(node, envelope({ agent: "kubernetes", status: "ok" }), "Assemble", before);
+    const out = runSetExpression(node, envelope({ agent: "kubernetes", status: "ok" }), before, "Assemble");
     expect(out.incident).toEqual(before.incident);
     expect(out.scenario).toBe("container-oom");
     expect(out.reply).toEqual({ agent: "kubernetes", status: "ok" });
@@ -142,7 +142,7 @@ describe("the Set node that joins the answer back to the incident", () => {
     const node = await collectNode("kubernetes");
     const answer = { agent: "kubernetes", status: "ok" };
     const fenced = { choices: [{ message: { content: "```json\n" + JSON.stringify(answer) + "\n```" } }] };
-    const out = runSetExpression(node, fenced, "Assemble", { incident: {} });
+    const out = runSetExpression(node, fenced, { incident: {} }, "Assemble");
     expect(out.reply).toEqual(answer);
   });
 
@@ -150,19 +150,19 @@ describe("the Set node that joins the answer back to the incident", () => {
     const node = await collectNode("logs");
     const answer = { agent: "logs", status: "ok" };
     const wrapped = envelope({ result: answer } as unknown as Record<string, unknown>);
-    expect(runSetExpression(node, wrapped, "Record kubernetes", {}).reply).toEqual(answer);
+    expect(runSetExpression(node, wrapped, {}, "Record kubernetes").reply).toEqual(answer);
 
     // A single key whose value is not an object is left alone: there is nothing
     // inside it that could be a result.
     const oneKey = envelope({ agent: "logs" });
-    expect(runSetExpression(node, oneKey, "Record kubernetes", {}).reply).toEqual({ agent: "logs" });
+    expect(runSetExpression(node, oneKey, {}, "Record kubernetes").reply).toEqual({ agent: "logs" });
   });
 
   it("still refuses an array or a bare string, rather than guessing further", async () => {
     // Guessing past this would be inventing an answer on the model's behalf.
     const node = await collectNode("metrics");
-    expect(runSetExpression(node, envelope([{ agent: "metrics" }] as unknown as Record<string, unknown>), "Record logs", {}).reply).toBeNull();
-    expect(runSetExpression(node, { choices: [{ message: { content: "\"just a string\"" } }] }, "Record logs", {}).reply).toBeNull();
+    expect(runSetExpression(node, envelope([{ agent: "metrics" }] as unknown as Record<string, unknown>), {}, "Record logs").reply).toBeNull();
+    expect(runSetExpression(node, { choices: [{ message: { content: "\"just a string\"" } }] }, {}, "Record logs").reply).toBeNull();
   });
 
   it("turns an unparseable answer into null rather than throwing inside n8n", async () => {
@@ -170,14 +170,14 @@ describe("the Set node that joins the answer back to the incident", () => {
     // different and much worse report than "the agent returned nothing".
     const node = await collectNode("logs");
     const out = runSetExpression(node, { choices: [{ message: { content: "sorry, no JSON today" } }] },
-      "Record kubernetes", { incident: {}, scenario: "container-oom" });
+      { incident: {}, scenario: "container-oom" }, "Record kubernetes");
     expect(out.reply).toBeNull();
   });
 
   it("reaches back to the node immediately before it, not to some other one", async () => {
     // The item link is the part that silently breaks when nodes are reordered.
     const node = await collectNode("metrics");
-    expect(() => runSetExpression(node, envelope({}), "Some Other Node", {}))
+    expect(() => runSetExpression(node, envelope({}), {}, "Some Other Node"))
       .toThrow(/not the node before it/);
   });
 
@@ -225,5 +225,39 @@ describe("what may reach the conclusion", () => {
     const out = run(code, { state: "refused", agent: "logs", reason: "logs: something" });
     expect(out.state).toBe("refused");
     expect(out.reason).toBe("logs: something");
+  });
+
+});
+
+describe("the harness refuses rather than assuming", () => {
+  /*
+   * Codex, 2026-09-06, on the harness itself. Every entry here is a way it
+   * could walk something and report success about a shape it never executed —
+   * which is the defect it exists to catch, one level up.
+   */
+  it("keeps each run's node outputs to itself", () => {
+    /*
+     * Asserted on the history directly, because the harness is synchronous:
+     * two runScenario calls never interleave, so a shared history would corrupt
+     * nothing today and the mutation for it survived. The property is real
+     * anyway — the day anything here awaits mid-run, a shared map is one
+     * incident reading another's — and this is where it is held.
+     */
+    const one = newHistory();
+    const two = newHistory();
+    one.remember("Assemble", { scenario: "container-oom" });
+    two.remember("Assemble", { scenario: "readiness-probe-failure" });
+    expect(one.lastOf("Assemble")).toEqual({ scenario: "container-oom" });
+    expect(two.lastOf("Assemble")).toEqual({ scenario: "readiness-probe-failure" });
+    expect(() => newHistory().lastOf("Assemble"), "a fresh history must know nothing").toThrow(/has not run/);
+  });
+
+  it("refuses to reach for a node that has not run", () => {
+    // Returning {} for a node that never ran turns a wiring mistake into a
+    // quietly empty object.
+    const node = { parameters: { jsonOutput: "={{ JSON.stringify($('Nowhere').item.json) }}" } };
+    expect(() => runSetExpression(node, {}, (name: string) => {
+      throw new Error(`the expression reaches for ${name}, which has not run in this execution`);
+    })).toThrow(/has not run in this execution/);
   });
 });
