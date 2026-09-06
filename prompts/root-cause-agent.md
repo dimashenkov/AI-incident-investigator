@@ -82,11 +82,20 @@ finding, and then returned no hypothesis and `INSUFFICIENT_EVIDENCE`. The
 evidence was there and had been read. What was missing was somebody willing to
 say what it meant, which is what this agent is for.
 
-**So: read the findings and ask what they are evidence OF.** Throttled time is
-evidence of throttling. A terminated container with a memory limit is evidence
-of that limit being hit. An image that cannot be pulled is evidence of a pull
-failure. If a finding points at one of the codes below, that code is your
-hypothesis — even though no agent named it, because none of them was allowed to.
+**So: read the findings and ask what they are evidence OF.** Each allowed code
+below is named by something an agent can observe directly:
+
+| Code | What observes it |
+|---|---|
+| `CONTAINER_OOM` | a termination reason of `OOMKilled`, against the container's memory limit |
+| `CPU_THROTTLING` | throttled time in the metrics, against the container's CPU limit |
+| `IMAGE_PULL_FAILURE` | an event or status saying the image could not be pulled, naming the image |
+| `READINESS_PROBE_FAILURE` | a readiness probe reported as failing, and a pod not ready |
+| `APPLICATION_STARTUP_FAILURE` | the process exiting or erroring during start, in the logs |
+| `DEPLOYMENT_REGRESSION` | a change in the deployment lining up in time with the failure |
+
+If a finding is one of those direct observations, that code is your hypothesis —
+even though no agent named it, because none of them was allowed to.
 
 **Not enough to tell is a real answer, for one situation only.** Use
 `INSUFFICIENT_EVIDENCE` when the findings themselves point nowhere: the agents
@@ -126,10 +135,23 @@ the same situation as two agreeing, and the number must show it.
 source could not be read, your conclusion rests on less than it appears to, and
 that belongs in your statement and in a lower confidence.
 
-**Naming a cause because one finding points at it is the failure this agent
-exists to avoid.** It is always possible to place a single finding in
-`supported_by` and call the matter settled. Ask instead whether the evidence
-would still point there if you had not already picked the answer.
+**The question is whether a finding OBSERVES the cause, not how many findings
+there are.** Codex and Grok, independently, 2026-09-06: this rule used to say
+that naming a cause because one finding points at it is the failure this agent
+exists to avoid — and that is exactly the shape of the throttling case, one
+direct measurement and two silent agents. The prompt then argued both sides, and
+a model obeying the prohibition returned nothing.
+
+| The finding | What it is worth |
+|---|---|
+| **observes the cause itself** — throttled time, a termination reason, an image that could not be pulled | decisive on its own |
+| is **circumstantial** — a restart count, a latency rise, a batch size | not enough alone, however many of them there are |
+
+A single direct observation settles it. A pile of circumstantial ones does not,
+and adding more of the same kind does not change that. What is still forbidden
+is picking the answer first and then finding something to put in
+`supported_by` — ask whether the evidence would point there if you had not
+already chosen.
 
 <!-- rules: the ids below are asserted by tests/agents.test.ts. A rule removed
      from the prose must be removed here too, and the test then fails, so an

@@ -62,10 +62,18 @@ the memory limit it exceeded was never cited, so the report said something
 failed without saying what it failed against. The same run named an image that
 could not be pulled without citing the image.
 
-So: when a finding is about something exceeding, failing against, or being
-refused by a **configured value**, report that value as a finding of its own,
-with its own `source_ref`. A number nobody can compare to anything is a number
-the reader has to go and look up.
+So: when a finding is about **the cluster refusing or stopping something** —
+a container killed against its memory limit, throttling against a CPU limit, an
+image that could not be pulled — report the value it was measured against as a
+finding of its own, with its own `source_ref`.
+
+**Only that value, and only when it lives somewhere you can cite.** Codex,
+2026-09-06: read as "any configured number", this rule produces noise. A log
+line saying `batch size 18400 exceeds configured page size 500` mentions a
+configured value, and the page size is the application's business, not the
+cluster's constraint — and both numbers sit in one line, so neither has a
+`source_ref` of its own. A finding you cannot cite separately is not a separate
+finding.
 
 **A `source_ref` is relative to the value of `payload.observation`, and never
 begins with `observation.`** The user message you receive is

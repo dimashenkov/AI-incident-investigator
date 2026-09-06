@@ -529,6 +529,22 @@ export const MUTATIONS = [
     mustFail: "reads the citations from the agents' findings, not from the evidence list",
   },
   {
+    // Two rules that contradict make the model obey whichever matches the shape
+    // in front of it, and the live run showed which one that is.
+    id: "root-cause-prompt-forbids-what-it-requires",
+    file: "prompts/root-cause-agent.md",
+    from: "**The question is whether a finding OBSERVES the cause, not how many findings",
+    to: "**Naming a cause because one finding points at it is the failure this agent exists to avoid. Not how many findings",
+    mustFail: "does not both require and forbid naming a cause from one finding",
+  },
+  {
+    id: "allowed-code-with-nothing-that-observes-it",
+    file: "prompts/root-cause-agent.md",
+    from: "| `DEPLOYMENT_REGRESSION` | a change in the deployment lining up in time with the failure |",
+    to: "| `DEPLOYMENT_REGRESSION` | |",
+    mustFail: "names, for every allowed cause code, what observes it",
+  },
+  {
     id: "claimed-provider-not-compared",
     file: "src/providers/fixtures.ts",
     from: '      ["provider", `fake-${slot}`],',

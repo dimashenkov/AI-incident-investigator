@@ -232,6 +232,38 @@ describe("every prompt carries the rules its schema will enforce", () => {
     }
   });
 
+  it("names, for every allowed cause code, what observes it", () => {
+    /*
+     * Grok, 2026-09-06: three of the six codes had a sentence saying what points
+     * at them and three had none, while the only worked example was
+     * CONTAINER_OOM. A model that does emit a code maps whatever it has onto
+     * the example it was shown.
+     */
+    const text = readPrompt("root-cause")!;
+    const codes = ["CONTAINER_OOM", "CPU_THROTTLING", "IMAGE_PULL_FAILURE",
+      "READINESS_PROBE_FAILURE", "APPLICATION_STARTUP_FAILURE", "DEPLOYMENT_REGRESSION"];
+    for (const code of codes) {
+      const row = text.split("\n").find((l) => l.startsWith(`| \`${code}\``));
+      expect(row, `${code} has no row saying what observes it`).toBeDefined();
+      expect(row!.split("|")[2]!.trim().length, `${code}'s row says nothing`).toBeGreaterThan(20);
+    }
+  });
+
+  it("does not both require and forbid naming a cause from one finding", () => {
+    /*
+     * Codex and Grok, independently, 2026-09-06: the prompt said a finding
+     * pointing at a code makes that code the hypothesis, AND that naming a
+     * cause because one finding points at it is the failure this agent exists
+     * to avoid. A model obeying the second returned nothing, which is exactly
+     * what the live run did. The distinction is directness, not count.
+     */
+    const text = readPrompt("root-cause")!;
+    expect(text, "the old count-based prohibition is back")
+      .not.toMatch(/Naming a cause because one finding points at it is the failure/);
+    expect(text).toMatch(/observes the cause itself/);
+    expect(text).toMatch(/circumstantial/);
+  });
+
   it("declares no rule id that no test knows about", () => {
     // A prompt could otherwise grow an id that looks checked and is not.
     for (const [agent, rules] of Object.entries(REQUIRED_RULES)) {
