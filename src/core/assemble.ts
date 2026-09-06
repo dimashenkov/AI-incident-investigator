@@ -278,4 +278,4 @@ export function concludeIncident(
   return mergeConcludeIncident(validate as Validate, incident);
 }
 
-export { resultBelongsHere, resolveRef, runnableAgents } from "./merge.js";
+export { resultBelongsHere, resolveRef, runnableAgents, normaliseRef, withResolvedRefs } from "./merge.js";

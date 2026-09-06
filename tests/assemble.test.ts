@@ -7,7 +7,7 @@
  * valid incident, because "this is hard to diagnose" is not "this is malformed".
  */
 import { describe, it, expect } from "vitest";
-import { assembleIncident, checkProvenance, concludeIncident, incidentIdFor, readRegistry, recordAgentResult, resultBelongsHere, resolveRef, runnableAgents, serviceFromTags } from "../src/core/assemble.js";
+import { normaliseRef, withResolvedRefs, assembleIncident, checkProvenance, concludeIncident, incidentIdFor, readRegistry, recordAgentResult, resultBelongsHere, resolveRef, runnableAgents, serviceFromTags } from "../src/core/assemble.js";
 import { listScenarios } from "../src/providers/fixtures.js";
 import { validate } from "../src/schema/validate.js";
 import { assembleObservingContext, checkPayloadIsExactlyTheSlice } from "../src/agents/context.js";
@@ -609,5 +609,98 @@ describe("an observation must have been gathered under the request we issued", (
       metrics: { state: "nothing" as const, slot: "metrics" as const },
     };
     expect(checkProvenance(none, request)).toContain("nothing whose provenance could be established");
+  });
+});
+
+describe("a path spelled with the wrapper it came in", () => {
+  /*
+   * Measured on the fourth live run, 2026-09-06: the model wrote
+   * `observation.events[0].message` and the answer was refused. Every prompt
+   * warns against the prefix twice, and it happened anyway, because the object
+   * the model is looking at is literally called `observation`.
+   *
+   * The first fix stripped the prefix inside the resolver. Both reviewers
+   * refused it: the stored citation stayed unfollowable, so the check and the
+   * audit trail disagreed. What is normalised is the SPELLING, and the spelling
+   * that works is what gets written down.
+   */
+  const observation = { events: [{ message: "Failed to pull image" }], pods: [{ name: "p" }] };
+
+  it("accepts the wrapper spelling and answers with the one that resolves", () => {
+    expect(normaliseRef(observation, "events[0].message")).toBe("events[0].message");
+    expect(normaliseRef(observation, "observation.events[0].message")).toBe("events[0].message");
+  });
+
+  it("still refuses a path that resolves to nothing, however it is spelled", () => {
+    expect(normaliseRef(observation, "observation.events[3].message")).toBeNull();
+    expect(normaliseRef(observation, "observation.nowhere")).toBeNull();
+    expect(normaliseRef(observation, "nowhere")).toBeNull();
+  });
+
+  it("refuses the wrapper on its own, which names everything and so names nothing", () => {
+    // Codex, 2026-09-06: an empty remainder resolves to the whole observation.
+    expect(normaliseRef(observation, "observation.")).toBeNull();
+    expect(normaliseRef(observation, "")).toBeNull();
+  });
+
+  it("prefers a field genuinely called observation over the alias", () => {
+    // Grok: startsWith cannot tell an envelope prefix from a real field name,
+    // so the literal path is tried first and a real field is never shadowed.
+    const nested = { observation: { note: "the real one" }, note: "the root one" };
+    expect(normaliseRef(nested, "observation.note")).toBe("observation.note");
+    expect(resolveRef(nested, normaliseRef(nested, "observation.note")!)).toBe("the real one");
+  });
+
+  it("writes the working spelling into the incident, not the one the model sent", () => {
+    /*
+     * The point of the whole change. A citation the machine approved and a
+     * human cannot follow is worse than a refusal — the refusal at least says
+     * something is wrong.
+     */
+    const result = {
+      agent: "kubernetes", status: "ok",
+      findings: [{ fact: "an image could not be pulled", source_ref: "observation.events[0].message" }],
+      hypotheses: [{ code: "IMAGE_PULL_FAILURE", statement: "s", supported_by: ["observation.events[0].message"] }],
+      confidence: 0.8,
+    };
+    const out = withResolvedRefs(observation, result) as typeof result;
+    expect(out.findings[0]!.source_ref, "the stored citation must resolve").toBe("events[0].message");
+    expect(out.hypotheses[0]!.supported_by, "supported_by must travel with it").toEqual(["events[0].message"]);
+    expect(resolveRef(observation, out.findings[0]!.source_ref)).toBe("Failed to pull image");
+  });
+
+  it("stores the working spelling through recordAgentResult, not only in the helper", () => {
+    /*
+     * The mutation for this survived a test that called the helper directly:
+     * replacing the call inside recordAgentResult changed nothing the test
+     * looked at. What matters is what ends up in the incident.
+     */
+    const a = assembleIncident("image-pull-failure", 1, {});
+    expect(a.state, a.state === "refused" ? a.reason : "").toBe("assembled");
+    if (a.state !== "assembled") return;
+
+    const obs = (a.incident.observations as Record<string, unknown>)["kubernetes"] as Record<string, unknown>;
+    const events = obs["events"] as Array<Record<string, unknown>>;
+    expect(events.length, "the fixture must have an event to cite").toBeGreaterThan(0);
+
+    const r = recordAgentResult(a.incident, {
+      agent: "kubernetes", status: "ok",
+      findings: [{ fact: "an image could not be pulled", source_ref: "observation.events[0].message" }],
+      hypotheses: [{ code: "IMAGE_PULL_FAILURE", statement: "s", supported_by: ["observation.events[0].message"] }],
+      confidence: 0.8,
+    });
+    expect(r.state, r.state === "refused" ? `${r.reason} ${JSON.stringify(r.errors)}` : "").toBe("recorded");
+    if (r.state !== "recorded") return;
+
+    const stored = ((r.incident.analysis as Record<string, unknown>)["agents"] as Array<Record<string, unknown>>)[0]!;
+    const ref = (stored["findings"] as Array<Record<string, unknown>>)[0]!["source_ref"];
+    expect(ref, "the incident must carry the spelling that resolves").toBe("events[0].message");
+    expect(resolveRef(obs, String(ref)), "and it must lead somewhere").toBeDefined();
+  });
+
+  it("leaves a result alone when nothing needed rewriting", () => {
+    const result = { agent: "kubernetes", status: "ok",
+      findings: [{ fact: "f", source_ref: "events[0].message" }], hypotheses: [], confidence: 0.5 };
+    expect(withResolvedRefs(observation, result)).toBe(result);
   });
 });

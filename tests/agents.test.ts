@@ -60,7 +60,10 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
     // a real model's first answer is refused: the payload visibly wraps the
     // observation, so a path beginning `observation.` is the natural thing to
     // write, resolves to nothing, and the whole result is thrown away.
-    { id: "source-ref-is-relative-to-the-observation", prose: /never\n?begins with `observation\.`/ },
+    // Was a prohibition until 2026-09-06. The checker normalises the prefix
+    // now, and a prompt still forbidding it would be a rule nothing enforces —
+    // which is the defect this repository exists to catch.
+    { id: "source-ref-is-a-path-inside-the-observation", prose: /a path inside the observation you were given/ },
     // Measured live on 2026-09-06: a container reported as OOMKilled without
     // the memory limit it exceeded, and an image that could not be pulled
     // without the image. The right code on ground the scenario was not built on.
@@ -78,7 +81,10 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
     // a real model's first answer is refused: the payload visibly wraps the
     // observation, so a path beginning `observation.` is the natural thing to
     // write, resolves to nothing, and the whole result is thrown away.
-    { id: "source-ref-is-relative-to-the-observation", prose: /never\n?begins with `observation\.`/ },
+    // Was a prohibition until 2026-09-06. The checker normalises the prefix
+    // now, and a prompt still forbidding it would be a rule nothing enforces —
+    // which is the defect this repository exists to catch.
+    { id: "source-ref-is-a-path-inside-the-observation", prose: /a path inside the observation you were given/ },
     // Measured live on 2026-09-06: a container reported as OOMKilled without
     // the memory limit it exceeded, and an image that could not be pulled
     // without the image. The right code on ground the scenario was not built on.
@@ -97,7 +103,10 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
     // a real model's first answer is refused: the payload visibly wraps the
     // observation, so a path beginning `observation.` is the natural thing to
     // write, resolves to nothing, and the whole result is thrown away.
-    { id: "source-ref-is-relative-to-the-observation", prose: /never\n?begins with `observation\.`/ },
+    // Was a prohibition until 2026-09-06. The checker normalises the prefix
+    // now, and a prompt still forbidding it would be a rule nothing enforces —
+    // which is the defect this repository exists to catch.
+    { id: "source-ref-is-a-path-inside-the-observation", prose: /a path inside the observation you were given/ },
     // Measured live on 2026-09-06: a container reported as OOMKilled without
     // the memory limit it exceeded, and an image that could not be pulled
     // without the image. The right code on ground the scenario was not built on.

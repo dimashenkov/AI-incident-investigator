@@ -58,12 +58,16 @@ cluster's constraint — and both numbers sit in one line, so neither has a
 `source_ref` of its own. A finding you cannot cite separately is not a separate
 finding.
 
-**A `source_ref` is relative to the value of `payload.observation`, and never
-begins with `observation.`** The user message you receive is
-`{ "incident_id": ..., "observation": { ... } }`, so the wrapper is visible and
-starting a path with `observation.` is the natural mistake. It resolves to
-nothing and the whole answer is refused. Write `lines[2].message`, not
-`observation.lines[2].message`.
+**A `source_ref` is a path inside the observation you were given.** Write
+`lines[2].message`, and if you begin it with `observation.` that is accepted too — the prefix
+is stripped and what remains has to resolve.
+
+Measured on 2026-09-06: this file used to forbid the prefix, twice, and a real
+model wrote it anyway, because the object it is looking at is literally called
+`observation`. A rule the checker no longer enforces is dead text, and dead text
+in a prompt is a rule a reader cannot tell from a live one. The path that ends
+up in the incident is the one that resolves, so a human following your citation
+lands on the value that was checked.
 
 **Check `truncated`.** If the observation says the log was truncated, you did not
 see everything, and any statement of the form "there is no X" is unfounded.
@@ -135,7 +139,7 @@ finding, a note of your own — is refused exactly like a missing one.
 
 - `finding-needs-source-ref`
 - `cite-the-limit-a-fact-is-measured-against`
-- `source-ref-is-relative-to-the-observation`
+- `source-ref-is-a-path-inside-the-observation`
 - `every-answer-carries-five-fields`
 - `hypothesis-code-from-the-list`
 - `no-data-is-an-answer`

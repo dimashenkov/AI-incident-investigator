@@ -79,9 +79,18 @@ export function recordAgentResult(
     return { state: "refused", reason: "analysis.agents is present but is not a list; refusing rather than replacing it" };
   }
 
+  // What goes into the incident is the result with its citations spelled the way
+  // they resolve. The check above accepted them; storing the other spelling
+  // would leave a human following a path that leads nowhere.
+  const observations = incident["observations"];
+  const slot = typeof observations === "object" && observations !== null
+    ? (observations as Record<string, unknown>)[String((result as Record<string, unknown>)["agent"])]
+    : undefined;
+  const stored = withResolvedRefs(slot, result as Record<string, unknown>);
+
   const next = {
     ...incident,
-    analysis: { ...(analysis as Record<string, unknown>), agents: [...((existing as unknown[]) ?? []), result] },
+    analysis: { ...(analysis as Record<string, unknown>), agents: [...((existing as unknown[]) ?? []), stored] },
   };
 
   const whole = validate("incident", next);
@@ -132,11 +141,53 @@ export function resultBelongsHere(incident: Record<string, unknown>, result: Rec
   for (const f of findings) {
     const ref = typeof f === "object" && f !== null ? (f as Record<string, unknown>)["source_ref"] : undefined;
     if (typeof ref !== "string") return "a finding carries no source_ref";
-    if (resolveRef(observation, ref) === undefined) {
+    if (normaliseRef(observation, ref) === null) {
       return `a finding cites ${ref}, which resolves to nothing in the ${agent} observation`;
     }
   }
   return null;
+}
+
+/**
+ * Rewrite every citation to the spelling that resolves, in place of the one the
+ * model wrote.
+ *
+ * Grok, 2026-09-06: accepting a spelling in the checker while storing another
+ * leaves check and audit trail disagreeing — the machine approves a citation a
+ * human then cannot follow. So the incident carries the working spelling, and
+ * the two are the same thing again.
+ *
+ * `supported_by` travels with it: a hypothesis must cite a source_ref its own
+ * findings report, and rewriting one without the other would break exactly that
+ * rule while fixing a different one.
+ */
+export function withResolvedRefs(observation: unknown, result: Record<string, unknown>): Record<string, unknown> {
+  const rewritten = new Map<string, string>();
+
+  const findings = Array.isArray(result["findings"]) ? (result["findings"] as unknown[]) : [];
+  const nextFindings = findings.map((f) => {
+    if (typeof f !== "object" || f === null) return f;
+    const one = f as Record<string, unknown>;
+    const ref = one["source_ref"];
+    if (typeof ref !== "string") return f;
+    const good = normaliseRef(observation, ref);
+    if (good === null || good === ref) return f;
+    rewritten.set(ref, good);
+    return { ...one, source_ref: good };
+  });
+
+  if (rewritten.size === 0) return result;
+
+  const hypotheses = Array.isArray(result["hypotheses"]) ? (result["hypotheses"] as unknown[]) : [];
+  const nextHypotheses = hypotheses.map((h) => {
+    if (typeof h !== "object" || h === null) return h;
+    const one = h as Record<string, unknown>;
+    const supported = one["supported_by"];
+    if (!Array.isArray(supported)) return h;
+    return { ...one, supported_by: supported.map((r) => (typeof r === "string" ? rewritten.get(r) ?? r : r)) };
+  });
+
+  return { ...result, findings: nextFindings, hypotheses: nextHypotheses };
 }
 
 /** Follow a path like `pods[0].containers[0].limits.memory` into an observation. */
@@ -147,6 +198,42 @@ export function resolveRef(root: unknown, path: string): unknown {
     cur = (cur as Record<string, unknown>)[seg];
   }
   return cur;
+}
+
+/**
+ * The spelling of a citation that actually resolves, or null.
+ *
+ * Measured on the fourth live run, 2026-09-06: the model wrote
+ * `observation.events[0].message`, prefixing the path with the wrapper its
+ * payload arrives in. Every specialist prompt warns against that twice, and it
+ * happened anyway, because the object the model is looking at is literally
+ * called `observation`.
+ *
+ * The first fix stripped the prefix inside the resolver, and both reviewers
+ * refused it for the same reason. Grok: "the stored source_ref remains a path a
+ * human cannot follow — check and audit trail diverge." Codex: an empty
+ * remainder must be rejected, and a prohibition the checker has retired is dead
+ * text that has to go.
+ *
+ * So this returns the spelling that WORKS, and the caller writes that spelling
+ * into the incident. Three things follow, and each was asked for:
+ *
+ *  - the literal path is tried FIRST, so an observation that genuinely holds a
+ *    field called `observation` is never shadowed by the alias;
+ *  - `observation.` alone resolves to the whole observation and is refused: a
+ *    citation naming everything names nothing;
+ *  - what is stored is what resolved, so following a citation by hand lands on
+ *    the value the machine checked.
+ */
+export function normaliseRef(observation: unknown, ref: string): string | null {
+  if (typeof ref !== "string" || ref.length === 0) return null;
+  if (resolveRef(observation, ref) !== undefined) return ref;
+
+  const prefix = "observation.";
+  if (!ref.startsWith(prefix)) return null;
+  const rest = ref.slice(prefix.length);
+  if (rest.length === 0) return null;
+  return resolveRef(observation, rest) !== undefined ? rest : null;
 }
 
 /** Which observation slots actually hold data. Used to decide which agents can run at all. */

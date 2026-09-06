@@ -554,6 +554,30 @@ export const MUTATIONS = [
     mustFail: "offers no confidence band for naming a cause on circumstantial evidence",
   },
   {
+    // Refusing an answer over notation costs a paid run every round.
+    id: "wrapper-prefix-refused-instead-of-resolved",
+    file: "src/core/merge.ts",
+    from: "  if (resolveRef(observation, ref) !== undefined) return ref;",
+    to: "  if (false) return ref;",
+    mustFail: "prefers a field genuinely called observation over the alias",
+  },
+  {
+    // A citation the machine approved and a human cannot follow is worse than a
+    // refusal: the refusal at least says something is wrong.
+    id: "the-stored-citation-is-not-the-one-that-resolves",
+    file: "src/core/merge.ts",
+    from: "  const stored = withResolvedRefs(slot, result as Record<string, unknown>);",
+    to: "  const stored = result;",
+    mustFail: "stores the working spelling through recordAgentResult, not only in the helper",
+  },
+  {
+    id: "the-wrapper-alone-accepted-as-a-citation",
+    file: "src/core/merge.ts",
+    from: "  if (rest.length === 0) return null;",
+    to: "  if (false) return null;",
+    mustFail: "refuses the wrapper on its own, which names everything and so names nothing",
+  },
+  {
     id: "claimed-provider-not-compared",
     file: "src/providers/fixtures.ts",
     from: '      ["provider", `fake-${slot}`],',
