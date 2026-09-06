@@ -73,12 +73,20 @@ What each answer means:
 | Answer | Meaning |
 |---|---|
 | it answers | done |
-| `requires a newer version of Codex` | the upgrade did not take — check `codex --version` |
-| `not supported when using Codex with a ChatGPT account` | the CLI is new enough and the rollout has not reached this account |
+| `requires a newer version of Codex` | the CLI is too old; nothing is known about the account yet |
+| `not supported when using Codex with a ChatGPT account` | the CLI is new enough and this account does not have the model |
 
-On 2026-09-06 this machine gave the second, which is why the version is the
-thing to change first. None of this needs an API key: when Astra reaches the
-account it runs on the same ChatGPT allowance as the 5.6 models.
+On 2026-09-06 this machine gave the second answer in the table, and that is the
+only thing measured. **It does not establish that the account has Astra** — the
+server refused on the version and never got as far as the entitlement. After the
+upgrade the answer may still be the third line.
+
+Saying "the account has it, only the CLI is old" would be a claim from one error
+message that names one cause. The version is simply the first thing in the way,
+and it is the only thing that can be changed to find out what is behind it.
+
+None of this needs an API key: the 5.6 models run on the ChatGPT allowance, and
+Astra would too.
 
 ## What this does not change
 
