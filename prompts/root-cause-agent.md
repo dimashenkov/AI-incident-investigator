@@ -120,9 +120,16 @@ So, in both directions:
 |---|---|
 | several agents, agreeing, and a direct observation of the cause | **0.8 to 0.95** |
 | one agent with a direct observation, the others silent | 0.6 to 0.8 |
-| circumstantial evidence only — nothing observed the cause itself | 0.4 to 0.6 |
 | agents disagree, or a source could not be read | **below 0.4**, and say why |
+| circumstantial evidence only — nothing observed the cause itself | `INSUFFICIENT_EVIDENCE` and `0` |
 | nothing supports any cause | `INSUFFICIENT_EVIDENCE` and `0` |
+
+**There is no band for a guess.** Grok, 2026-09-06: this table used to offer
+`0.4 to 0.6` for circumstantial evidence, sitting one line away from the rule
+that a pile of circumstantial findings does not settle anything. A number
+available for naming the nearest code at half confidence is an invitation to
+name it. Circumstantial evidence and no evidence get the same answer here,
+because they lead to the same action: somebody has to go and look.
 
 **0.95 is the ceiling, not 1.0.** A conclusion drawn from what three agents
 happened to look at is never certain, and a number that says it is has stopped

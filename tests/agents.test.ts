@@ -249,6 +249,20 @@ describe("every prompt carries the rules its schema will enforce", () => {
     }
   });
 
+  it("offers no confidence band for naming a cause on circumstantial evidence", () => {
+    /*
+     * Grok, 2026-09-06: a band of 0.4 to 0.6 for "circumstantial evidence only"
+     * sat one line from the rule that circumstantial findings do not settle
+     * anything. A number available for the nearest code at half confidence is
+     * an invitation to name it.
+     */
+    const text = readPrompt("root-cause")!;
+    const row = text.split("\n").find((l) => l.includes("circumstantial evidence only"));
+    expect(row, "the row is gone; this test no longer checks anything").toBeDefined();
+    expect(row, "circumstantial evidence has a band again").not.toMatch(/0\.\d\s*to\s*0\.\d/);
+    expect(row).toContain("INSUFFICIENT_EVIDENCE");
+  });
+
   it("does not both require and forbid naming a cause from one finding", () => {
     /*
      * Codex and Grok, independently, 2026-09-06: the prompt said a finding

@@ -545,6 +545,15 @@ export const MUTATIONS = [
     mustFail: "names, for every allowed cause code, what observes it",
   },
   {
+    // A number available for naming the nearest code at half confidence is an
+    // invitation to name it.
+    id: "a-confidence-band-for-guessing",
+    file: "prompts/root-cause-agent.md",
+    from: "| circumstantial evidence only — nothing observed the cause itself | `INSUFFICIENT_EVIDENCE` and `0` |",
+    to: "| circumstantial evidence only — nothing observed the cause itself | 0.4 to 0.6 |",
+    mustFail: "offers no confidence band for naming a cause on circumstantial evidence",
+  },
+  {
     id: "claimed-provider-not-compared",
     file: "src/providers/fixtures.ts",
     from: '      ["provider", `fake-${slot}`],',
