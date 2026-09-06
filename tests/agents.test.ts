@@ -67,7 +67,10 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
     // Measured live on 2026-09-06: a container reported as OOMKilled without
     // the memory limit it exceeded, and an image that could not be pulled
     // without the image. The right code on ground the scenario was not built on.
-    { id: "cite-the-limit-a-fact-is-measured-against", prose: /half a finding without the limit/ },
+    // Measured live twice in one run on 2026-09-06: the metrics agent reported
+    // throttled time and nobody cited the CPU limit, because the limit is not
+    // in the metrics slot. The rule belonged to the agent that can obey it.
+    { id: "report-the-configuration-the-incident-turns-on", prose: /You hold the configuration, and the other agents do not/ },
     { id: "finding-needs-source-ref", prose: /Every finding needs a `source_ref`/ },
     { id: "every-answer-carries-five-fields", prose: /All five, always|all five, always/ },
     { id: "hypothesis-code-from-the-list", prose: /A hypothesis `code` must be one of these, exactly/ },
@@ -84,11 +87,14 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
     // Was a prohibition until 2026-09-06. The checker normalises the prefix
     // now, and a prompt still forbidding it would be a rule nothing enforces —
     // which is the defect this repository exists to catch.
+    { id: "configuration-is-not-in-your-slot", prose: /You cannot see the configuration, and you are not asked to/ },
     { id: "source-ref-is-a-path-inside-the-observation", prose: /a path inside the observation you were given/ },
     // Measured live on 2026-09-06: a container reported as OOMKilled without
     // the memory limit it exceeded, and an image that could not be pulled
     // without the image. The right code on ground the scenario was not built on.
-    { id: "cite-the-limit-a-fact-is-measured-against", prose: /half a finding without the limit/ },
+    // Measured live twice in one run on 2026-09-06: the metrics agent reported
+    // throttled time and nobody cited the CPU limit, because the limit is not
+    // in the metrics slot. The rule belonged to the agent that can obey it.
     { id: "finding-needs-source-ref", prose: /Every finding needs a `source_ref`/ },
     { id: "every-answer-carries-five-fields", prose: /All five, always|all five, always/ },
     { id: "hypothesis-code-from-the-list", prose: /A hypothesis `code` must be one of these, exactly/ },
@@ -106,11 +112,14 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
     // Was a prohibition until 2026-09-06. The checker normalises the prefix
     // now, and a prompt still forbidding it would be a rule nothing enforces —
     // which is the defect this repository exists to catch.
+    { id: "configuration-is-not-in-your-slot", prose: /You cannot see the configuration, and you are not asked to/ },
     { id: "source-ref-is-a-path-inside-the-observation", prose: /a path inside the observation you were given/ },
     // Measured live on 2026-09-06: a container reported as OOMKilled without
     // the memory limit it exceeded, and an image that could not be pulled
     // without the image. The right code on ground the scenario was not built on.
-    { id: "cite-the-limit-a-fact-is-measured-against", prose: /half a finding without the limit/ },
+    // Measured live twice in one run on 2026-09-06: the metrics agent reported
+    // throttled time and nobody cited the CPU limit, because the limit is not
+    // in the metrics slot. The rule belonged to the agent that can obey it.
     { id: "finding-needs-source-ref", prose: /Every finding needs a `source_ref`/ },
     { id: "every-answer-carries-five-fields", prose: /All five, always|all five, always/ },
     { id: "hypothesis-code-from-the-list", prose: /A hypothesis `code` must be one of these, exactly/ },
@@ -285,6 +294,31 @@ describe("every prompt carries the rules its schema will enforce", () => {
       .not.toMatch(/Naming a cause because one finding points at it is the failure/);
     expect(text).toMatch(/observes the cause itself/);
     expect(text).toMatch(/circumstantial/);
+  });
+
+  it("asks each agent only for what its own slot can answer", () => {
+    /*
+     * Measured live twice in one run, 2026-09-06. The rule "cite the limit a
+     * fact is measured against" was in all three specialist prompts, and two of
+     * the three cannot obey it: the limits, the image and the replica count are
+     * in the Kubernetes observation, and the logs and metrics agents are handed
+     * a different slot. So the metrics agent reported throttled time and nobody
+     * cited the CPU limit — not disobedience, an impossible instruction.
+     *
+     * A prompt that asks for what its slot does not contain produces either a
+     * refusal or an invented path. Both were seen.
+     */
+    for (const agent of ["logs", "metrics"] as AgentName[]) {
+      const text = readPrompt(agent)!;
+      expect(text, `${agent} is asked for configuration it was not given`)
+        .not.toMatch(/report the value it was measured against|cite the limit/i);
+      expect(text, `${agent} should say the configuration is not its to report`)
+        .toMatch(/cannot see the configuration/);
+    }
+    // And the one that CAN see it is told to report it even when nothing looks
+    // wrong, because that is the case where nobody thought to.
+    expect(readPrompt("kubernetes")!, "the kubernetes prompt must ask for it when the cluster looks healthy")
+      .toMatch(/nothing wrong at all/);
   });
 
   it("declares no rule id that no test knows about", () => {

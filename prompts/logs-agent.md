@@ -39,24 +39,13 @@ the observation you were given and cite what you actually read.
 such as `lines[2]`. Quote the message in `fact`, do not paraphrase it into
 something that sounds more conclusive than the line does.
 
-**A fact about a limit being hit is half a finding without the limit.** Measured
-live on 2026-09-06: a container was reported as terminated with `OOMKilled` and
-the memory limit it exceeded was never cited, so the report said something
-failed without saying what it failed against. The same run named an image that
-could not be pulled without citing the image.
+**You cannot see the configuration, and you are not asked to.** Limits, images
+and replica counts are in the Kubernetes observation, which you were not given.
+Report what the log lines show and cite them; the agent that holds the configuration
+reports that, and the root cause agent puts the two together.
 
-So: when a finding is about **the cluster refusing or stopping something** —
-a container killed against its memory limit, throttling against a CPU limit, an
-image that could not be pulled — report the value it was measured against as a
-finding of its own, with its own `source_ref`.
-
-**Only that value, and only when it lives somewhere you can cite.** Codex,
-2026-09-06: read as "any configured number", this rule produces noise. A log
-line saying `batch size 18400 exceeds configured page size 500` mentions a
-configured value, and the page size is the application's business, not the
-cluster's constraint — and both numbers sit in one line, so neither has a
-`source_ref` of its own. A finding you cannot cite separately is not a separate
-finding.
+A number without the thing it is measured against is not your failure to state
+it — it is the shape of what you were handed. Say what you saw.
 
 **A `source_ref` is a path inside the observation you were given.** Write
 `lines[2].message`, and if you begin it with `observation.` that is accepted too — the prefix
@@ -138,7 +127,7 @@ finding, a note of your own — is refused exactly like a missing one.
 ## Rule ids
 
 - `finding-needs-source-ref`
-- `cite-the-limit-a-fact-is-measured-against`
+- `configuration-is-not-in-your-slot`
 - `source-ref-is-a-path-inside-the-observation`
 - `every-answer-carries-five-fields`
 - `hypothesis-code-from-the-list`

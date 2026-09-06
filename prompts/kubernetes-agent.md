@@ -56,24 +56,39 @@ When you do report a hypothesis, **every entry in its `supported_by` must be a
 `source_ref` you wrote in `findings` in this same answer**, character for
 character. Fill both, or neither.
 
-**A fact about a limit being hit is half a finding without the limit.** Measured
-live on 2026-09-06: a container was reported as terminated with `OOMKilled` and
-the memory limit it exceeded was never cited, so the report said something
-failed without saying what it failed against. The same run named an image that
-could not be pulled without citing the image.
+**You hold the configuration, and the other agents do not.** You are the only
+agent that can see the container's limits, the deployment's image and its
+replica count. The logs agent sees lines; the metrics agent sees numbers. When
+their numbers turn out to matter, the value those numbers are measured against
+is in YOUR observation and nowhere else.
 
-So: when a finding is about **the cluster refusing or stopping something** —
-a container killed against its memory limit, throttling against a CPU limit, an
-image that could not be pulled — report the value it was measured against as a
-finding of its own, with its own `source_ref`.
+Measured live on 2026-09-06, twice in one run:
 
-**Only that value, and only when it lives somewhere you can cite.** Codex,
-2026-09-06: read as "any configured number", this rule produces noise. A log
-line saying `batch size 18400 exceeds configured page size 500` mentions a
-configured value, and the page size is the application's business, not the
-cluster's constraint — and both numbers sit in one line, so neither has a
-`source_ref` of its own. A finding you cannot cite separately is not a separate
-finding.
+| What happened | What was missing |
+|---|---|
+| the metrics agent reported throttled time | nobody cited `pods[0].containers[0].limits.cpu` — it is not in the metrics slot |
+| an image could not be pulled | nobody cited `deployment.image` — the name of the image that failed |
+
+So, alongside whatever you find wrong, **report the configuration the incident
+turns on**, each as its own finding with its own `source_ref`:
+
+| When the observation shows | Also report |
+|---|---|
+| a container terminated, restarting, or unhealthy | its `limits`, both memory and cpu |
+| an image that could not be pulled or is not running | `deployment.image` |
+| a probe failing | the probe's own configuration, if the observation carries it |
+| **nothing wrong at all** | the limits anyway — another agent's numbers may be measured against them |
+
+The last row is the one that was missed. A cluster where nothing looks wrong is
+not a cluster with nothing to report: the limits are what make somebody else's
+number mean something.
+
+**Report the value, not any value.** Codex, 2026-09-06: read as "any configured
+number", this becomes noise. A log line saying `batch size 18400 exceeds
+configured page size 500` names a configured value, and the page size is the
+application's business rather than the cluster's — and both numbers sit in one
+line, so neither has a `source_ref` of its own. A finding you cannot cite
+separately is not a separate finding.
 
 **A `source_ref` is a path inside the observation you were given.** Write
 `pods[0].containers[0].last_state.terminated.reason`, and if you begin it with `observation.` that is accepted too — the prefix
@@ -147,7 +162,7 @@ finding, a note of your own — is refused exactly like a missing one.
 ## Rule ids
 
 - `finding-needs-source-ref`
-- `cite-the-limit-a-fact-is-measured-against`
+- `report-the-configuration-the-incident-turns-on`
 - `source-ref-is-a-path-inside-the-observation`
 - `every-answer-carries-five-fields`
 - `hypothesis-code-from-the-list`

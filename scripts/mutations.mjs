@@ -612,6 +612,15 @@ export const MUTATIONS = [
     mustFail: "counts every rewritten finding, not every distinct spelling",
   },
   {
+    // A cluster where nothing looks wrong is not a cluster with nothing to
+    // report: the limits are what make somebody else's number mean something.
+    id: "healthy-cluster-reports-nothing-at-all",
+    file: "prompts/kubernetes-agent.md",
+    from: "| **nothing wrong at all** | the limits anyway — another agent's numbers may be measured against them |",
+    to: "",
+    mustFail: "asks each agent only for what its own slot can answer",
+  },
+  {
     id: "claimed-provider-not-compared",
     file: "src/providers/fixtures.ts",
     from: '      ["provider", `fake-${slot}`],',
