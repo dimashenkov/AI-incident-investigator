@@ -41,8 +41,44 @@ wrong. The list had five perfectly usable names in it.
 | `requires a newer version of Codex` | the account knows it; the CLI is too old |
 
 `gpt-6-astra` gives the second. It is a separate model, not another name for a
-5.6, and it needs Codex **0.153.0+**; this machine has 0.149.0. Upgrading is
-`brew upgrade --cask codex`, and it is the owner's call.
+5.6, and it needs Codex **0.153.0+**; this machine has 0.149.0.
+
+## Turning on gpt-6-astra
+
+Three steps, and the first belongs to the owner — an agent does not upgrade
+software on somebody's machine.
+
+**1. Upgrade.** Measured 2026-09-06: installed 0.149.0, available 0.153.4.
+
+```bash
+brew upgrade --cask codex
+```
+
+**2. Check the account has it.** The model list is refetched on the first run of
+the new version.
+
+```bash
+codex --version
+python3 -c "import json,io,os;d=json.load(io.open(os.path.expanduser('~/.codex/models_cache.json')));print(sorted(m.get('id') or m.get('slug') for m in d['models']))"
+```
+
+**3. Run it.**
+
+```bash
+codex exec -s read-only --skip-git-repo-check -m gpt-6-astra "PROMPT" < /dev/null 2>&1
+```
+
+What each answer means:
+
+| Answer | Meaning |
+|---|---|
+| it answers | done |
+| `requires a newer version of Codex` | the upgrade did not take — check `codex --version` |
+| `not supported when using Codex with a ChatGPT account` | the CLI is new enough and the rollout has not reached this account |
+
+On 2026-09-06 this machine gave the second, which is why the version is the
+thing to change first. None of this needs an API key: when Astra reaches the
+account it runs on the same ChatGPT allowance as the 5.6 models.
 
 ## What this does not change
 
