@@ -485,6 +485,33 @@ export const MUTATIONS = [
     mustFail: "keeps each run's node outputs to itself",
   },
   {
+    // The agent that weighs the others reads no slot; skipping it would leave a
+    // conclusion drawn from nothing weighing anything.
+    id: "slotless-agent-can-be-skipped-like-an-empty-slot",
+    file: "scripts/workflow-runtime.mjs",
+    from: "  if (slot === null || slot === undefined) {",
+    to: "  if (false) {",
+    mustFail: "refuses, never skips, when the agent that reads no slot cannot be given a context",
+  },
+  {
+    // A run that gave no answer is not a wrong answer. Folding them together
+    // makes a routing bug look like a model that cannot think.
+    id: "a-refused-run-scored-as-a-wrong-answer",
+    file: "scripts/score-run.mjs",
+    from: '  if (answer.state !== "concluded") {',
+    to: "  if (false) {",
+    mustFail: "keeps a run that gave no answer apart from one that gave a wrong answer",
+  },
+  {
+    // The comparison that was missing on 2026-09-06, when a wrong answer was
+    // reported as one of "three of five concluded".
+    id: "any-conclusion-counted-as-the-right-one",
+    file: "scripts/score-run.mjs",
+    from: "  if (got === want.code) {",
+    to: "  if (true) {",
+    mustFail: "calls the right code correct and the wrong code wrong",
+  },
+  {
     id: "claimed-provider-not-compared",
     file: "src/providers/fixtures.ts",
     from: '      ["provider", `fake-${slot}`],',

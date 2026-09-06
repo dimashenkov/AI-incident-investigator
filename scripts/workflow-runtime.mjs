@@ -300,8 +300,22 @@ return items.map(function (item, index) {
    * document already says which slots hold an established absence; that is the
    * thing to ask.
    */
+  /*
+   * Only an agent that reads a slot can be skipped for an empty one.
+   *
+   * Grok, 2026-09-06, traced this and reached the wrong conclusion — the chain
+   * does work — but landed on something real: the root cause agent reads no
+   * slot, AGENT_SLOT gives null for it, and collection[null] is undefined, so
+   * the branch happened to refuse for the right reason by accident. A line that
+   * is correct by luck is a line nobody can reason about.
+   */
+  const slot = AGENT_SLOT[NEXT];
+  if (slot === null || slot === undefined) {
+    return { json: { index, state: "refused", agent: NEXT,
+      reason: NEXT + " reads no observation slot, so its context failing is a refusal and never a skip: " + ctx.reason } };
+  }
   const collection = (j.incident && j.incident.collection) || {};
-  const record = collection[AGENT_SLOT[NEXT]] || {};
+  const record = collection[slot] || {};
   if (record.state === "nothing") {
     return { json: { index, state: "skipped", agent: NEXT, scenario: j.scenario,
       incident: j.incident, skipped_because: NEXT + " had nothing to read: the provider reported an established absence" } };

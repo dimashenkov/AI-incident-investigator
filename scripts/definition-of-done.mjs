@@ -29,7 +29,7 @@ export const DEFINITION_OF_DONE = [
   {
     n: 3, claim: "Confidence reduction under conflicting evidence.", covered: false,
     needs: "a model call",
-    why: "the schema permits a low confidence and requires evidence to state its direction, but whether a model actually lowers the number when findings conflict can only be seen by asking one",
+    why: "the schema permits a low confidence and requires evidence to state its direction, but whether a model actually lowers the number when findings conflict can only be seen by asking one. Codex and Grok, 2026-09-06, independently: NONE of the five scenarios poses conflicting evidence, so no run over them can close this — the only live movement was upward, from 0.6 to 0.8, after the prompt stopped pointing only downwards. Closing it needs a scenario built to conflict, and a comparable one that does not",
   },
   {
     n: 4, claim: "risk and requires_approval.", covered: true,
@@ -120,6 +120,6 @@ export const DEFINITION_OF_DONE = [
   {
     n: 10, claim: "The deployed workflow — not merely local code — produces the required result.", covered: false,
     needs: "a model call through the deployed workflow",
-    why: "drift detection establishes that the deployment IS what this repository generates, which is a different claim from the deployment producing the right answer",
+    why: "drift detection establishes that the deployment IS what this repository generates, which is a different claim from the deployment producing the right answer. Codex, 2026-09-06: 'required result' was undefined, so no run could close the item as written. It is defined now — a conclusion matching the scenario's expected.json, which scripts/score-run.mjs compares — and what remains is a captured deployed execution that satisfies it",
   },
 ];

@@ -101,6 +101,29 @@ describe("the generated workflow investigates, not merely validates", () => {
     expect(String(r.reason)).toContain("logs");
   });
 
+  it("refuses, never skips, when the agent that reads no slot cannot be given a context", async () => {
+    /*
+     * Grok, 2026-09-06: the root cause agent reads no observation slot, so
+     * AGENT_SLOT gives null and collection[null] is undefined — the branch
+     * refused for the right reason by accident. A line correct by luck is a
+     * line nobody can reason about, and the day a slot record is keyed
+     * differently it would start skipping the one agent that must always run.
+     */
+    const { workflow } = await runScenario.generated();
+    const record = workflow.nodes.find((n: { name: string }) => n.name === "Record metrics");
+    const run = (json: Record<string, unknown>) =>
+      (new Function("$input", `"use strict";\n${record.parameters.jsCode}`) as (i: unknown) => Array<{ json: Record<string, unknown> }>)(
+        { all: () => [{ json }] },
+      )[0]!.json;
+
+    // An incident with no agent results at all: the root cause context cannot
+    // assemble, and there is nothing to weigh.
+    const out = run({ state: "skipped", scenario: "x",
+      incident: { incident_id: "INC-2026-0101", analysis: { agents: [] }, collection: {} } });
+    expect(out.state, "the agent that weighs the others must never be skipped").toBe("refused");
+    expect(String(out.reason)).toContain("reads no observation slot");
+  });
+
   it("stops when the model answers with something that is not JSON", async () => {
     // The most likely real failure, and the one a stub that always returns an
     // object cannot produce: the model writes prose, or fences the JSON.
