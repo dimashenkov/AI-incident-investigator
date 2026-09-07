@@ -639,6 +639,29 @@ export const MUTATIONS = [
     mustFail: "asks each agent only for what its own slot can answer",
   },
   {
+    // Codex, 2026-09-07: the mutation above fails because the SLOGAN vanishes,
+    // not because the meaning reverses. Keeping the slogan and appending the
+    // demotion escapes it, and that escape is the whole defect the rewrite was
+    // for. This mutation keeps every guarded string intact and demotes the half
+    // anyway, so only a negative assertion can catch it.
+    id: "configuration-demoted-while-the-slogan-survives",
+    file: "prompts/kubernetes-agent.md",
+    from: "Write the symptoms first because they are what the incident is about.",
+    to: "Write the symptoms first; the configuration is optional if they are clear.",
+    mustFail: "asks each agent only for what its own slot can answer",
+  },
+  {
+    // Grok, 2026-09-07: an agent that must decide the incident IS an image-pull
+    // failure to match the image row cannot obey "do not diagnose" and this row
+    // at once, and it drops the row. Matching on the words present is what
+    // makes the two rules compatible.
+    id: "configuration-row-matched-by-diagnosis-not-by-reading",
+    file: "prompts/kubernetes-agent.md",
+    from: "| an event or a state that **names an image** | `deployment.image` |",
+    to: "| an image that could not be pulled or is not running | `deployment.image` |",
+    mustFail: "asks each agent only for what its own slot can answer",
+  },
+  {
     // A marker inside a shown citation demonstrates a path this system would
     // refuse, and a model copying the example literally loses its whole answer.
     id: "scoped-label-inside-the-citation-it-labels",

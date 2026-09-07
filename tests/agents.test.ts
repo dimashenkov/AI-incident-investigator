@@ -390,6 +390,37 @@ describe("every prompt carries the rules its schema will enforce", () => {
      */
     expect(kube, "the answer must be stated as two required parts, not two priorities")
       .toMatch(/Your answer has two parts, and it is incomplete without either/);
+    /*
+     * Codex, 2026-09-07: the mutation that guards this slogan fails because the
+     * slogan DISAPPEARS, not because the meaning reverses — so keeping the
+     * sentence and appending "the configuration is optional" escapes every
+     * assertion here. That escape is now a mutation of its own, and this is the
+     * assertion that catches it. It is deliberately negative and would pass
+     * vacuously on its own; the mutation is what makes it mean something.
+     */
+    expect(kube, "nothing may downgrade the configuration half to optional or secondary")
+      .not.toMatch(/configuration is optional|configuration is secondary|configuration, if you have room/i);
+
+    /*
+     * Grok, 2026-09-07, from the other angle and reaching the same place: the
+     * agent quoted the image-pull event in all three runs and still did not
+     * report deployment.image, because matching that row required deciding the
+     * incident WAS an image-pull failure — which "do not diagnose" forbids. A
+     * rule cannot be obeyed by breaking another rule. So the rows are matched
+     * on the words present, not on what they mean, and more than one fires.
+     */
+    expect(kube, "matching a configuration row must be reading, not classifying")
+      .toMatch(/matching a row is reading, and reading is not diagnosing/);
+    expect(kube, "the rows must be stated as non-exclusive, or the agent picks one and stops")
+      .toMatch(/rows are not exclusive/);
+    expect(kube, "the image row must trigger on an image being NAMED, not on a diagnosis")
+      .toMatch(/\| an event or a state that \*\*names an image\*\* \| `deployment\.image` \|/);
+    // And it must come first: it is the row measured missing, and the row a
+    // reader stops at once an earlier row has already matched.
+    expect(
+      kube.indexOf("names an image"),
+      "the image row must precede the limits row it was losing to",
+    ).toBeLessThan(kube.indexOf("a container terminated, restarting, or unhealthy"));
     expect(kube, "and the configuration half must be named as the one that gets dropped")
       .toMatch(/it is the half most often\s*\n?dropped/);
     expect(kube, "and the event must be named as an output, not left to inference")

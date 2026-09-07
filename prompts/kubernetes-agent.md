@@ -60,8 +60,9 @@ three.
 | **the configuration** — the values only your slot holds | the next agent has a cause and no way to weigh it |
 
 Write the symptoms first because they are what the incident is about. Then stop
-and ask: **which row of the configuration table applies to what I just wrote?**
-Answer it before you finish.
+and ask: **which rows of the configuration table apply to what I just wrote?**
+Rows, plural — they are not exclusive, and more than one usually fires. Answer
+it before you finish.
 
 | Look at | Report |
 |---|---|
@@ -95,12 +96,25 @@ is not in the metrics slot; and an image could not be pulled with nobody citing
 **The configuration table is not optional, and it is the half most often
 dropped.** For every symptom above, find its row here and report that value too:
 
-| Alongside a symptom of | Also report |
+**Every row that matches fires, and rows are not exclusive.** A pod can be
+unready and its event name an image; that is two rows and two values, not a
+choice between them.
+
+**A row is matched on the words in front of you, not on what they mean.** You
+do not have to decide what is wrong to notice that an event names an image —
+matching a row is reading, and reading is not diagnosing.
+
+| If the observation contains | Also report |
 |---|---|
+| an event or a state that **names an image** | `deployment.image` |
 | a container terminated, restarting, or unhealthy | its `limits`, memory and cpu |
 | a pod not ready or a probe failing | the probe's configuration, if the observation carries one |
-| an image that could not be pulled or is not running | `deployment.image` |
 | **nothing wrong at all, but there are pods** | the limits anyway — another agent's numbers may be measured against them |
+
+The image row is first because it is the one measured missing: on 2026-09-07 the
+agent quoted an event reading `Failed to pull image ... not found` three times
+out of three and never reported `deployment.image`. The event was in the answer.
+The row was not matched, because matching it looked like naming the cause.
 
 The last row is not permission to name a cause. It is the case where your slot
 is quiet and somebody else's is not, and the number they need is yours to
