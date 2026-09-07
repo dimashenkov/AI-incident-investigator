@@ -94,10 +94,42 @@ export function releaseMayProceed(report) {
   return null;
 }
 
+/**
+ * Did the gate actually finish? A reason to stop, or null to carry on reading.
+ *
+ * A gate that was KILLED did not produce the report on disk. `spawnSync` on a
+ * killed child gives `error: undefined` and `status: null`, so the caller's
+ * success test did not return and the read below picked up whatever
+ * out/acceptance-gate.json held from an earlier run. If that leftover showed
+ * only drift failing, the chain DEPLOYED while announcing "the gate failed on
+ * no-drift-from-baseline only" — a statement about a run that never finished.
+ * This project has had the gate killed by a ten-minute limit twice, so the
+ * trigger is not hypothetical. Found by a subagent on 2026-09-07.
+ *
+ * A signal kill is not a verdict. Neither is a spawn that never started.
+ */
+export function gateFinished(r) {
+  if (r === null || typeof r !== "object") return "the gate result could not be read at all";
+  if (r.error !== undefined && r.error !== null) {
+    return `the gate could not be started: ${r.error?.message ?? String(r.error)}`;
+  }
+  if (typeof r.status !== "number") {
+    return `the gate did not finish${r.signal ? ` (killed by ${r.signal})` : ""}, `
+      + "so any report on disk is from a different run";
+  }
+  return null;
+}
+
 function gateStep() {
   process.stdout.write(`\n── acceptance gate\n`);
   const r = spawnSync("node", ["scripts/acceptance-gate.mjs"], { cwd: ROOT, stdio: "inherit" });
   if (r.error === undefined && r.status === 0) return;
+
+  const finished = gateFinished(r);
+  if (finished !== null) {
+    process.stdout.write(`\nrelease stopped at "acceptance gate": ${finished}\n`);
+    process.exit(2);
+  }
 
   let report = null;
   try {

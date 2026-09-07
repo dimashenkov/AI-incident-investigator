@@ -1,5 +1,21 @@
 # Using `grok` on this machine
 
+> **Ported from another project.** Everything below the invocation was written
+> for a Python repository and measured there. This repository has no `tools/`
+> directory and not one Python file — `tools/grok_adjudicate.py`,
+> `tools/classify_alarms.py` and the two pytest files named later have never
+> existed here, and the cost figures ($0.19 for thirty adjudications, $0.15 for
+> twenty codings) are that project's, not this one's. What transfers is the
+> command, the flags and the failure modes; what does not is every path and
+> every number. Marked on 2026-09-07 after a subagent checked each reference and
+> found none of them on disk.
+>
+> One correction rather than a caveat: a line below says *"Every call spends the
+> owner's money."* It does not. Grok runs on SuperGrok Lite, a fixed monthly
+> fee, and `CLAUDE.md` §13 and `docs/spend-counter.md` both classify its
+> `total_cost_usd` as weight rather than a bill. One more call does not raise
+> the invoice.
+
 Hand this file to an agent that has to run Grok here. It states what is
 installed, the one shape of call that is used, and the four ways a call can look
 successful while proving nothing.

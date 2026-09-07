@@ -139,6 +139,16 @@ export async function buildRuntime() {
   const core = buildCore().code;
   const merge = transpile("src/core/merge.ts");
   const slice = transpile("src/agents/slice.ts");
+  /*
+   * The cross-field constraints, from the same source the tests run.
+   *
+   * build-core.mjs generates only the ajv validators, so until 2026-09-07 the
+   * deployed node ran the schemas and nothing else — and a collection claiming
+   * "collected" over a null observation, a thread id naming another incident,
+   * and a message stamped with a foreign incident id were all VALID in n8n and
+   * invalid locally. Measured through the real generated core, not read.
+   */
+  const invariants = transpile("src/schema/invariants.ts");
   const prompts = readPrompts();
   const incidents = await assembledIncidents();
 
@@ -153,14 +163,23 @@ ${core}
 })(module, exports);
 const validators = module.exports;
 
+// ---- src/schema/invariants.ts, transpiled in memory ----
+${invariants}
+
 // ---- the three-state validator merge.ts expects ----
 function validate(name, data) {
   const fn = validators["validate_" + String(name).replace(/-/g, "_")];
   if (typeof fn !== "function") return { state: "unchecked", reason: "no such schema: " + name };
-  if (fn(data)) return { state: "valid" };
-  return { state: "invalid", errors: (fn.errors || []).map(function (e) {
-    return (e.instancePath === "" ? "(root)" : e.instancePath) + " " + (e.message || "failed");
-  }) };
+  if (!fn(data)) {
+    return { state: "invalid", errors: (fn.errors || []).map(function (e) {
+      return (e.instancePath === "" ? "(root)" : e.instancePath) + " " + (e.message || "failed");
+    }) };
+  }
+  // The same second half src/schema/validate.ts runs, so "valid" means one
+  // thing here and in a unit test. It did not until 2026-09-07.
+  const cross = invariantErrors(name, data);
+  if (cross.length > 0) return { state: "invalid", errors: cross };
+  return { state: "valid" };
 }
 
 // ---- src/core/merge.ts, transpiled in memory ----

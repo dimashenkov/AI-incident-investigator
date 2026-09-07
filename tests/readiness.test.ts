@@ -9,8 +9,8 @@
  */
 import { describe, it, expect } from "vitest";
 // @ts-expect-error - plain .mjs script, no types
-import { definitionOfDone, latestScored, summarise, oneLine, bar, gateResult, scenariosMeasured } from "../scripts/readiness.mjs";
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { definitionOfDone, latestScored, summarise, oneLine, bar, gateResult, scenariosMeasured, sourceNewerThan } from "../scripts/readiness.mjs";
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -163,6 +163,38 @@ describe("a readiness figure that admits what it does not know", () => {
     } finally { rmSync(d, { recursive: true, force: true }); }
   });
 
+  /*
+   * The date is data; the filename is a habit. A subagent found on 2026-09-07
+   * that an undated record — `final-run.json`, or the sentinel a debt used to
+   * wait for — sorts above every `2026-…` in ASCII and became "the newest", so
+   * a superseded run's greens could outlive the regression after it.
+   */
+  it("takes the newest by the date inside the record, not by filename", () => {
+    const d = tmp();
+    try {
+      mkdirSync(join(d, "runs"), { recursive: true });
+      writeFileSync(join(d, "runs", "zzz-oldest.json"),
+        JSON.stringify({ when: "2026-01-01", scored: { a: "wrong" } }));
+      writeFileSync(join(d, "runs", "aaa-newest.json"),
+        JSON.stringify({ when: "2026-06-06", scored: { a: "correct" } }));
+      const r = latestScored(join(d, "runs"));
+      expect(r.file, "the later date wins, whatever the files are called").toBe("aaa-newest.json");
+      expect(r.scored).toEqual({ a: "correct" });
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it("never lets an undated record outrank a dated one", () => {
+    const d = tmp();
+    try {
+      mkdirSync(join(d, "runs"), { recursive: true });
+      writeFileSync(join(d, "runs", "2026-01-01-real.json"),
+        JSON.stringify({ when: "2026-01-01", scored: { a: "correct" } }));
+      writeFileSync(join(d, "runs", "final-run.json"), JSON.stringify({ scored: { a: "wrong" } }));
+      expect(latestScored(join(d, "runs")).file,
+        "a record with no date may predate everything; it must not lead").toBe("2026-01-01-real.json");
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
   it("does not treat an empty scored object as a run that answered nothing", () => {
     const d = tmp();
     try {
@@ -219,15 +251,69 @@ describe("a readiness figure that admits what it does not know", () => {
     } finally { rmSync(d, { recursive: true, force: true }); }
   });
 
-  it("reads a recorded gate result in both directions", () => {
+  /*
+   * A gate result older than the tree is not a statement about this tree.
+   *
+   * This file reported "the acceptance gate passed", present tense, from an
+   * artifact with no date — so a subagent on 2026-09-07 could read the mtimes
+   * side by side and find five mutations and a whole uncommitted diff
+   * postdating the green being reported. The same staleness the gate itself
+   * refuses for its vitest report, one reader over.
+   */
+  it("refuses a gate result that predates the tree it is asked about", () => {
+    const d = tmp();
+    try {
+      mkdirSync(join(d, "out"), { recursive: true });
+      mkdirSync(join(d, "src"), { recursive: true });
+      writeFileSync(join(d, "src", "thing.ts"), "export const a = 1;");
+      const edited = statSync(join(d, "src", "thing.ts")).mtimeMs;
+
+      writeFileSync(join(d, "out", "acceptance-gate.json"),
+        JSON.stringify({ exitCode: 0, finishedAt: edited - 5000 }));
+      const stale = gateResult(d)[0];
+      expect(stale.state, "a green from before the edit is not about this tree").toBe("unestablished");
+      expect(stale.why).toMatch(/src\/thing\.ts/);
+
+      writeFileSync(join(d, "out", "acceptance-gate.json"),
+        JSON.stringify({ exitCode: 0, finishedAt: edited + 5000 }));
+      expect(gateResult(d)[0].state, "and a green from after it is").toBe("green");
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it("refuses a gate result that carries no time at all", () => {
     const d = tmp();
     try {
       mkdirSync(join(d, "out"), { recursive: true });
       writeFileSync(join(d, "out", "acceptance-gate.json"), JSON.stringify({ exitCode: 0 }));
+      const r = gateResult(d)[0];
+      expect(r.state, "undateable is not green").toBe("unestablished");
+      expect(r.why).toMatch(/carries no time/);
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it("names the file that outran the gate, rather than only saying stale", () => {
+    const d = tmp();
+    try {
+      mkdirSync(join(d, "scripts"), { recursive: true });
+      writeFileSync(join(d, "scripts", "later.mjs"), "// x");
+      const at = statSync(join(d, "scripts", "later.mjs")).mtimeMs;
+      expect(sourceNewerThan(d, at - 1000)).toBe("scripts/later.mjs");
+      expect(sourceNewerThan(d, at + 1000), "nothing newer, so nothing to name").toBeNull();
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it("reads a recorded gate result in both directions", () => {
+    const d = tmp();
+    try {
+      mkdirSync(join(d, "out"), { recursive: true });
+      // Dated into the future, so the freshness check above is satisfied and
+      // this test is about the exit code and nothing else.
+      const fresh = Date.now() + 60_000;
+      writeFileSync(join(d, "out", "acceptance-gate.json"), JSON.stringify({ exitCode: 0, finishedAt: fresh }));
       expect(gateResult(d)[0].state).toBe("green");
-      writeFileSync(join(d, "out", "acceptance-gate.json"), JSON.stringify({ exitCode: 2 }));
+      writeFileSync(join(d, "out", "acceptance-gate.json"), JSON.stringify({ exitCode: 2, finishedAt: fresh }));
       expect(gateResult(d)[0].state).toBe("red");
-      writeFileSync(join(d, "out", "acceptance-gate.json"), JSON.stringify({ nothing: true }));
+      writeFileSync(join(d, "out", "acceptance-gate.json"), JSON.stringify({ nothing: true, finishedAt: fresh }));
       expect(gateResult(d)[0].state, "a result with no exit code establishes nothing").toBe("unestablished");
     } finally { rmSync(d, { recursive: true, force: true }); }
   });

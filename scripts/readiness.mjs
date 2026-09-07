@@ -17,7 +17,7 @@
  * 1 when something is established and red, 2 when something cannot be
  * established, 3 when both.
  */
-import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -117,13 +117,40 @@ export function scenariosMeasured(root = ROOT) {
 /**
  * The newest run record that carries machine-readable scores.
  *
- * Newest by filename, because the records are named by date and nothing else
- * in them is ordered. A record without `scored` is skipped rather than treated
- * as an empty result: absent is not the same as nothing was answered.
+ * Newest by the `when` INSIDE the record, not by filename.
+ *
+ * Filename order was the first version, and a subagent priced it on 2026-09-07:
+ * a record not named by date — `final-run.json`, or the very sentinel a debt
+ * used to wait for — sorts above every `2026-…` in ASCII and becomes "the
+ * newest", so a superseded run's greens could outlive the regression that
+ * followed it. The date is data; the filename is a habit.
+ *
+ * A record with no readable `when` falls back to its filename and SAYS so, so
+ * "I sorted this one by its name" is visible rather than assumed.
+ *
+ * A record without `scored` is skipped rather than treated as an empty result:
+ * absent is not the same as nothing was answered.
  */
 export function latestScored(runsDir) {
   if (!existsSync(runsDir)) return { scored: null, why: "docs/runs does not exist" };
-  const files = readdirSync(runsDir).filter((f) => f.endsWith(".json")).sort().reverse();
+  const names = readdirSync(runsDir).filter((f) => f.endsWith(".json"));
+  const dated = names.map((f) => {
+    let when = null;
+    try {
+      const w = JSON.parse(readFileSync(join(runsDir, f), "utf8"))?.when;
+      if (typeof w === "string" && w.length > 0) when = w;
+    } catch { /* unreadable here is decided below, not silently */ }
+    return { f, when };
+  });
+  // Records with a date first, newest first; undated ones after, by name — an
+  // undated record must never outrank a dated one it may well predate.
+  dated.sort((a, b) => {
+    if (a.when !== null && b.when !== null) return a.when < b.when ? 1 : a.when > b.when ? -1 : 0;
+    if (a.when !== null) return -1;
+    if (b.when !== null) return 1;
+    return a.f < b.f ? 1 : -1;
+  });
+  const files = dated.map((d) => d.f);
   for (const f of files) {
     let rec;
     try {
@@ -141,6 +168,34 @@ export function latestScored(runsDir) {
 }
 
 /**
+ * The first tracked source file newer than a moment, or null.
+ *
+ * Deliberately shallow and deliberately named: it walks the directories whose
+ * contents the gate is about, and it returns the file it found rather than a
+ * boolean, so the report can say WHICH edit outran the gate.
+ */
+export function sourceNewerThan(root, at, dirs = ["src", "scripts", "tests", "schemas", "prompts", "scenarios"]) {
+  const stack = dirs.map((d) => join(root, d));
+  while (stack.length > 0) {
+    const dir = stack.pop();
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const e of entries) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) { stack.push(p); continue; }
+      try {
+        if (statSync(p).mtimeMs > at) return p.slice(root.length + 1);
+      } catch { /* a file that vanished mid-walk is not evidence */ }
+    }
+  }
+  return null;
+}
+
+/**
  * The build itself: the last gate result the repository can show.
  *
  * `out/` is gitignored, so this check is unestablished in a fresh clone rather
@@ -155,6 +210,26 @@ export function gateResult(root = ROOT) {
   try {
     const r = JSON.parse(readFileSync(path, "utf8"));
     if (typeof r.exitCode !== "number") return [unknown("gate", "the recorded gate result names no exit code")];
+    /*
+     * A gate result older than the tree is not a statement about this tree.
+     *
+     * This said "the acceptance gate passed", present tense, from a file with
+     * no date — so five mutations and a whole uncommitted diff could postdate
+     * the green it was reporting. Found by a subagent on 2026-09-07, which read
+     * the mtimes side by side. The same staleness the gate itself refuses for
+     * the vitest report, one reader over.
+     *
+     * A result with no `finishedAt` predates this check and cannot be dated, so
+     * it is unestablished rather than green — "I could not tell how old this
+     * is" is not "it passed".
+     */
+    if (typeof r.finishedAt !== "number") {
+      return [unknown("gate", "the recorded gate result carries no time, so it cannot be tied to this tree")];
+    }
+    const newer = sourceNewerThan(root, r.finishedAt);
+    if (newer !== null) {
+      return [unknown("gate", `the recorded gate result predates ${newer}, so it is not about this tree`)];
+    }
     if (r.exitCode === 0) return [green("gate", "the acceptance gate passed")];
     return [red("gate", `the acceptance gate exited ${r.exitCode}`)];
   } catch (e) {

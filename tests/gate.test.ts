@@ -11,7 +11,7 @@
  *   · die on a check that throws, and report nothing at all
  */
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync, writeFileSync, mkdtempSync, existsSync, symlinkSync, realpathSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync, mkdtempSync, existsSync, symlinkSync, realpathSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
@@ -39,7 +39,7 @@ function collectTests(dir: string): string[] {
 }
 // Plain .mjs — the same file node runs in production, so there are no types.
 // @ts-expect-error
-import { runGate, format, restoreInterruptedMutation, CHECKS, CHILD_MARKER, LIMITATIONS, DEBT, SECRET_SHAPED, readFreshReport, interpretVitestReport, interpretScripts, findSecretShaped, parsePorcelainZ, readCurrentChunk, namedTestFailed, coverageGaps, someRunWasScored, withRepair} from "../scripts/acceptance-gate.mjs";
+import { runGate, format, restoreInterruptedMutation, CHECKS, CHILD_MARKER, LIMITATIONS, DEBT, SECRET_SHAPED, readFreshReport, interpretVitestReport, interpretScripts, findSecretShaped, parsePorcelainZ, readCurrentChunk, namedTestFailed, coverageGaps, someRunWasScored, withRepair, reportIsFromThisRun} from "../scripts/acceptance-gate.mjs";
 // @ts-expect-error
 import { MUTATIONS } from "../scripts/mutations.mjs";
 
@@ -546,11 +546,45 @@ describe("the mutation machinery, which is what makes 'every fix has a test' che
     // may only point at a statically named test. A name assembled inside a loop
     // is not findable here and fails — the right outcome, since such a mutation
     // could not prove which test caught it either.
-    const declared = new Set([...suite.matchAll(/\bit\(\s*(["'`])((?:\\.|(?!\1).)*)\1/g)].map((m) => m[2]));
-    expect(declared.size, "no it() declarations were found; the matcher is broken").toBeGreaterThan(20);
+    /*
+     * Counted, not collapsed into a Set.
+     *
+     * `namedTestFailed` returns on the FIRST title that matches, and the vitest
+     * reporter orders results by file path — so two tests sharing a title mean
+     * one of them silently answers for the other, and a mutation can be
+     * reported caught by a test that never ran against it. That happened on
+     * 2026-09-07: a fix of mine duplicated two titles across files and the
+     * verdict was right by alphabet. The rename closed it; a Set could not have
+     * seen it, which is why this now counts.
+     */
+    const titles = [...suite.matchAll(/\bit\(\s*(["'`])((?:\\.|(?!\1).)*)\1/g)].map((m) => m[2]!);
+    expect(titles.length, "no it() declarations were found; the matcher is broken").toBeGreaterThan(20);
     for (const m of MUTATIONS as Array<{ id: string; mustFail: string }>) {
-      expect(declared.has(m.mustFail), `${m.id} names a test that is not declared anywhere: ${m.mustFail}`).toBe(true);
+      const times = titles.filter((t) => t === m.mustFail).length;
+      expect(times,
+        times === 0
+          ? `${m.id} names a test that is not declared anywhere: ${m.mustFail}`
+          : `${m.id} names a title declared ${times} times; the mutation would be judged by whichever `
+            + `file sorts first, not by the test written for it: ${m.mustFail}`)
+        .toBe(1);
     }
+  });
+
+  /*
+   * And no two tests anywhere may share a title, whether a mutation names them
+   * or not — the next duplicate would otherwise be invisible until it happened
+   * to collide with a mustFail.
+   */
+  it("declares no test title twice across the suite", () => {
+    const suite = collectTests(new URL("./", import.meta.url).pathname)
+      .map((f: string) => readFileSync(f, "utf8")).join("\n");
+    const titles = [...suite.matchAll(/\bit\(\s*(["'`])((?:\\.|(?!\1).)*)\1/g)].map((m) => m[2]!);
+    expect(titles.length, "no titles found; this would pass on an empty set").toBeGreaterThan(100);
+    const seen = new Map<string, number>();
+    for (const t of titles) seen.set(t, (seen.get(t) ?? 0) + 1);
+    const repeated = [...seen.entries()].filter(([, n]) => n > 1).map(([t, n]) => `${t} (${n})`);
+    expect(repeated,
+      "a shared title makes the mutation harness answer from whichever file sorts first").toEqual([]);
   });
 });
 
@@ -851,5 +885,34 @@ describe("the gate does not pass for what it never checked", () => {
     }
     // And no record at all is not an unknown either.
     expect(withRepair(clean, null).exitCode).toBe(0);
+  });
+});
+
+/*
+ * A report from a previous execution is not evidence about this one.
+ *
+ * checkTests returns early when the gate is already inside a vitest child —
+ * before readFreshReport deletes the old file — so the Definition-of-Done check
+ * read a report written minutes earlier by a different run and printed "5 of 10
+ * covered by tests that ran and passed" while vitest had not run at all. A
+ * subagent reproduced it on 2026-09-07 by calling the two checks in order.
+ * readFreshReport's own comment says "both callers go through here now"; there
+ * was a third reader.
+ */
+describe("coverage is established from this run's test report, not a leftover", () => {
+  it("refuses a report written before this gate run started", () => {
+    const d = mkdtempSync(join(tmpdir(), "report-"));
+    const f = join(d, "vitest-report.json");
+    writeFileSync(f, "{}");
+    const mtime = statSync(f).mtimeMs;
+    // A run that started AFTER the file was written cannot have written it.
+    expect(reportIsFromThisRun(f, mtime + 1000), "a report older than the run is not this run's")
+      .toBe(false);
+    // A run that started before it, and is still going, did.
+    expect(reportIsFromThisRun(f, mtime - 1000), "and one written since the run began is").toBe(true);
+  });
+
+  it("says no for a report that is not there, rather than throwing", () => {
+    expect(reportIsFromThisRun(join(tmpdir(), "absent-report-8812.json"), 0)).toBe(false);
   });
 });

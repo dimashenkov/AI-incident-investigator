@@ -335,6 +335,23 @@ export function resolveRef(root: unknown, path: string): unknown {
   let cur: unknown = root;
   for (const seg of path.replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean)) {
     if (cur === null || typeof cur !== "object") return undefined;
+    /*
+     * OWN properties only.
+     *
+     * A subagent probed this on 2026-09-07: `toString`, `hasOwnProperty`,
+     * `pods.length` and `pods[0].constructor` all resolved, so a finding citing
+     * `toString` named nothing in the observation, passed the check that exists
+     * to refuse a path pointing nowhere, and was stored as the working spelling
+     * a human is told to follow. Every object has a toString; no observation
+     * has one to cite.
+     *
+     * `length` still resolves, deliberately: it is an OWN property of an array,
+     * it names a number a reader can verify by counting, and "two pods, none
+     * ready" is a real observation. Refusing it would be this file inventing a
+     * rule wider than the defect. What is refused is the shape that names
+     * nothing — every object has a toString, and no observation has one.
+     */
+    if (!Object.prototype.hasOwnProperty.call(cur, seg)) return undefined;
     cur = (cur as Record<string, unknown>)[seg];
   }
   return cur;

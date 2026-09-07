@@ -85,7 +85,7 @@ export const MUTATIONS = [
   },
   {
     id: "only-the-flattering-evidence-is-traced",
-    file: "src/schema/validate.ts",
+    file: "src/schema/invariants.ts",
     from: 'const EVIDENCE_LISTS = ["supported_by", "contradicted_by"] as const;',
     to: 'const EVIDENCE_LISTS = ["supported_by"] as const;',
     mustFail: "traces contradicting evidence back to a finding, not only supporting evidence",
@@ -669,6 +669,16 @@ export const MUTATIONS = [
     mustFail: "turns a 200 that is not the model's envelope into null, not a TypeError",
   },
   {
+    // A citation naming a property every object has: `toString` resolved, so a
+    // finding pointing nowhere passed the check that refuses paths pointing
+    // nowhere, and was stored as the spelling a human should follow.
+    id: "prototype-property-accepted-as-a-citation",
+    file: "src/core/merge.ts",
+    from: "    if (!Object.prototype.hasOwnProperty.call(cur, seg)) return undefined;",
+    to: "    if (false) return undefined;",
+    mustFail: "refuses a citation that names a property every object has",
+  },
+  {
     // The identity of the answering agent taken from the answer itself, with
     // the node that asked staying silent about who it asked.
     id: "asked-agent-not-bound-to-answering-agent",
@@ -743,6 +753,69 @@ export const MUTATIONS = [
     from: "  const pct = total === 0 ? 0 : Math.floor((g / total) * 100);",
     to: "  const pct = g + r === 0 ? 0 : Math.floor((g / (g + r)) * 100);",
     mustFail: "does not count an unestablished check as green",
+  },
+  {
+    // A leftover vitest report accepted as this run's, so "the named tests ran
+    // and passed" is said about an execution that did not happen here.
+    id: "stale-vitest-report-accepted-as-this-runs",
+    file: "scripts/acceptance-gate.mjs",
+    from: "    return statOf(path).mtimeMs >= startedAt;",
+    to: "    return true;",
+    mustFail: "refuses a report written before this gate run started",
+  },
+  {
+    // A gate result older than the tree reported as a statement about it: the
+    // readiness figure then rests on a green that predates every later edit.
+    id: "stale-gate-result-reported-as-current",
+    file: "scripts/readiness.mjs",
+    from: "    const newer = sourceNewerThan(root, r.finishedAt);",
+    to: "    const newer = null;",
+    mustFail: "refuses a gate result that predates the tree it is asked about",
+  },
+  {
+    // A result with no time at all read as green, which is the same claim with
+    // nothing behind it.
+    id: "undated-gate-result-read-as-green",
+    file: "scripts/readiness.mjs",
+    from: '    if (typeof r.finishedAt !== "number") {',
+    to: "    if (false) {",
+    mustFail: "refuses a gate result that carries no time at all",
+  },
+  {
+    // The deployed node running the schemas and nothing else, so "valid" means
+    // one thing in a unit test and another in production — which is exactly the
+    // promise the top of src/schema/validate.ts makes.
+    id: "deployed-validator-skips-the-cross-field-rules",
+    file: "scripts/workflow-runtime.mjs",
+    from: "  const cross = invariantErrors(name, data);\n  if (cross.length > 0) return { state: \"invalid\", errors: cross };",
+    to: "  const cross = [];\n  if (cross.length > 0) return { state: \"invalid\", errors: cross };",
+    mustFail: "gives the same verdict locally and in the deployed node, case by case",
+  },
+  {
+    // A killed gate treated as a finished one, so the release reads a report
+    // from a different run and deploys on it.
+    id: "killed-gate-report-read-as-this-runs",
+    file: "scripts/release.mjs",
+    from: '  if (typeof r.status !== "number") {',
+    to: "  if (false) {",
+    mustFail: "stops when the gate was killed by a signal",
+  },
+  {
+    // Filename order instead of the recorded date: an undated record sorts above
+    // every dated one and a superseded run's greens outlive the regression.
+    id: "run-records-ordered-by-filename-not-date",
+    file: "scripts/readiness.mjs",
+    from: "    if (a.when !== null && b.when !== null) return a.when < b.when ? 1 : a.when > b.when ? -1 : 0;",
+    to: "    if (false) return 0;",
+    mustFail: "takes the newest by the date inside the record, not by filename",
+  },
+  {
+    // An undated record allowed to lead: it may predate everything.
+    id: "undated-run-record-outranks-a-dated-one",
+    file: "scripts/readiness.mjs",
+    from: "    if (a.when !== null) return -1;\n    if (b.when !== null) return 1;",
+    to: "    if (a.when !== null) return 1;\n    if (b.when !== null) return -1;",
+    mustFail: "never lets an undated record outrank a dated one",
   },
   {
     // Prose in a run record read as a score: the readiness figure would then

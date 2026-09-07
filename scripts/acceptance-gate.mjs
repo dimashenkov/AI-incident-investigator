@@ -21,7 +21,7 @@
 import { spawnSync } from "node:child_process";
 
 import { MUTATIONS } from "./mutations.mjs";
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -358,6 +358,25 @@ import("./scripts/definition-of-done.mjs").then((m) => {
  * one rule, only one guarded. Found by a subagent on 2026-09-07 running both
  * against the same input.
  */
+/**
+ * When this gate run started. Set once, at the top of the process.
+ *
+ * A report older than this belongs to some other execution, and "the named
+ * tests ran and passed" is a claim about a run that did not happen here.
+ */
+export const RUN_STARTED_AT = Date.now();
+
+/** Is the report on disk from this run, rather than one left behind? */
+export function reportIsFromThisRun(path, startedAt = RUN_STARTED_AT, statOf = statSync) {
+  try {
+    return statOf(path).mtimeMs >= startedAt;
+  } catch {
+    // Unreadable is not "from this run"; it is not established either way, and
+    // the caller turns that into unknown rather than into a pass.
+    return false;
+  }
+}
+
 export function coverageGaps(list, passedTitles) {
   const missing = [];
   for (const item of list) {
@@ -399,9 +418,27 @@ function checkDefinitionOfDone() {
    * The gate already has the vitest report from its own run, so it can ask the
    * stronger question: did this test execute, and did it pass.
    */
+  /*
+   * The report must come from THIS run.
+   *
+   * `checkTests` returns early when the gate is already inside a vitest child,
+   * before `readFreshReport` deletes the old file — so this check read a report
+   * written minutes earlier by a different execution and printed
+   * "5 of 10 covered by tests that ran and passed" while vitest had not run at
+   * all. A subagent reproduced it on 2026-09-07 by calling the two checks in
+   * order. Exactly the defect `readFreshReport` was written for: it says "both
+   * callers go through here now", and there was a third reader.
+   *
+   * The gate stamps the run it is in, and a report that predates the stamp is
+   * not this run's report.
+   */
   const report = resolve(ROOT, "out/vitest-report.json");
   if (!existsSync(report)) {
     return unknown("no vitest report; cannot establish that the named tests actually ran", "read DoD");
+  }
+  if (!reportIsFromThisRun(report)) {
+    return unknown("the vitest report on disk predates this gate run, so coverage cannot be established from it",
+      "read DoD");
   }
   let passedTitles;
   try {
@@ -643,6 +680,15 @@ export function namedTestFailed(report, name) {
  * The test of which list a line belongs in: could a program decide it with the
  * files on disk? If yes it is debt, and debt has a due date.
  */
+/** What the generated workflow weighs right now, for the limitation below. */
+function workflowSizeMB() {
+  try {
+    return `${(statSync(resolve(ROOT, "workflows/incident.json")).size / 1e6).toFixed(2)} MB`;
+  } catch {
+    return "a size this run could not read";
+  }
+}
+
 export const LIMITATIONS = [
   // Moved here on 2026-09-05, when provenance closed the other half.
   //
@@ -684,7 +730,14 @@ export const LIMITATIONS = [
   // exported it back and compared digests, on 2026-09-05. Whether the EDITOR
   // opens it, and what it does to a 350 KB Code node, nothing here has tried —
   // and nothing here can, because it is a browser.
-  "that the n8n editor can open a workflow this size — the API stores and returns 2.25 MB, measured; the editor is untried",
+  /*
+   * The size is READ, not remembered. 2.25 MB was measured on 2026-09-05
+   * against a 15-node workflow; the file now has 19 nodes and weighs more, and
+   * a limitation printed on every run carrying a stale number is the defect
+   * this list exists to state honestly.
+   */
+  `that the n8n editor can open a workflow this size — the API stores and returns ${workflowSizeMB()}, `
+    + "measured on each gate run; the editor is untried",
   // Codex, 2026-09-05, after the first live run: "the schema allows 0 to 1, and
   // concludeIncident copies the model's number without checking the prompt's
   // bands, the agreement count, directness, contradictions, or the 0.95
@@ -769,7 +822,24 @@ export const DEBT = [
      * scripts/readiness.mjs counts. The same signal, asked in one place.
      */
     unlessScoredRun: true,
-    why: "the three uncovered items wait on a model call through the DEPLOYED workflow, which no recorded run has made yet",
+    /*
+     * Rewritten 2026-09-07. The old sentence was wrong in both halves and it is
+     * the line the gate prints on every run:
+     *
+     *   "the three uncovered items" — there are FIVE uncovered, and the same
+     *   gate run prints "5 of 10 covered" two lines away;
+     *   "no recorded run has made yet" — six chain records say in their own
+     *   notes that they ran end to end through the deployed workflow. The real
+     *   condition is that no record carries machine-readable scores.
+     *
+     * Worse, two of the uncovered items wait on code nobody has written, not on
+     * a model call — readiness.mjs says so out loud — so they were excused by a
+     * reason that does not apply to them. The comment directly above this entry
+     * says a number here is the second-carrier defect. The number was here.
+     */
+    why: "the uncovered Definition-of-Done items whose evidence is a model's answer wait on a run "
+      + "recorded with machine-readable scores; the definition-of-done check names which, and not "
+      + "every uncovered item waits on this",
   },
 ];
 
@@ -867,7 +937,14 @@ function checkDebt() {
   if (waiting.length > 0) {
     return pass(
       `chunk ${chunk}: ${waiting.length} promised check(s) wait on something that has not happened — ` +
-      waiting.map((d) => `${d.why} (${d.unlessArtifact})`).join("; "),
+      /*
+       * Name what it waits FOR, whichever kind of condition it is. The message
+       * formatted `d.unlessArtifact` unconditionally and printed "(undefined)"
+       * for a debt that waits on a scored run — and this line is the only thing
+       * a reader is told about why the promise is not due.
+       */
+      waiting.map((d) => `${d.why} (${typeof d.unlessArtifact === "string"
+        ? d.unlessArtifact : "waiting for a run whose results were recorded machine-readably"})`).join("; "),
       "read PROGRESS.md",
     );
   }
@@ -1083,6 +1160,13 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === resolve(fileUR
    * nobody could put back was invisible to every later reader.
    */
   writeFileSync(OUT, JSON.stringify({ results: gate.results, exitCode: gate.exitCode,
+    /*
+     * When this ran. scripts/readiness.mjs reported "the acceptance gate
+     * passed", present tense, from a file with no date — so a green gate could
+     * outlive every edit made after it. The same staleness this file refuses
+     * for the vitest report, one reader over.
+     */
+    finishedAt: Date.now(),
     repaired: gate.repaired ?? null, nothingChecked: gate.nothingChecked === true,
     limitations: gate.limitations, debt: gate.debt }, null, 2));
   process.exit(gate.exitCode);

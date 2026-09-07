@@ -6,6 +6,7 @@
  * different draft support is the second-carrier defect: a payload passes here
  * and fails there, and nobody can tell which one was right.
  */
+import { invariantErrors } from "./invariants.js";
 import Ajv2020, { type ErrorObject, type ValidateFunction } from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 
@@ -96,142 +97,16 @@ function describe(err: ErrorObject): string {
   return `${where} ${err.message ?? "failed"}`;
 }
 
-/**
- * Constraints JSON Schema cannot state, checked in the same call so that "valid"
- * means one thing.
+/*
+ * The cross-field constraints now live in ./invariants.ts, unchanged.
  *
- * A subagent review on 2026-09-04 found the hole: every id in the system is
- * pattern-checked and none is checked against any other. An incident could
- * carry a conversation whose thread belonged to a different incident, whose
- * messages named a third, and all four schemas were satisfied — every field had
- * the right shape and no field had the right value. Shape is not identity, and
- * cross-incident mixing is exactly the defect these ids exist to catch.
- *
- * Draft 2020-12 has no way to say "this field must equal that one", so it is
- * done here rather than left as a comment nobody runs.
+ * Moved on 2026-09-07 because scripts/build-core.mjs generates only the ajv
+ * validators, so the deployed n8n node ran the schemas and never these — and
+ * `valid` meant two different things in a unit test and in production, which
+ * is the promise at the top of this file. A file with no imports can be
+ * transpiled into the node from the same source the tests run, the way
+ * merge.ts and slice.ts already are.
  */
-function invariantErrors(name: SchemaName, data: unknown): string[] {
-  if (typeof data !== "object" || data === null) return [];
-  const errs: string[] = [];
-  const obj = data as Record<string, unknown>;
-
-  const checkConversation = (c: Record<string, unknown>, where: string): void => {
-    const incidentId = c["incident_id"];
-    if (typeof incidentId !== "string") return;
-
-    const threadId = c["thread_id"];
-    if (typeof threadId === "string" && threadId !== `thread-${incidentId}`) {
-      errs.push(`${where}/thread_id ${threadId} is not derived from incident ${incidentId}`);
-    }
-
-    const messages = c["messages"];
-    if (Array.isArray(messages)) {
-      messages.forEach((m, i) => {
-        if (typeof m !== "object" || m === null) return;
-        const mid = (m as Record<string, unknown>)["incident_id"];
-        if (typeof mid === "string" && mid !== incidentId) {
-          errs.push(`${where}/messages/${i}/incident_id ${mid} belongs to another incident than ${incidentId}`);
-        }
-      });
-    }
-  };
-
-  if (name === "conversation") checkConversation(obj, "(root)");
-
-  if (name === "incident") {
-    const conv = obj["conversation"];
-    if (typeof conv === "object" && conv !== null) {
-      const c = conv as Record<string, unknown>;
-      checkConversation(c, "/conversation");
-      const incidentId = obj["incident_id"];
-      if (typeof incidentId === "string" && typeof c["incident_id"] === "string" && c["incident_id"] !== incidentId) {
-        errs.push(`/conversation/incident_id ${String(c["incident_id"])} does not match the incident it is attached to (${incidentId})`);
-      }
-    }
-
-    /*
-     * An incident embeds whole documents, and each one must mean the same thing
-     * inside as it does alone.
-     *
-     * A subagent review on 2026-09-04 found that only `conversation` was being
-     * checked. An agent result whose hypothesis cited a finding nobody reported
-     * was refused on its own and accepted the moment it was placed in
-     * `analysis.agents[]` — precisely the "passes here, fails there" split this
-     * file opens by saying it exists to prevent.
-     */
-    /*
-     * The observation and the record of collecting it must say the same thing.
-     *
-     * Codex, 2026-09-05: null in an observation slot meant both "the provider
-     * looked and there was nothing" and "nobody could look", and the failure
-     * lived outside the document, so serialising it lost even the fact that a
-     * slot had failed. The `collection` record carries the three answers; this
-     * is what keeps it from disagreeing with the observation beside it, because
-     * a record nothing cross-checks would drift into decoration.
-     */
-    const collection = obj["collection"];
-    const observations = obj["observations"];
-    if (typeof collection === "object" && collection !== null
-        && typeof observations === "object" && observations !== null) {
-      const c = collection as Record<string, unknown>;
-      const o = observations as Record<string, unknown>;
-      for (const slot of ["kubernetes", "logs", "metrics"]) {
-        const entry = c[slot];
-        if (typeof entry !== "object" || entry === null) continue;
-        const state = (entry as Record<string, unknown>)["state"];
-        const present = o[slot] !== null && o[slot] !== undefined;
-        if (present && state !== "collected") {
-          errs.push(`/collection/${slot}/state says ${String(state)} while /observations/${slot} carries an observation`);
-        }
-        if (!present && state === "collected") {
-          errs.push(`/collection/${slot}/state says collected while /observations/${slot} is null`);
-        }
-      }
-    }
-
-    const agents = (obj["analysis"] as Record<string, unknown> | undefined)?.["agents"];
-    if (Array.isArray(agents)) {
-      agents.forEach((a, i) => {
-        for (const e of invariantErrors("agent-result", a)) {
-          errs.push(`/analysis/agents/${i}${e.startsWith("/") ? e : ` ${e}`}`);
-        }
-      });
-    }
-  }
-
-  if (name === "agent-result") {
-    const findings = obj["findings"];
-    const refs = new Set(
-      Array.isArray(findings)
-        ? findings
-            .map((f) => (typeof f === "object" && f !== null ? (f as Record<string, unknown>)["source_ref"] : undefined))
-            .filter((r): r is string => typeof r === "string")
-        : [],
-    );
-    // Both directions, not one. Codex, chunk 0 round 11: only supported_by was
-    // traced back to a finding, so a hypothesis could be weakened by
-    // contradictions that no finding reports. A rule about evidence references
-    // holds for every list of evidence references, not for the flattering one.
-    const EVIDENCE_LISTS = ["supported_by", "contradicted_by"] as const;
-    const hypotheses = obj["hypotheses"];
-    if (Array.isArray(hypotheses)) {
-      hypotheses.forEach((h, i) => {
-        if (typeof h !== "object" || h === null) return;
-        for (const field of EVIDENCE_LISTS) {
-          const by = (h as Record<string, unknown>)[field];
-          if (!Array.isArray(by)) continue;
-          for (const ref of by) {
-            if (typeof ref === "string" && !refs.has(ref)) {
-              errs.push(`/hypotheses/${i}/${field} cites ${ref}, which no finding in this result reports`);
-            }
-          }
-        }
-      });
-    }
-  }
-
-  return errs;
-}
 
 export function validate(name: SchemaName, data: unknown): ValidationResult {
   compileAll();

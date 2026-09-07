@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 // @ts-expect-error — plain .mjs, the same file node runs.
 import { chooseSource } from "../scripts/record-baseline.mjs";
 // @ts-expect-error - plain .mjs script, no types
-import { releaseMayProceed, DRIFT_CHECK_ID } from "../scripts/release.mjs";
+import { releaseMayProceed, gateFinished, DRIFT_CHECK_ID } from "../scripts/release.mjs";
 
 const SOURCE = readFileSync(new URL("../scripts/release.mjs", import.meta.url).pathname, "utf8");
 const PKG = JSON.parse(readFileSync(new URL("../package.json", import.meta.url).pathname, "utf8"));
@@ -114,5 +114,43 @@ describe("the one gate failure a release is allowed to walk past", () => {
   it("stops when the gate failed while every check passed, because that disagreement is itself a defect", () => {
     const stop = releaseMayProceed({ results: [ok("tests"), ok("typecheck")] });
     expect(stop).toContain("disagreement");
+  });
+});
+
+/*
+ * A gate that was killed did not produce the report on disk.
+ *
+ * spawnSync on a killed child gives error: undefined and status: null, so the
+ * success test did not return and the release read whatever
+ * out/acceptance-gate.json held from an EARLIER run. If that leftover showed
+ * only drift failing, the chain deployed while announcing "the gate failed on
+ * no-drift-from-baseline only" — a claim about a run that never finished. The
+ * gate has been killed by a ten-minute limit twice in this project, so the
+ * trigger is recorded, not imagined. Found by a subagent on 2026-09-07.
+ */
+describe("a release reads a gate report only from a gate that finished", () => {
+  it("stops when the gate was killed by a signal", () => {
+    const r = gateFinished({ status: null, signal: "SIGTERM", error: undefined });
+    expect(r, "a signal kill is not a verdict").not.toBeNull();
+    expect(String(r)).toMatch(/did not finish/);
+    expect(String(r)).toMatch(/SIGTERM/);
+  });
+
+  it("stops when the gate never started", () => {
+    expect(String(gateFinished({ status: null, error: new Error("ENOENT") })))
+      .toMatch(/could not be started/);
+  });
+
+  it("stops when the result cannot be read at all", () => {
+    for (const bad of [null, undefined, "nope", 7]) {
+      expect(gateFinished(bad as never), `${JSON.stringify(bad)} is not a result`).not.toBeNull();
+    }
+  });
+
+  it("carries on for a gate that ran and exited, whatever the code", () => {
+    // Zero, one, two, three: each is a verdict, and the caller decides on it.
+    for (const status of [0, 1, 2, 3]) {
+      expect(gateFinished({ status, error: undefined }), `exit ${status} is a finished run`).toBeNull();
+    }
   });
 });

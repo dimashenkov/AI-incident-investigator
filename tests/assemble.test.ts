@@ -471,6 +471,29 @@ describe("the verdict becomes the incident's own", () => {
     expect(recordAgentResult(a.incident, asKubernetes).state).toBe("recorded");
   });
 
+  /*
+   * A citation must name something the observation carries, not something every
+   * object has. A subagent probed this on 2026-09-07: `toString`,
+   * `hasOwnProperty` and `pods[0].constructor` all resolved, so a finding
+   * citing `toString` passed the check that exists to refuse a path pointing
+   * nowhere — and was then stored as the working spelling a human is told to
+   * follow.
+   */
+  it("refuses a citation that names a property every object has", () => {
+    const obs = { pods: [{ phase: "Running" }], events: [], deployment: { image: "x" } };
+    for (const ref of ["toString", "hasOwnProperty", "constructor", "pods[0].constructor",
+                       "observation.toString", "valueOf"]) {
+      expect(normaliseRef(obs, ref), `${ref} names nothing in the observation`).toBeNull();
+    }
+    // And real paths still resolve, or this refuses everything.
+    for (const ref of ["pods[0].phase", "deployment.image", "events"]) {
+      expect(normaliseRef(obs, ref), `${ref} is a real path and must resolve`).toBe(ref);
+    }
+    // length is an own property of an array and names a number a reader can
+    // count. Kept on purpose; the defect was the shape that names nothing.
+    expect(normaliseRef(obs, "pods.length")).toBe("pods.length");
+  });
+
   it("refuses a root cause verdict citing a path no agent reported", () => {
     const bad = { ...VERDICT, findings: [{ fact: "invented", source_ref: "series[0].points[3].value" }],
       hypotheses: [] };
