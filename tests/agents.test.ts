@@ -183,7 +183,7 @@ describe("every prompt carries the rules its schema will enforce", () => {
       const cited = [
         ...text.matchAll(/"source_ref":\s*"([^"]*)"/g),
         ...text.matchAll(/"supported_by":\s*\[\s*"([^"]*)"/g),
-      ].map((m) => m[1]!);
+      ].map((m) => m[1]!).filter((r) => !r.startsWith("SCENARIO-SPECIFIC"));
       expect(cited.length, `${agent} shows no citation at all; this test would pass on nothing`).toBeGreaterThan(0);
       for (const ref of cited) {
         expect(ref, `${agent} shows a placeholder where a model expects a path`).not.toMatch(/^\.*$/);
@@ -210,10 +210,21 @@ describe("every prompt carries the rules its schema will enforce", () => {
     expect(scenarios.length, "no scenarios; this test would pass on nothing").toBeGreaterThan(0);
 
     for (const [agent, slot] of Object.entries(slots)) {
+      /*
+       * A citation marked SCENARIO-SPECIFIC is exempt, and that marker is the
+       * whole point of it. Codex, 2026-09-06, asked for a worked example whose
+       * first finding is the event that names the cause — and this very test,
+       * added after Grok found the same defect one level up, refuses a path
+       * that resolves only where that thing happened.
+       *
+       * Both are right. The way out is not to weaken either: an example
+       * labelled for one kind of incident is not a template, and the label is
+       * in the text the model reads, not only in this test.
+       */
       const cited = [
         ...readPrompt(agent as AgentName)!.matchAll(/"source_ref":\s*"([^"]*)"/g),
         ...readPrompt(agent as AgentName)!.matchAll(/"supported_by":\s*\[\s*"([^"]*)"/g),
-      ].map((m) => m[1]!);
+      ].map((m) => m[1]!).filter((r) => !r.startsWith("SCENARIO-SPECIFIC"));
       expect(cited.length, `${agent} shows no citation`).toBeGreaterThan(0);
 
       for (const scenario of scenarios) {
@@ -333,6 +344,25 @@ describe("every prompt carries the rules its schema will enforce", () => {
     expect(kube).toMatch(/no SYMPTOM/);
     expect(kube, "and reporting a real limit must be named as not inventing")
       .toMatch(/is not inventing a finding/);
+
+    /*
+     * Measured live on 2026-09-06, in the run immediately after the rule was
+     * added: for an image-pull failure the agent reported three configuration
+     * findings and not the event saying the image could not be pulled, which
+     * it had cited the run before. A new duty displaced the one that mattered,
+     * and the scenario went from right-code to wrong.
+     */
+    expect(kube, "the symptom must be asked for before the configuration")
+      .toMatch(/The symptom comes first, and the configuration is second/);
+    expect(kube).toMatch(/read `events` and the pod and container states first/);
+
+    // Codex, 2026-09-06: ordering words is weak; a worked example whose first
+    // finding is the event guides the answer without rejecting it afterwards.
+    expect(kube, "the prompt must show what an answer looks like, not only order it")
+      .toMatch(/SCENARIO-SPECIFIC events\[0\]\.message/);
+    // And "report every one that shows something wrong" invites a padded list
+    // that buries the finding naming the cause.
+    expect(kube).toMatch(/Report what is wrong, not everything you can see/);
   });
 
   it("declares no rule id that no test knows about", () => {

@@ -630,6 +630,15 @@ export const MUTATIONS = [
     mustFail: "asks each agent only for what its own slot can answer",
   },
   {
+    // Adding a duty displaced the one that mattered: three configuration
+    // findings and no event, on an observation whose event names the cause.
+    id: "configuration-asked-for-before-the-symptom",
+    file: "prompts/kubernetes-agent.md",
+    from: "**The symptom comes first, and the configuration is second.** Measured live on",
+    to: "**Configuration first.** Measured live on",
+    mustFail: "asks each agent only for what its own slot can answer",
+  },
+  {
     id: "claimed-provider-not-compared",
     file: "src/providers/fixtures.ts",
     from: '      ["provider", `fake-${slot}`],',

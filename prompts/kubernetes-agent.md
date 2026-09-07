@@ -69,13 +69,51 @@ Measured live on 2026-09-06, twice in one run:
 | the metrics agent reported throttled time | nobody cited `pods[0].containers[0].limits.cpu` — it is not in the metrics slot |
 | an image could not be pulled | nobody cited `deployment.image` — the name of the image that failed |
 
-So, alongside whatever you find wrong, **report the configuration the incident
-turns on**, each as its own finding with its own `source_ref`:
+**The symptom comes first, and the configuration is second.** Measured live on
+2026-09-06, immediately after this rule was added: for an image-pull failure the
+agent reported three configuration findings and **not the event saying the image
+could not be pulled** — which was in `events[0].message` all along, and had been
+cited the run before. Adding a duty displaced the one that mattered.
+
+So: **read `events` and the pod and container states first**, and report what
+shows something wrong. That is the finding the incident is about. Only then add
+the configuration.
+
+**For an image-pull incident only** — an answer looks like this, the event that
+says so, then the value it names. These two paths exist in THAT incident and may
+not exist in yours; what to copy is the order, not the values.
+
+```json
+"findings": [
+  { "fact": "the image could not be pulled: not found", "source_ref": "SCENARIO-SPECIFIC events[0].message" },
+  { "fact": "the deployment image is the one in your observation", "source_ref": "SCENARIO-SPECIFIC deployment.image" }
+]
+```
+
+Drop the words `SCENARIO-SPECIFIC` — they are there so nobody, human or model,
+mistakes a worked example for a template. Every path you send must be one you
+read in the observation you were given.
+
+Codex, 2026-09-06, on why an example and not a longer instruction: ordering words
+in a prompt is weak, and a worked example whose first finding is the event guides
+the answer without anything having to reject it afterwards. Copy the SHAPE; the
+values are yours to read.
+
+**Report what is wrong, not everything you can see.** A list padded with every
+`Pending`, every replica count and both events buries the one that names the
+cause. If two events say the same thing, cite the one that says it precisely —
+`Failed to pull image ... not found` over `Back-off pulling image`.
+
+An answer with configuration and no symptom, on an observation that contains a
+symptom, is worse than the old answer with a symptom and no configuration.
+
+Then, alongside whatever you found wrong, **report the configuration the
+incident turns on**, each as its own finding with its own `source_ref`:
 
 | When the observation shows | Also report |
 |---|---|
-| a container terminated, restarting, or unhealthy | its `limits`, both memory and cpu |
-| a pod not ready, or a probe failing | the probe's configuration, and the limits |
+| a container terminated or restarting | its `limits`, both memory and cpu |
+| a pod not ready, or a probe failing | the probe's configuration **if the observation carries one** |
 | an image that could not be pulled or is not running | `deployment.image` |
 | a probe failing | the probe's own configuration, if the observation carries it |
 | **nothing wrong at all, but there are pods** | the limits anyway — another agent's numbers may be measured against them, and no other agent can see them |

@@ -6,19 +6,21 @@ it was measured on 2026-09-06, not assumed.
 ## The short version
 
 ```bash
-codex exec -s read-only --skip-git-repo-check -m gpt-5.6-terra "PROMPT" < /dev/null 2>&1
+codex exec -s read-only --skip-git-repo-check "PROMPT" < /dev/null 2>&1
 ```
 
-`-m` works on the ChatGPT subscription. No API key, no API billing.
+## Which model — none, here
 
-## Which model
+The owner decided on 2026-09-06 not to pass `-m` at all, which is how most of
+this project's reviews were already run. The server picks.
 
-| Model | Use it for |
-|---|---|
-| `gpt-5.6-terra` | **the default** for reviews — the balance of capability and usage |
-| `gpt-5.6-sol` | the hard one: architecture, concurrency, security, a large diff |
-| `gpt-5.6-luna` | a fast, shallow check |
-| `gpt-5.5`, `gpt-5.4-mini` | available; no reason to prefer them for a new workflow |
+The rest of this file is what was measured while trying the other way, and it
+stands because the next project may want the choice. `-m` does work on the
+ChatGPT subscription, with a name from the account's own list, and it needs no
+API key.
+
+The cost of not passing it: two runs are not strictly comparable if the server
+moves the model underneath you. That is accepted here deliberately.
 
 ## Do not guess the name — read the list
 
@@ -43,50 +45,18 @@ wrong. The list had five perfectly usable names in it.
 `gpt-6-astra` gives the second. It is a separate model, not another name for a
 5.6, and it needs Codex **0.153.0+**; this machine has 0.149.0.
 
-## Turning on gpt-6-astra
+## gpt-6-astra — dropped
 
-Three steps, and the first belongs to the owner — an agent does not upgrade
-software on somebody's machine.
+The owner dropped it on 2026-09-06. It is left here only so nobody spends an
+afternoon rediscovering the same two facts:
 
-**1. Upgrade.** Measured 2026-09-06: installed 0.149.0, available 0.153.4.
+* the identifier is `gpt-6-astra`, not `astra`, and the wrong one gives a
+  misleading error about ChatGPT accounts;
+* with Codex 0.149.0 the server refuses on the VERSION and never reaches the
+  entitlement — so that refusal says nothing about whether an account has it.
 
-```bash
-brew upgrade --cask codex
-```
-
-**2. Check the account has it.** The model list is refetched on the first run of
-the new version.
-
-```bash
-codex --version
-python3 -c "import json,io,os;d=json.load(io.open(os.path.expanduser('~/.codex/models_cache.json')));print(sorted(m.get('id') or m.get('slug') for m in d['models']))"
-```
-
-**3. Run it.**
-
-```bash
-codex exec -s read-only --skip-git-repo-check -m gpt-6-astra "PROMPT" < /dev/null 2>&1
-```
-
-What each answer means:
-
-| Answer | Meaning |
-|---|---|
-| it answers | done |
-| `requires a newer version of Codex` | the CLI is too old; nothing is known about the account yet |
-| `not supported when using Codex with a ChatGPT account` | the CLI is new enough and this account does not have the model |
-
-On 2026-09-06 this machine gave the second answer in the table, and that is the
-only thing measured. **It does not establish that the account has Astra** — the
-server refused on the version and never got as far as the entitlement. After the
-upgrade the answer may still be the third line.
-
-Saying "the account has it, only the CLI is old" would be a claim from one error
-message that names one cause. The version is simply the first thing in the way,
-and it is the only thing that can be changed to find out what is behind it.
-
-None of this needs an API key: the 5.6 models run on the ChatGPT allowance, and
-Astra would too.
+Upgrading (`brew upgrade --cask codex`) is what would answer the question. It is
+not being done, because the 5.6 models are enough for reviews here.
 
 ## What this does not change
 
