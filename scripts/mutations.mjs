@@ -616,7 +616,7 @@ export const MUTATIONS = [
     // report: the limits are what make somebody else's number mean something.
     id: "healthy-cluster-reports-nothing-at-all",
     file: "prompts/kubernetes-agent.md",
-    from: "| **nothing wrong at all, but there are pods** | the limits anyway — another agent's numbers may be measured against them, and no other agent can see them |",
+    from: "| **nothing wrong at all, but there are pods** | the limits anyway — another agent's numbers may be measured against them |",
     to: "",
     mustFail: "asks each agent only for what its own slot can answer",
   },
@@ -625,8 +625,8 @@ export const MUTATIONS = [
     // front of it, and a healthy-looking cluster matches the older one.
     id: "no-symptom-read-as-nothing-to-report",
     file: "prompts/kubernetes-agent.md",
-    from: "**If the observation shows no SYMPTOM**, that is not the same as showing",
-    to: "**If the observation shows nothing relevant**, return no_data. That is not the same as showing",
+    from: "**No symptom is not the same as nothing.**",
+    to: "**If the observation shows nothing relevant, return no_data.**",
     mustFail: "asks each agent only for what its own slot can answer",
   },
   {
@@ -634,8 +634,27 @@ export const MUTATIONS = [
     // findings and no event, on an observation whose event names the cause.
     id: "configuration-asked-for-before-the-symptom",
     file: "prompts/kubernetes-agent.md",
-    from: "**The symptom comes first, and the configuration is second.** Measured live on",
-    to: "**Configuration first.** Measured live on",
+    from: "Two things, in this order. **The symptom first.** Then the configuration it",
+    to: "Two things. **The configuration first.** Then the symptom it",
+    mustFail: "asks each agent only for what its own slot can answer",
+  },
+  {
+    // A marker inside a shown citation demonstrates a path this system would
+    // refuse, and a model copying the example literally loses its whole answer.
+    id: "scoped-label-inside-the-citation-it-labels",
+    file: "prompts/kubernetes-agent.md",
+    from: '{ "fact": "the event says: Failed to pull image ... not found", "source_ref": "events[0].message" }',
+    to: '{ "fact": "the event says: Failed to pull image ... not found", "source_ref": "SCENARIO-SPECIFIC events[0].message" }',
+    mustFail: "asks each agent only for what its own slot can answer",
+  },
+  {
+    // Saying naming the cause is another agent's job while handing over a list
+    // of cause codes is a contradiction the model resolves by the shape it
+    // happens to see.
+    id: "code-list-without-saying-why-it-is-there",
+    file: "prompts/kubernetes-agent.md",
+    from: "**Usually you return no hypotheses at all, and that is the expected answer.**",
+    to: "**Pick the code that fits what you saw.**",
     mustFail: "asks each agent only for what its own slot can answer",
   },
   {

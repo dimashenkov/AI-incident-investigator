@@ -26,6 +26,26 @@ import {
 } from "../src/agents/context.js";
 
 const SCENARIOS = new URL("../scenarios/", import.meta.url).pathname;
+
+/**
+ * Citations a prompt shows as general guidance, excluding worked examples that
+ * announce which incident they belong to.
+ *
+ * Codex, 2026-09-06: the marker used to live inside the `source_ref` string, so
+ * the example demonstrated a citation this system would refuse and a model
+ * copying it literally would lose its whole answer. The label belongs around
+ * the example. A fenced block introduced by EXAMPLE FOR ONE INCIDENT is that
+ * scope, and it is a line the model reads too.
+ */
+function citationsOutsideScopedExamples(text: string): string[] {
+  const scoped = [...text.matchAll(/EXAMPLE FOR ONE INCIDENT[\s\S]*?```json[\s\S]*?```/g)].map((m) => m[0]);
+  let rest = text;
+  for (const block of scoped) rest = rest.replace(block, "");
+  return [
+    ...rest.matchAll(/"source_ref":\s*"([^"]*)"/g),
+    ...rest.matchAll(/"supported_by":\s*\[\s*"([^"]*)"/g),
+  ].map((m) => m[1]!);
+}
 const K8S = JSON.parse(readFileSync(`${SCENARIOS}container-oom/kubernetes.json`, "utf8"));
 const LOGS = JSON.parse(readFileSync(`${SCENARIOS}container-oom/logs.json`, "utf8"));
 const METRICS = JSON.parse(readFileSync(`${SCENARIOS}container-oom/metrics.json`, "utf8"));
@@ -183,7 +203,7 @@ describe("every prompt carries the rules its schema will enforce", () => {
       const cited = [
         ...text.matchAll(/"source_ref":\s*"([^"]*)"/g),
         ...text.matchAll(/"supported_by":\s*\[\s*"([^"]*)"/g),
-      ].map((m) => m[1]!).filter((r) => !r.startsWith("SCENARIO-SPECIFIC"));
+      ].map((m) => m[1]!);
       expect(cited.length, `${agent} shows no citation at all; this test would pass on nothing`).toBeGreaterThan(0);
       for (const ref of cited) {
         expect(ref, `${agent} shows a placeholder where a model expects a path`).not.toMatch(/^\.*$/);
@@ -221,10 +241,7 @@ describe("every prompt carries the rules its schema will enforce", () => {
        * labelled for one kind of incident is not a template, and the label is
        * in the text the model reads, not only in this test.
        */
-      const cited = [
-        ...readPrompt(agent as AgentName)!.matchAll(/"source_ref":\s*"([^"]*)"/g),
-        ...readPrompt(agent as AgentName)!.matchAll(/"supported_by":\s*\[\s*"([^"]*)"/g),
-      ].map((m) => m[1]!).filter((r) => !r.startsWith("SCENARIO-SPECIFIC"));
+      const cited = citationsOutsideScopedExamples(readPrompt(agent as AgentName)!);
       expect(cited.length, `${agent} shows no citation`).toBeGreaterThan(0);
 
       for (const scenario of scenarios) {
@@ -341,7 +358,7 @@ describe("every prompt carries the rules its schema will enforce", () => {
      */
     expect(kube, "the old wording makes a healthy cluster report nothing")
       .not.toMatch(/If the observation shows nothing relevant/);
-    expect(kube).toMatch(/no SYMPTOM/);
+    expect(kube).toMatch(/No symptom is not the same as nothing/);
     expect(kube, "and reporting a real limit must be named as not inventing")
       .toMatch(/is not inventing a finding/);
 
@@ -352,17 +369,52 @@ describe("every prompt carries the rules its schema will enforce", () => {
      * it had cited the run before. A new duty displaced the one that mattered,
      * and the scenario went from right-code to wrong.
      */
+    /*
+     * Rewritten on 2026-09-07. Grok read the whole file and showed four rules
+     * added in two days each undoing the last: the configuration duty
+     * displaced the event, the symptom-first correction displaced the
+     * configuration duty, "do not diagnose" displaced the event again because
+     * the example's own words were a conclusion, and the healthy-cluster row
+     * displaced no_data. A fifth patch was not the answer.
+     *
+     * What holds now is the shape: one section saying what to report, symptom
+     * before configuration, with the event as a first-class output rather than
+     * something the tables never mention.
+     */
     expect(kube, "the symptom must be asked for before the configuration")
-      .toMatch(/The symptom comes first, and the configuration is second/);
-    expect(kube).toMatch(/read `events` and the pod and container states first/);
+      .toMatch(/\*\*The symptom first\.\*\*/);
+    expect(kube, "and the event must be named as an output, not left to inference")
+      .toMatch(/\| `events` \| every event that shows something wrong/);
+    // And "do not diagnose" must not forbid quoting what an event says, which
+    // is what made a model drop the one finding that named the cause.
+    expect(kube, "quoting an event must be distinguished from diagnosing")
+      .toMatch(/Reporting what an event says is not\s*\n?diagnosing/);
+
+    /*
+     * Grok, 2026-09-07, on the rewrite: the file said naming the cause is
+     * another agent's work and then handed over a list of cause codes. A model
+     * resolves that whichever way the shape in front of it suggests.
+     */
+    expect(kube, "the code list must say why it is there, not invite filling it in")
+      .toMatch(/Usually you return no hypotheses at all/);
+    /*
+     * And deduplication read loosely drops the finding that names the cause: an
+     * event and a pod state are different sources, not two spellings of one.
+     */
+    expect(kube, "an event and a pod state must not be deduplicated into one")
+      .toMatch(/Two things are equivalent only when they say the same thing/);
 
     // Codex, 2026-09-06: ordering words is weak; a worked example whose first
     // finding is the event guides the answer without rejecting it afterwards.
     expect(kube, "the prompt must show what an answer looks like, not only order it")
-      .toMatch(/SCENARIO-SPECIFIC events\[0\]\.message/);
+      .toMatch(/EXAMPLE FOR ONE INCIDENT[\s\S]*?"source_ref": "events\[0\]\.message"/);
+    // And the label must be around the example, not inside a citation: a marker
+    // in the source_ref demonstrates a path this system would refuse.
+    expect(kube, "a scoped label must not sit inside a shown citation")
+      .not.toMatch(/"source_ref":\s*"[A-Z-]+ /);
     // And "report every one that shows something wrong" invites a padded list
     // that buries the finding naming the cause.
-    expect(kube).toMatch(/Report what is wrong, not everything you can see/);
+    expect(kube).toMatch(/Report every distinct symptom; report each one once/);
   });
 
   it("declares no rule id that no test knows about", () => {
