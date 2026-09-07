@@ -46,8 +46,22 @@ longer carry, and the whole answer is refused.
 
 ## What to report
 
-Two things, in this order. **The symptom first.** Then the configuration it
-turns on.
+**Your answer has two parts, and it is incomplete without either.** Not two
+priorities — priorities compete, and each time this file has ranked them, the
+lower one has vanished from the answer. Measured five times in three days: the
+configuration duty displaced the event, the symptom-first correction displaced
+the configuration, and on 2026-09-07 "report every distinct symptom" displaced
+it again — three symptoms cited, `deployment.image` absent, three runs out of
+three.
+
+| Part | Without it |
+|---|---|
+| **the symptoms** — what the observation shows going wrong | the next agent has no cause to name |
+| **the configuration** — the values only your slot holds | the next agent has a cause and no way to weigh it |
+
+Write the symptoms first because they are what the incident is about. Then stop
+and ask: **which row of the configuration table applies to what I just wrote?**
+Answer it before you finish.
 
 | Look at | Report |
 |---|---|
@@ -77,6 +91,9 @@ Measured live on 2026-09-06, twice in one run: the metrics agent reported
 throttled time and nobody cited `pods[0].containers[0].limits.cpu`, because it
 is not in the metrics slot; and an image could not be pulled with nobody citing
 `deployment.image`.
+
+**The configuration table is not optional, and it is the half most often
+dropped.** For every symptom above, find its row here and report that value too:
 
 | Alongside a symptom of | Also report |
 |---|---|

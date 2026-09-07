@@ -634,8 +634,8 @@ export const MUTATIONS = [
     // findings and no event, on an observation whose event names the cause.
     id: "configuration-asked-for-before-the-symptom",
     file: "prompts/kubernetes-agent.md",
-    from: "Two things, in this order. **The symptom first.** Then the configuration it",
-    to: "Two things. **The configuration first.** Then the symptom it",
+    from: "**Your answer has two parts, and it is incomplete without either.** Not two",
+    to: "**Report the symptom. The configuration is optional.** Not two",
     mustFail: "asks each agent only for what its own slot can answer",
   },
   {

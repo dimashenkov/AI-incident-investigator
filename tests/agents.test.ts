@@ -381,8 +381,17 @@ describe("every prompt carries the rules its schema will enforce", () => {
      * before configuration, with the event as a first-class output rather than
      * something the tables never mention.
      */
-    expect(kube, "the symptom must be asked for before the configuration")
-      .toMatch(/\*\*The symptom first\.\*\*/);
+    /*
+     * Measured 2026-09-07, three runs out of three: the agent cited three
+     * symptoms and no configuration at all. Ranking the two made the lower one
+     * vanish, for the fifth time in three days. So the prompt states a
+     * completeness requirement rather than a priority — priorities compete,
+     * and something always loses.
+     */
+    expect(kube, "the answer must be stated as two required parts, not two priorities")
+      .toMatch(/Your answer has two parts, and it is incomplete without either/);
+    expect(kube, "and the configuration half must be named as the one that gets dropped")
+      .toMatch(/it is the half most often\s*\n?dropped/);
     expect(kube, "and the event must be named as an output, not left to inference")
       .toMatch(/\| `events` \| every event that shows something wrong/);
     // And "do not diagnose" must not forbid quoting what an event says, which
