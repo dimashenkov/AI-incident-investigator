@@ -35,9 +35,20 @@ const mustCiteOf = (scenario: string): string[] => expectedFor(scenario, SCENARI
 const qualified = (code: string, cited: string[], confidence: unknown, against: number) => {
   const a = concluded(code, cited) as Record<string, any>;
   a.incident.analysis.confidence = confidence;
-  a.incident.analysis.evidence = Array.from({ length: against }, () => ({
-    source: "metrics", fact: "memory never approached the limit", supports: "against",
-  }));
+  a.incident.analysis.evidence = [
+    { source: "kubernetes", fact: "the container was OOMKilled", supports: "for" },
+    ...Array.from({ length: against }, () => ({
+      source: "metrics", fact: "memory never approached the limit", supports: "against",
+    })),
+  ];
+  return a;
+};
+
+/** An answer whose evidence list is exactly what is passed, warts and all. */
+const withEvidence = (code: string, cited: string[], confidence: unknown, evidence: unknown[]) => {
+  const a = concluded(code, cited) as Record<string, any>;
+  a.incident.analysis.confidence = confidence;
+  a.incident.analysis.evidence = evidence;
   return a;
 };
 
@@ -194,6 +205,53 @@ describe("a scenario whose evidence conflicts is scored on more than its code", 
       "container-oom must carry no ceiling, or it is not the comparable case").toBe(null);
     expect(score("container-oom", qualified("CONTAINER_OOM", clean, 0.95, 0), SCENARIOS).state).toBe("correct");
     expect(score("container-oom", concluded("CONTAINER_OOM", clean), SCENARIOS).state).toBe("correct");
+  });
+
+  /*
+   * Grok, 2026-09-07: the first version counted supports === "against" and
+   * nothing else, so a bare flag with no source and no fact lifted the verdict
+   * to correct. Anyone who knows the field name walks past the check — the same
+   * defect as a field that cannot fail a run, one level in.
+   */
+  it("refuses a dissent that is a flag rather than evidence", () => {
+    const bare = score(S, withEvidence("CONTAINER_OOM", cite, 0.4, [{ supports: "against" }]), SCENARIOS);
+    expect(bare.state, "a bare flag must not satisfy the dissent requirement").toBe("correct-but-unqualified");
+    expect(bare.why.join(" ")).toMatch(/nothing was weighed/);
+
+    const empty = score(S, withEvidence("CONTAINER_OOM", cite, 0.4,
+      [{ source: "", fact: "", supports: "against" }]), SCENARIOS);
+    expect(empty.state, "empty strings are not evidence either").toBe("correct-but-unqualified");
+  });
+
+  /*
+   * And a contradiction raised by the slot that already supports the answer is
+   * not the conflict this scenario poses: the whole scenario is kubernetes and
+   * metrics disagreeing with each other.
+   */
+  it("refuses a dissent that comes from the same source as the support", () => {
+    const r = score(S, withEvidence("CONTAINER_OOM", cite, 0.4, [
+      { source: "kubernetes", fact: "the container was OOMKilled", supports: "for" },
+      { source: "kubernetes", fact: "but it might have been something else", supports: "against" },
+    ]), SCENARIOS);
+    expect(r.state).toBe("correct-but-unqualified");
+    expect(r.why.join(" ")).toMatch(/same source as the support/);
+  });
+
+  /*
+   * Codex reached this by calling score() directly on 2026-09-07: a refusal with
+   * an empty evidence list scored `correct`, so the scenario could not tell a
+   * reasoned refusal from one that never noticed the contradiction. A refusal is
+   * exempt from pointing AGAINST a conclusion it never reached — not from having
+   * looked at anything.
+   */
+  it("refuses a refusal that states no evidence at all", () => {
+    const r = score(S, withEvidence("INSUFFICIENT_EVIDENCE", cite, 0, []), SCENARIOS);
+    expect(r.state, "an empty-handed refusal must not read as a reasoned one").toBe("correct-but-unqualified");
+    expect(r.why.join(" ")).toMatch(/stating no evidence/);
+    // But a refusal that shows what it saw is the honest answer and stays correct.
+    const ok = score(S, withEvidence("INSUFFICIENT_EVIDENCE", cite, 0,
+      [{ source: "metrics", fact: "memory never approached the limit", supports: "against" }]), SCENARIOS);
+    expect(ok.state).toBe("correct");
   });
 
   it("counts the new state separately in the report and does not exit clean", () => {

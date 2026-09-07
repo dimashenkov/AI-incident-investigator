@@ -1,19 +1,51 @@
 {
   "collected_at": "2026-09-07T09:42:14Z",
-  "window": { "from": "2026-09-07T09:30:00Z", "to": "2026-09-07T09:42:00Z" },
+  "window": {
+    "from": "2026-09-07T09:30:00Z",
+    "to": "2026-09-07T09:42:00Z"
+  },
   "series": [
-    { "name": "http_requests_failed_ratio", "unit": "ratio", "container": "orders-api",
+    {
+      "name": "http_requests_failed_ratio",
+      "unit": "ratio",
+      "container": "orders-api",
       "points": [
-        { "ts": "2026-09-07T09:32:00Z", "value": 0.001 },
-        { "ts": "2026-09-07T09:36:00Z", "value": 0.002 },
-        { "ts": "2026-09-07T09:38:00Z", "value": 0.31 },
-        { "ts": "2026-09-07T09:40:00Z", "value": 0.44 }
-      ] },
-    { "name": "container_cpu_cfs_throttled_seconds_total", "unit": "seconds", "container": "orders-api",
+        {
+          "ts": "2026-09-07T09:32:00Z",
+          "value": 0.001
+        },
+        {
+          "ts": "2026-09-07T09:36:00Z",
+          "value": 0.002
+        },
+        {
+          "ts": "2026-09-07T09:39:00Z",
+          "value": 0.31
+        },
+        {
+          "ts": "2026-09-07T09:40:00Z",
+          "value": 0.44
+        }
+      ]
+    },
+    {
+      "name": "container_cpu_cfs_throttled_seconds_total",
+      "unit": "seconds",
+      "container": "orders-api",
       "points": [
-        { "ts": "2026-09-07T09:32:00Z", "value": 0.0 },
-        { "ts": "2026-09-07T09:36:00Z", "value": 0.0 },
-        { "ts": "2026-09-07T09:40:00Z", "value": 0.0 }
-      ] }
+        {
+          "ts": "2026-09-07T09:32:00Z",
+          "value": 0.0
+        },
+        {
+          "ts": "2026-09-07T09:36:00Z",
+          "value": 0.0
+        },
+        {
+          "ts": "2026-09-07T09:40:00Z",
+          "value": 0.0
+        }
+      ]
+    }
   ]
 }

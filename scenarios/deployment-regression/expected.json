@@ -1,3 +1,8 @@
-{ "root_cause_code": "DEPLOYMENT_REGRESSION",
-  "note": "What this scenario is FOR. Nothing is wrong at pod level: both pods Running, both ready, zero restarts, no throttling, and the desired replica count is met. Every symptom an agent normally reaches for is absent, and the only thing that can name the cause is the time at which a rollout event and the first error line meet. It also exercises the kubernetes prompt's healthy-cluster row: the slot is quiet, and the value another agent needs is still ours to report.",
-  "must_cite": ["events[0].message", "lines[3].message"] }
+{
+  "root_cause_code": "DEPLOYMENT_REGRESSION",
+  "note": "What this scenario is FOR. Nothing is wrong at pod level: both pods Running, both ready, zero restarts, no throttling, and the desired replica count is met. Every symptom an agent normally reaches for is absent, and the only thing that can name the cause is the time at which a rollout event and the first error line meet. Grok, 2026-09-07, found the first version self-defeating: the failure ratio rose at 09:38:00, two seconds BEFORE the scale-up event, so the metrics said the failures predated the rollout and a careful reader would have been right to answer INSUFFICIENT_EVIDENCE. The sample now sits at 09:39:00, after the first 500. It also exercises the kubernetes prompt's healthy-cluster row: the slot is quiet, and the value another agent needs is still ours to report.",
+  "must_cite": [
+    "events[0].message",
+    "lines[3].message"
+  ]
+}

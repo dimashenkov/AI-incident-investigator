@@ -15,7 +15,7 @@
  * human reads the thread against it. What this settles is the one comparison a
  * machine can make honestly.
  */
-import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -111,7 +111,8 @@ export function score(scenario, answer, root = SCENARIOS) {
    * doubt its own doubt; and `supports: "against"` is stated relative to a
    * conclusion, so demanding dissent from a run that reached none is asking what
    * the field cannot express. must_cite still applies — refusing does not excuse
-   * a run from showing what it looked at.
+   * a run from showing what it looked at — and so does a weaker form of the
+   * dissent rule, written below: a refusal must state SOME evidence.
    */
   const unqualified = [];
   const refused = got === "INSUFFICIENT_EVIDENCE";
@@ -129,11 +130,45 @@ export function score(scenario, answer, root = SCENARIOS) {
       unqualified.push(`confidence ${c} is above the ceiling of ${want.maxConfidence} this scenario requires`);
     }
   }
-  if (want.requiresDissent && !refused) {
-    const ev = answer.incident?.analysis?.evidence;
-    const against = Array.isArray(ev) ? ev.filter((e) => e?.supports === "against").length : 0;
-    if (against === 0) {
-      unqualified.push("no evidence points against the conclusion, so nothing was weighed");
+  /*
+   * Dissent, checked as evidence rather than as a flag.
+   *
+   * Grok, 2026-09-07: the first version counted `supports === "against"` and
+   * nothing else, so `{ supports: "against" }` — no source, no fact, no relation
+   * to the contradiction the scenario is about — lifted the verdict from
+   * correct-but-unqualified to correct. Anyone who knows the field name passes.
+   * That is the same defect as a field that cannot fail a run, one level in.
+   *
+   * Two things are checkable here and a third is not. Checkable: the item is
+   * SHAPED like evidence — a source and a fact, both non-empty strings — and it
+   * comes from a DIFFERENT source than what supports the conclusion, because a
+   * contradiction raised by the same slot that supports the answer is not the
+   * conflict this scenario poses. Not checkable, and not claimed: whether the
+   * dissent is TRUE. A human reads the thread for that.
+   */
+  if (want.requiresDissent) {
+    const ev = Array.isArray(answer.incident?.analysis?.evidence) ? answer.incident.analysis.evidence : [];
+    const shaped = ev.filter((e) => typeof e?.source === "string" && e.source.length > 0
+      && typeof e?.fact === "string" && e.fact.length > 0);
+    if (refused) {
+      /*
+       * A refusal has no conclusion, so `against` has nothing to point away
+       * from — but it still has to have looked. An empty evidence list on a
+       * refusal is indistinguishable from a run that never noticed the
+       * contradiction, which Codex reached by calling score() directly on
+       * 2026-09-07 and getting `correct` back.
+       */
+      if (shaped.length === 0) {
+        unqualified.push("it refused while stating no evidence at all, so nothing shows it saw the contradiction");
+      }
+    } else {
+      const against = shaped.filter((e) => e.supports === "against");
+      const forSources = new Set(shaped.filter((e) => e.supports === "for").map((e) => e.source));
+      if (against.length === 0) {
+        unqualified.push("no evidence points against the conclusion, so nothing was weighed");
+      } else if (forSources.size > 0 && against.every((e) => forSources.has(e.source))) {
+        unqualified.push("every dissent comes from the same source as the support, which is not the conflict this scenario poses");
+      }
     }
   }
   if (unqualified.length > 0) {
@@ -199,6 +234,23 @@ export function format(results) {
   return lines.join("\n");
 }
 
+/**
+ * Write the scored result into a run record, so a later reader does not have to
+ * take somebody's prose for it.
+ *
+ * The run records held their outcome as a sentence written for a human. A
+ * sentence is not something a machine may count, so scripts/readiness.mjs
+ * reported every scenario as unestablished — correctly, and uselessly. This is
+ * the fix at the source: the scorer writes what it decided, at the moment it
+ * decides it, next to the cost of the run that produced it.
+ */
+export function recordInto(recordPath, results) {
+  const rec = JSON.parse(readFileSync(recordPath, "utf8"));
+  rec.scored = Object.fromEntries(results.map((r) => [r.scenario, r.state]));
+  writeFileSync(recordPath, `${JSON.stringify(rec, null, 2)}\n`);
+  return rec.scored;
+}
+
 function main() {
   const path = process.argv[2];
   if (path === undefined) {
@@ -209,6 +261,17 @@ function main() {
   const answers = JSON.parse(readFileSync(path, "utf8"));
   const results = scoreAll(answers);
   process.stdout.write(format(results));
+
+  const at = process.argv.indexOf("--record");
+  if (at !== -1) {
+    const target = process.argv[at + 1];
+    if (target === undefined) {
+      process.stderr.write("--record needs the path of a run record in docs/runs/\n");
+      process.exit(2);
+    }
+    recordInto(target, results);
+    process.stdout.write(`  recorded ${results.length} scores into ${target}\n\n`);
+  }
   // Wrong is a failure; not established is not the same failure.
   // The right code on other ground is not a clean result and does not exit 0.
   process.exit((results.some((r) => r.state === "wrong" || r.state === "correct-without-its-evidence"

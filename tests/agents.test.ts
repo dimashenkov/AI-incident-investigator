@@ -412,22 +412,29 @@ describe("every prompt carries the rules its schema will enforce", () => {
      * own — text that was never there cannot be found — which is why each has a
      * mutation that keeps the positive string and inserts the contradiction.
      * The mutation is what makes the assertion mean anything.
+     *
+     * The distance classes are `[^.]`, not `[^.\n]`. Codex, 2026-09-07: this
+     * file is wrapped Markdown, so every one of these rules could be broken by
+     * a sentence that simply crossed a line — the guard excluded newlines, and a
+     * line break is the one character certain to be there. Stopping at a full
+     * stop rather than at a line end is the better boundary anyway: a sentence
+     * carries the meaning, and it does not care where it wraps.
      */
     expect(kube, "nothing may downgrade the configuration half to optional or secondary")
-      .not.toMatch(/configuration[^.\n]{0,40}(is optional|are optional|can be omitted|may be omitted|is secondary|if you have room)/i);
+      .not.toMatch(/configuration[^.]{0,70}(is optional|are optional|can be omitted|may be omitted|is secondary|if you have room)/i);
     expect(kube, "and no sentence may say the second part is droppable in other words")
-      .not.toMatch(/(second|other) (half|part)[^.\n]{0,40}(can|may) be (omitted|skipped|left out)/i);
+      .not.toMatch(/(second|other) (half|part)[^.]{0,70}(can|may) be (omitted|skipped|left out)/i);
 
     // A quiet cluster is the case the configuration row exists FOR, so nothing
     // may route it to no_data — in the row, in prose, or in either order.
     expect(kube, "a healthy cluster must never be routed to no_data")
-      .not.toMatch(/(healthy|nothing wrong|looks? fine|quiet)[^.\n]{0,60}no_data|no_data[^.\n]{0,60}(healthy|nothing wrong|looks? fine)/i);
+      .not.toMatch(/(healthy|nothing wrong|looks? fine|quiet)[^.]{0,90}no_data|no_data[^.]{0,90}(healthy|nothing wrong|looks? fine)/i);
 
     // Matching a row must stay a reading act. An instruction to match it only
     // once the cause is known puts the row behind the rule that forbids naming
     // the cause, which is exactly how it was lost three runs out of three.
     expect(kube, "no row may be gated behind diagnosing first")
-      .not.toMatch(/only after[^.\n]{0,40}diagnos|once you (have )?diagnos/i);
+      .not.toMatch(/only after[^.]{0,70}diagnos|once you (have )?diagnos/i);
 
     // The hypothesis list is normally empty. Nothing may turn the code table
     // into an instruction to always choose from it.

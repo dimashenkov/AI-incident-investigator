@@ -512,6 +512,85 @@ export const MUTATIONS = [
     mustFail: "calls the right code correct and the wrong code wrong",
   },
   {
+    // The bar drawn in two characters instead of three: unestablished becomes
+    // empty, and empty reads as "not done yet" when the truth is "not asked".
+    id: "unestablished-drawn-as-empty-in-the-bar",
+    file: "scripts/readiness.mjs",
+    from: '  return "█".repeat(g + extraToGreen) + "▒".repeat(u + extraToUnknown) + "░".repeat(r + extraToRed);',
+    to: '  return "█".repeat(g + extraToGreen) + " ".repeat(u + extraToUnknown) + "░".repeat(r + extraToRed);',
+    mustFail: "draws unestablished as its own character, not as empty",
+  },
+  {
+    // A bar padded with green reports work nobody did.
+    id: "bar-remainder-padded-with-green",
+    file: "scripts/readiness.mjs",
+    from: "  const extraToGreen = s.unestablished === 0 && s.red === 0 ? pad : 0;",
+    to: "  const extraToGreen = pad;",
+    mustFail: "never pads the bar with green",
+  },
+  {
+    // The two directions a readiness percentage lies in, and both flatter.
+    // Rounding up puts 99% on a project with two checks open; counting only
+    // what is established drops the unestablished out of the denominator and
+    // turns "we have not asked yet" into "we are done".
+    id: "readiness-rounded-up-instead-of-down",
+    file: "scripts/readiness.mjs",
+    from: "  const pct = total === 0 ? 0 : Math.floor((g / total) * 100);",
+    to: "  const pct = total === 0 ? 0 : Math.ceil((g / total) * 100);",
+    mustFail: "rounds down, so the figure never reads higher than the checks support",
+  },
+  {
+    id: "readiness-counting-only-what-is-established",
+    file: "scripts/readiness.mjs",
+    from: "  const pct = total === 0 ? 0 : Math.floor((g / total) * 100);",
+    to: "  const pct = g + r === 0 ? 0 : Math.floor((g / (g + r)) * 100);",
+    mustFail: "does not count an unestablished check as green",
+  },
+  {
+    // Prose in a run record read as a score: the readiness figure would then
+    // rest on a sentence somebody wrote about their own run.
+    id: "run-record-prose-counted-as-a-score",
+    file: "scripts/readiness.mjs",
+    from: "    if (scored !== null && typeof scored === \"object\" && !Array.isArray(scored) && Object.keys(scored).length > 0) {",
+    to: "    if (scored !== undefined || rec?.outcome !== undefined) {",
+    mustFail: "skips a run record that carries no machine-readable scores",
+  },
+  {
+    // "I could not look" turned into "it failed", which is the third state
+    // collapsing into the second wherever this project stops watching.
+    id: "missing-gate-result-read-as-a-failure",
+    file: "scripts/readiness.mjs",
+    from: "    return [unknown(\"gate\", \"out/acceptance-gate.json is absent — the gate has not run here\")];",
+    to: "    return [red(\"gate\", \"out/acceptance-gate.json is absent\")];",
+    mustFail: "calls the gate unestablished when no gate result exists here",
+  },
+  {
+    // The qualification that travels with the figure, removed: the one line
+    // anybody reads stops admitting that two thirds of it is unanswered.
+    id: "readiness-figure-without-its-qualification",
+    file: "scripts/readiness.mjs",
+    from: "  if (s.waitingOnMoney > 0) parts.push(`${s.waitingOnMoney} wait on a paid run`);",
+    to: "  if (false) parts.push(`${s.waitingOnMoney} wait on a paid run`);",
+    mustFail: "says separately how much waits on money and how much on work",
+  },
+  {
+    // A dissent that is a flag rather than evidence, which is how anyone who
+    // knows the field name satisfies a requirement about weighing a conflict.
+    id: "dissent-satisfied-by-a-bare-flag",
+    file: "scripts/score-run.mjs",
+    from: "    const shaped = ev.filter((e) => typeof e?.source === \"string\" && e.source.length > 0\n      && typeof e?.fact === \"string\" && e.fact.length > 0);",
+    to: "    const shaped = ev;",
+    mustFail: "refuses a dissent that is a flag rather than evidence",
+  },
+  {
+    // A refusal that never looked, scored as a reasoned refusal.
+    id: "empty-handed-refusal-scored-as-reasoned",
+    file: "scripts/score-run.mjs",
+    from: "      if (shaped.length === 0) {\n        unqualified.push(\"it refused while stating no evidence at all, so nothing shows it saw the contradiction\");",
+    to: "      if (false) {\n        unqualified.push(\"it refused while stating no evidence at all, so nothing shows it saw the contradiction\");",
+    mustFail: "refuses a refusal that states no evidence at all",
+  },
+  {
     // The ceiling exists so a contradicted conclusion cannot be held at 0.9.
     // Dropped, the conflicting scenario scores exactly like the clean one and
     // Definition of Done item 3 goes back to being unmeasurable.
@@ -667,6 +746,18 @@ export const MUTATIONS = [
     mustFail: "asks each agent only for what its own slot can answer",
   },
   {
+    // Codex, 2026-09-07: the oldest negative assertion in that test — the one
+    // forbidding logs and metrics from being asked for configuration they were
+    // never given — had no mutation behind it at all, so it had been passing on
+    // nothing since the day it was written. This puts the impossible instruction
+    // back into the slot that cannot obey it.
+    id: "metrics-asked-for-a-limit-its-slot-does-not-carry",
+    file: "prompts/metrics-agent.md",
+    from: "it \u2014 it is the shape of what you were handed. Say what you saw.",
+    to: "it \u2014 it is the shape of what you were handed. Cite the limit it was\nmeasured against, then say what you saw.",
+    mustFail: "asks each agent only for what its own slot can answer",
+  },
+  {
     // Codex, 2026-09-07: the mutation above fails because the SLOGAN vanishes,
     // not because the meaning reverses. Keeping the slogan and appending the
     // demotion escapes it, and that escape is the whole defect the rewrite was
@@ -705,10 +796,19 @@ export const MUTATIONS = [
     mustFail: "asks each agent only for what its own slot can answer",
   },
   {
+    /*
+     * Codex, 2026-09-07: the first version of this replaced "rows are not
+     * exclusive", which a POSITIVE assertion also requires — so its failure
+     * proved the positive guard worked and said nothing about the negative one.
+     * A mutation that trips two guards measures the stronger of them. This one
+     * appends across a line break and deletes nothing, so only the negative
+     * assertion can catch it — and only because the class stops at a full stop
+     * rather than at a newline.
+     */
     id: "second-half-made-droppable-in-other-words",
     file: "prompts/kubernetes-agent.md",
     from: "Rows, plural — they are not exclusive, and more than one usually fires. Answer",
-    to: "Rows, plural — the second half can be omitted when short of room. Answer",
+    to: "Rows, plural — they are not exclusive, and more than one usually fires. The\nsecond half may be omitted when short of room. Answer",
     mustFail: "asks each agent only for what its own slot can answer",
   },
   {
