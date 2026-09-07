@@ -28,6 +28,7 @@ const CAUSE_CODES: string[] = [...commonSchema.$defs.causeCode.enum, "INSUFFICIE
 const expectedFor = (scenario: string) =>
   JSON.parse(readFileSync(`${ROOT}${scenario}/expected.json`, "utf8")) as {
     root_cause_code: string; note?: string; must_cite?: string[];
+    also_acceptable?: string[]; max_confidence?: number; requires_dissent?: boolean;
   };
 
 /** Follow a dotted/bracketed path like `pods[0].containers[0].limits.memory`. */
@@ -103,9 +104,36 @@ describe("every scenario's expected answer is one the system can give", () => {
     }
   });
 
-  it("gives each scenario with a cause a distinct one, so no two are the same test", () => {
-    const codes = scenarios.filter((s) => s !== "insufficient-evidence").map((s) => expectedFor(s).root_cause_code);
-    expect(new Set(codes).size).toBe(codes.length);
+  /*
+   * Two scenarios may share a cause code only when one of them is a HARDER
+   * version of the other — the pair Definition of Done item 3 needs, where the
+   * same cause is once clean and once contradicted, and the confidence must
+   * differ between them. Without that qualification, a repeated code really is
+   * the same test twice, and the second one measures nothing new.
+   *
+   * Widened from "all distinct" on 2026-09-07, when conflicting-evidence was
+   * added deliberately sharing CONTAINER_OOM with container-oom. The rule is
+   * not "duplicates are fine now": a duplicate must earn itself by carrying a
+   * ceiling or a dissent requirement that its twin does not.
+   */
+  it("lets two scenarios share a cause only when one of them is the harder case", () => {
+    const withCause = scenarios.filter((s) => s !== "insufficient-evidence");
+    expect(withCause.length, "nothing to compare; this would pass on an empty set").toBeGreaterThan(1);
+    const byCode = new Map<string, string[]>();
+    for (const s of withCause) {
+      const code = expectedFor(s).root_cause_code as string;
+      byCode.set(code, [...(byCode.get(code) ?? []), s]);
+    }
+    for (const [code, sharing] of byCode) {
+      if (sharing.length === 1) continue;
+      const qualified = sharing.filter((s) => {
+        const e = expectedFor(s);
+        return typeof e.max_confidence === "number" || e.requires_dissent === true;
+      });
+      expect(qualified.length,
+        `${sharing.join(" and ")} both expect ${code}; one must carry max_confidence or ` +
+        "requires_dissent, or the second is the first test run twice").toBe(sharing.length - 1);
+    }
   });
 });
 

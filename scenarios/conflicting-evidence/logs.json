@@ -1,0 +1,28 @@
+{
+  "collected_at": "2026-09-07T11:21:07Z",
+  "window": {
+    "from": "2026-09-07T11:10:00Z",
+    "to": "2026-09-07T11:21:00Z"
+  },
+  "truncated": false,
+  "lines": [
+    {
+      "ts": "2026-09-07T11:13:02Z",
+      "level": "info",
+      "container": "ledger-writer",
+      "message": "flush cycle complete, 1204 entries, heap 148Mi"
+    },
+    {
+      "ts": "2026-09-07T11:16:40Z",
+      "level": "info",
+      "container": "ledger-writer",
+      "message": "flush cycle complete, 1187 entries, heap 151Mi"
+    },
+    {
+      "ts": "2026-09-07T11:19:44Z",
+      "level": "info",
+      "container": "ledger-writer",
+      "message": "flush cycle complete, 1230 entries, heap 149Mi"
+    }
+  ]
+}

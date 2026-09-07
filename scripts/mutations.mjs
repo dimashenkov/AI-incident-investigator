@@ -507,9 +507,37 @@ export const MUTATIONS = [
     // reported as one of "three of five concluded".
     id: "any-conclusion-counted-as-the-right-one",
     file: "scripts/score-run.mjs",
-    from: "  if (got !== want.code) {",
-    to: "  if (false) {",
+    from: "  const acceptable = got === want.code || want.alsoAcceptable.includes(got);",
+    to: "  const acceptable = true;",
     mustFail: "calls the right code correct and the wrong code wrong",
+  },
+  {
+    // The ceiling exists so a contradicted conclusion cannot be held at 0.9.
+    // Dropped, the conflicting scenario scores exactly like the clean one and
+    // Definition of Done item 3 goes back to being unmeasurable.
+    id: "confidence-ceiling-that-cannot-fail-a-run",
+    file: "scripts/score-run.mjs",
+    from: "    } else if (c > want.maxConfidence) {",
+    to: "    } else if (false) {",
+    mustFail: "refuses the right code held too confidently, and says so in its own state",
+  },
+  {
+    // `null > 0.6` is false, so reading the confidence without checking that it
+    // IS a number lets an answer that states none satisfy the ceiling.
+    id: "missing-confidence-satisfying-the-ceiling",
+    file: "scripts/score-run.mjs",
+    from: "    if (typeof c !== \"number\" || !Number.isFinite(c)) {",
+    to: "    if (false) {",
+    mustFail: "does not let a missing confidence satisfy the ceiling",
+  },
+  {
+    // Absence read as a requirement of zero: every clean scenario would fail a
+    // ceiling it was never given, while looking like a stricter check.
+    id: "absent-ceiling-read-as-a-ceiling-of-zero",
+    file: "scripts/score-run.mjs",
+    from: "    const maxConfidence = typeof e.max_confidence === \"number\" && Number.isFinite(e.max_confidence)\n      ? e.max_confidence : null;",
+    to: "    const maxConfidence = Number(e.max_confidence) || 0;",
+    mustFail: "leaves a scenario without these fields exactly as it was",
   },
   {
     // A field that cannot fail the run is a comment.

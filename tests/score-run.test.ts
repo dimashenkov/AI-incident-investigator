@@ -28,6 +28,19 @@ const concluded = (code: string, cited: string[] = []) => ({
 
 const mustCiteOf = (scenario: string): string[] => expectedFor(scenario, SCENARIOS).mustCite;
 
+/**
+ * The same answer, plus the two things a conflicting scenario is scored on:
+ * how sure it says it is, and whether anything in its evidence argues back.
+ */
+const qualified = (code: string, cited: string[], confidence: unknown, against: number) => {
+  const a = concluded(code, cited) as Record<string, any>;
+  a.incident.analysis.confidence = confidence;
+  a.incident.analysis.evidence = Array.from({ length: against }, () => ({
+    source: "metrics", fact: "memory never approached the limit", supports: "against",
+  }));
+  return a;
+};
+
 describe("scoring a run against what the scenario is for", () => {
   it("knows what every scenario on disk expects", () => {
     // A scenario with no expected answer cannot be scored, and a run over it
@@ -118,5 +131,74 @@ describe("scoring a run against what the scenario is for", () => {
     const text = format(scoreAll({}, SCENARIOS));
     expect(text).toContain("Concluding and being right are different things");
     expect(text).toContain("not established");
+  });
+});
+
+/*
+ * Definition of Done item 3 says confidence falls when findings conflict. Until
+ * 2026-09-07 nothing could measure that: expected.json held only a code, and a
+ * field that cannot fail the run is a comment. These are the tests for the
+ * three qualifications that give it teeth — and for the two ways they could
+ * quietly grant a pass instead.
+ */
+describe("a scenario whose evidence conflicts is scored on more than its code", () => {
+  const S = "conflicting-evidence";
+  const cite = mustCiteOf(S);
+
+  it("takes either honest answer and refuses a third", () => {
+    // Naming the observed cause with the number lowered, or refusing outright.
+    expect(score(S, qualified("CONTAINER_OOM", cite, 0.5, 1), SCENARIOS).state).toBe("correct");
+    // A refusal is exempt from both qualifications, for one reason: they are
+    // asked of a conclusion, and a refusal is the absence of one. It still has
+    // to cite what it looked at.
+    expect(score(S, qualified("INSUFFICIENT_EVIDENCE", cite, 0.9, 0), SCENARIOS).state).toBe("correct");
+    expect(score(S, qualified("INSUFFICIENT_EVIDENCE", [], 0.9, 0), SCENARIOS).state)
+      .toBe("correct-without-its-evidence");
+    expect(score(S, qualified("CPU_THROTTLING", cite, 0.2, 1), SCENARIOS).state).toBe("wrong");
+  });
+
+  it("refuses the right code held too confidently, and says so in its own state", () => {
+    const r = score(S, qualified("CONTAINER_OOM", cite, 0.9, 1), SCENARIOS);
+    expect(r.state, "0.9 on contradicted evidence must not read as correct").toBe("correct-but-unqualified");
+    expect(r.why.join(" ")).toMatch(/above the ceiling/);
+  });
+
+  it("refuses a conclusion that never mentions what argues with it", () => {
+    const r = score(S, qualified("CONTAINER_OOM", cite, 0.4, 0), SCENARIOS);
+    expect(r.state).toBe("correct-but-unqualified");
+    expect(r.why.join(" ")).toMatch(/nothing was weighed/);
+  });
+
+  /*
+   * The defect this whole file exists to catch, in the one place it would have
+   * been invisible: `null > 0.6` is false in JavaScript, so an answer that
+   * states no confidence at all would have SATISFIED the ceiling. A missing
+   * number reading as a met requirement is the absence being taken for consent.
+   */
+  it("does not let a missing confidence satisfy the ceiling", () => {
+    for (const c of [null, undefined, "0.4", Number.NaN]) {
+      const r = score(S, qualified("CONTAINER_OOM", cite, c, 1), SCENARIOS);
+      expect(r.state, `confidence ${JSON.stringify(c)} must not pass as met`).toBe("correct-but-unqualified");
+      expect(r.why.join(" ")).toMatch(/states no confidence/);
+    }
+  });
+
+  /*
+   * The other direction: the qualifications must not leak onto scenarios that
+   * never asked for them, or every clean run turns red for lacking a ceiling
+   * it was never given. Absence means no requirement, not a requirement of zero.
+   */
+  it("leaves a scenario without these fields exactly as it was", () => {
+    const clean = mustCiteOf("container-oom");
+    expect(expectedFor("container-oom", SCENARIOS).maxConfidence,
+      "container-oom must carry no ceiling, or it is not the comparable case").toBe(null);
+    expect(score("container-oom", qualified("CONTAINER_OOM", clean, 0.95, 0), SCENARIOS).state).toBe("correct");
+    expect(score("container-oom", concluded("CONTAINER_OOM", clean), SCENARIOS).state).toBe("correct");
+  });
+
+  it("counts the new state separately in the report and does not exit clean", () => {
+    const text = format([score(S, qualified("CONTAINER_OOM", cite, 0.9, 1), SCENARIOS)]);
+    expect(text).toMatch(/UNQUALIFIED/);
+    expect(text).toMatch(/right code held wrongly/);
   });
 });

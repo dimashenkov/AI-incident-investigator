@@ -1,0 +1,13 @@
+{
+  "root_cause_code": "CONTAINER_OOM",
+  "also_acceptable": [
+    "INSUFFICIENT_EVIDENCE"
+  ],
+  "max_confidence": 0.6,
+  "requires_dissent": true,
+  "note": "What this scenario is FOR, and it is the only one that can close Definition of Done item 3. Two direct observations cannot both be the whole story: the container was OOMKilled against a 512Mi limit, and the memory series never leaves ~155Mi across the entire window, flat, with the logs reporting a heap around 150Mi right up to the kill. Something killed it that the slice does not show — a sibling process, a page cache spike between samples, a wrong metric. Nothing here resolves it. So two answers are honest and both are accepted: name the observed cause with the confidence LOWERED, or refuse. What is not honest is CONTAINER_OOM at high confidence, and that is what max_confidence refuses. requires_dissent asks for the contradiction to appear in the evidence with supports=against, because a conclusion that never mentions what argues with it has not weighed anything. The comparable scenario is container-oom: same cause, same fields, no contradiction — and its confidence must come back HIGHER, or the number moved for some reason other than the conflict.",
+  "must_cite": [
+    "pods[0].containers[0].last_state.terminated.reason",
+    "series[0].points[0].value"
+  ]
+}

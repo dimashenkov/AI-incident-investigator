@@ -1,0 +1,11 @@
+{
+  "id": "alert-5e93",
+  "title": "ledger-writer killed, cause unclear",
+  "triggered_at": "2026-09-07T11:20:00Z",
+  "severity": "critical",
+  "monitor_id": "mon-8815",
+  "tags": [
+    "service:ledger-writer",
+    "env:production"
+  ]
+}

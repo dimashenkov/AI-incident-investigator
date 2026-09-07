@@ -1,0 +1,47 @@
+{
+  "collected_at": "2026-09-07T11:21:09Z",
+  "window": {
+    "from": "2026-09-07T11:10:00Z",
+    "to": "2026-09-07T11:21:00Z"
+  },
+  "series": [
+    {
+      "name": "container_memory_working_set_bytes",
+      "unit": "bytes",
+      "container": "ledger-writer",
+      "points": [
+        {
+          "ts": "2026-09-07T11:12:00Z",
+          "value": 161480704
+        },
+        {
+          "ts": "2026-09-07T11:15:00Z",
+          "value": 158334976
+        },
+        {
+          "ts": "2026-09-07T11:18:00Z",
+          "value": 163577856
+        },
+        {
+          "ts": "2026-09-07T11:19:00Z",
+          "value": 160432128
+        }
+      ]
+    },
+    {
+      "name": "container_cpu_cfs_throttled_seconds_total",
+      "unit": "seconds",
+      "container": "ledger-writer",
+      "points": [
+        {
+          "ts": "2026-09-07T11:12:00Z",
+          "value": 0.0
+        },
+        {
+          "ts": "2026-09-07T11:18:00Z",
+          "value": 0.0
+        }
+      ]
+    }
+  ]
+}
