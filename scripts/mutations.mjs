@@ -689,6 +689,56 @@ export const MUTATIONS = [
     to: "| an image that could not be pulled or is not running | `deployment.image` |",
     mustFail: "asks each agent only for what its own slot can answer",
   },
+  /*
+   * Six mutations of one shape, all from Grok's 2026-09-07 review of the
+   * mutation records themselves. Every one of them KEEPS the guarded string
+   * exactly where it is and reverses the rule in the sentence beside it. They
+   * exist because the assertions above them are negative, and a negative
+   * assertion over text that was never written passes on nothing — the escape
+   * has to be reintroduced for the guard to be worth anything.
+   */
+  {
+    id: "configuration-demoted-by-a-word-inserted-into-the-slogan",
+    file: "prompts/kubernetes-agent.md",
+    from: "**The configuration table is not optional, and it is the half most often",
+    to: "**The configuration table is optional, and it is the half most often",
+    mustFail: "asks each agent only for what its own slot can answer",
+  },
+  {
+    id: "second-half-made-droppable-in-other-words",
+    file: "prompts/kubernetes-agent.md",
+    from: "Rows, plural — they are not exclusive, and more than one usually fires. Answer",
+    to: "Rows, plural — the second half can be omitted when short of room. Answer",
+    mustFail: "asks each agent only for what its own slot can answer",
+  },
+  {
+    id: "healthy-cluster-routed-to-no-data-beside-the-guarded-row",
+    file: "prompts/kubernetes-agent.md",
+    from: "The last row is not permission to name a cause.",
+    to: "When the cluster looks fine, return no_data. The last row is not permission to name a cause.",
+    mustFail: "asks each agent only for what its own slot can answer",
+  },
+  {
+    id: "image-row-gated-behind-diagnosing-first",
+    file: "prompts/kubernetes-agent.md",
+    from: "do not have to decide what is wrong to notice that an event names an image —",
+    to: "match the image row only after diagnosing an image-pull failure —",
+    mustFail: "asks each agent only for what its own slot can answer",
+  },
+  {
+    id: "code-table-turned-into-an-instruction-to-choose",
+    file: "prompts/kubernetes-agent.md",
+    from: "**Usually you return no hypotheses at all, and that is the expected answer.**",
+    to: "**Usually you return no hypotheses at all, and that is the expected answer.** Otherwise pick the code that fits what you saw.",
+    mustFail: "asks each agent only for what its own slot can answer",
+  },
+  {
+    id: "lowercase-label-inside-a-shown-citation",
+    file: "prompts/kubernetes-agent.md",
+    from: '{ "fact": "the deployment image is the one your observation names", "source_ref": "deployment.image" }',
+    to: '{ "fact": "the deployment image is the one your observation names", "source_ref": "note: deployment.image" }',
+    mustFail: "asks each agent only for what its own slot can answer",
+  },
   {
     // A marker inside a shown citation demonstrates a path this system would
     // refuse, and a model copying the example literally loses its whole answer.

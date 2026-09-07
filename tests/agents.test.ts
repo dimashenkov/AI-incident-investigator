@@ -398,8 +398,63 @@ describe("every prompt carries the rules its schema will enforce", () => {
      * assertion that catches it. It is deliberately negative and would pass
      * vacuously on its own; the mutation is what makes it mean something.
      */
+    /*
+     * Grok, 2026-09-07, reviewing the mutation records rather than the prompt,
+     * and finding the class this whole block belongs to: nearly every mutation
+     * here fails because a STRING VANISHES, not because the meaning reverses.
+     * It wrote out the escape for eight of them — edits that keep every guarded
+     * string exactly where it is and destroy the rule in the sentence next to
+     * it. The one above was its own example: it forbids "configuration is
+     * optional" and does not match "configuration TABLE is optional".
+     *
+     * So each rule below is guarded twice: the sentence must be present, and
+     * its contradiction must be absent. The negative halves would pass on their
+     * own — text that was never there cannot be found — which is why each has a
+     * mutation that keeps the positive string and inserts the contradiction.
+     * The mutation is what makes the assertion mean anything.
+     */
     expect(kube, "nothing may downgrade the configuration half to optional or secondary")
-      .not.toMatch(/configuration is optional|configuration is secondary|configuration, if you have room/i);
+      .not.toMatch(/configuration[^.\n]{0,40}(is optional|are optional|can be omitted|may be omitted|is secondary|if you have room)/i);
+    expect(kube, "and no sentence may say the second part is droppable in other words")
+      .not.toMatch(/(second|other) (half|part)[^.\n]{0,40}(can|may) be (omitted|skipped|left out)/i);
+
+    // A quiet cluster is the case the configuration row exists FOR, so nothing
+    // may route it to no_data — in the row, in prose, or in either order.
+    expect(kube, "a healthy cluster must never be routed to no_data")
+      .not.toMatch(/(healthy|nothing wrong|looks? fine|quiet)[^.\n]{0,60}no_data|no_data[^.\n]{0,60}(healthy|nothing wrong|looks? fine)/i);
+
+    // Matching a row must stay a reading act. An instruction to match it only
+    // once the cause is known puts the row behind the rule that forbids naming
+    // the cause, which is exactly how it was lost three runs out of three.
+    expect(kube, "no row may be gated behind diagnosing first")
+      .not.toMatch(/only after[^.\n]{0,40}diagnos|once you (have )?diagnos/i);
+
+    // The hypothesis list is normally empty. Nothing may turn the code table
+    // into an instruction to always choose from it.
+    expect(kube, "the code list must not become an instruction to pick one")
+      .not.toMatch(/invent a code|pick the code that fits|choose the code that best/i);
+
+    /*
+     * A source_ref is a path. Grok showed the old check `"source_ref": "[A-Z-]+ `
+     * was uppercase-only, so a lowercase label — "note: events[0].message" —
+     * walked straight through it. A path in this system has no spaces and no
+     * colons, so that is the rule, and it is about the shape rather than about
+     * which words somebody thought to forbid.
+     */
+    const shownRefs = [...kube.matchAll(/"source_ref":\s*"([^"]*)"/g)].map((m) => m[1]);
+    expect(shownRefs.length, "no source_ref is shown at all; this would pass on an empty set")
+      .toBeGreaterThan(0);
+    for (const ref of shownRefs) {
+      expect(ref, "a shown source_ref must be a bare path, with no label in it")
+        .not.toMatch(/[ :]/);
+    }
+
+    // Two sentences the whole file rests on, and neither was asserted by
+    // anything until Grok looked for what nothing covered.
+    expect(kube, "the instruction not to diagnose must be present, not implied")
+      .toMatch(/\*\*Do not diagnose the incident\.\*\*/);
+    expect(kube, "and configuration must be reported without being ranked")
+      .toMatch(/\*\*Report configuration; do not rank it\.\*\*/);
 
     /*
      * Grok, 2026-09-07, from the other angle and reaching the same place: the
