@@ -21,7 +21,17 @@ import { listScenarios, newCollectionRequest, readSlot, readScenario, toObservat
  * Reading without a request returns the raw fixture, which is how the schema
  * comes to refuse it — the stamp is applied by the collection, not by the file.
  */
-const REQUEST = newCollectionRequest("INC-2026-0101", "prod-eu", "production", "aaaaaaaa-0000-4000-8000-000000000000");
+/*
+ * The SAME incident id BASE_INCIDENT carries.
+ *
+ * It was INC-2026-0101 against a base of INC-2026-0001, and the test below
+ * asserted the result was valid — observations gathered for one incident,
+ * placed into another, and called well formed. Nothing objected until the
+ * provenance rule moved into invariants.ts on 2026-09-07, because
+ * common.schema.json states the rule in prose ("An observation asked for
+ * elsewhere is not this incident's") and nothing enforced it after collection.
+ */
+const REQUEST = newCollectionRequest("INC-2026-0001", "prod-eu", "production", "aaaaaaaa-0000-4000-8000-000000000000");
 
 const ROOT = new URL("../scenarios/", import.meta.url).pathname;
 

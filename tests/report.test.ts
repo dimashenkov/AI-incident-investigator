@@ -140,7 +140,10 @@ describe("the thread says what happened, and only that", () => {
     // "datadog: the alert that opened this incident" whenever nothing had been
     // found. Satisfying a schema by lying is the hole the schema exists to close.
     const bare = incidentWith({ agent: "logs", status: "no_data", findings: [], hypotheses: [], confidence: 0 });
-    const withRc = recordAgentResult(bare, { agent: "root_cause", status: "ok", findings: [], hypotheses: [], confidence: 0.1 });
+    // Confidence 0, not 0.1: with no findings and no hypotheses there is
+    // nothing for a tenth of certainty to be about, and since 2026-09-07 the
+    // schema says so — an ok result carrying no findings may not claim any.
+    const withRc = recordAgentResult(bare, { agent: "root_cause", status: "ok", findings: [], hypotheses: [], confidence: 0 });
     if (withRc.state !== "recorded") throw new Error(withRc.reason);
     const done = concludeIncident(withRc.incident);
     if (done.state !== "concluded") throw new Error(done.reason);

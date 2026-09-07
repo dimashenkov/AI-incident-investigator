@@ -781,6 +781,66 @@ export const MUTATIONS = [
     to: "    if (false) {",
     mustFail: "refuses a gate result that carries no time at all",
   },
+  /*
+   * Six schema holes, all measured through the real validator by a subagent on
+   * 2026-09-07 rather than read out of the files. Each mutation puts the hole
+   * back; each names the probe that must then fail.
+   */
+  {
+    // "At least one agent must have run" counted an agent whose status is
+    // error, which the agent-result schema defines as could not run.
+    id: "diagnosis-resting-on-an-agent-that-could-not-run",
+    file: "schemas/incident.schema.json",
+    from: '                "contains": {\n                  "type": "object",\n                  "properties": {\n                    "status": {\n                      "not": {\n                        "const": "error"\n                      }\n                    }\n                  },\n                  "required": [\n                    "status"\n                  ]\n                },\n',
+    to: "",
+    mustFail: "12 diagnosed on an agent that could not run",
+  },
+  {
+    // Only diagnosed and insufficient_evidence had conditional rules, so a
+    // failed incident could carry a confident named cause.
+    id: "failed-incident-carrying-a-confident-cause",
+    file: "schemas/incident.schema.json",
+    from: '            "enum": [\n              "failed",\n              "investigating"\n            ]',
+    to: '            "enum": [\n              "no-such-status"\n            ]',
+    mustFail: "13 failed while carrying a confident cause",
+  },
+  {
+    // The error-text rule was written for `ok` alone, so no_data could carry
+    // "connection refused" — could-not-check turned into checked-and-clean.
+    id: "no-data-allowed-to-carry-an-error-text",
+    file: "schemas/agent-result.schema.json",
+    from: '            "enum": [\n              "ok",\n              "no_data"\n            ]',
+    to: '            "const": "ok"',
+    mustFail: "15 no_data carrying an error text",
+  },
+  {
+    // An ok result with no findings claiming certainty: the definition of
+    // no_data, taken through the door that has no confidence rule.
+    id: "empty-ok-result-allowed-to-claim-confidence",
+    file: "schemas/agent-result.schema.json",
+    from: '      "then": {\n        "type": "object",\n        "properties": {\n          "confidence": {\n            "const": 0\n          }\n        }\n      }\n    }\n  ]',
+    to: '      "then": {\n        "type": "object"\n      }\n    }\n  ]',
+    mustFail: "16 ok with nothing found and confidence anyway",
+  },
+  {
+    // Each list checked alone, so one fact could support a hypothesis and
+    // contradict it at once — and merge.ts counts it twice, both ways.
+    id: "one-citation-both-supporting-and-contradicting",
+    file: "src/schema/invariants.ts",
+    from: "          const both = forRefs.filter((r) => typeof r === \"string\" && againstRefs.includes(r));",
+    to: "          const both = [];",
+    mustFail: "17 one citation both supporting and contradicting",
+  },
+  {
+    // Provenance stated in prose by common.schema.json and enforced only at
+    // collection time, so an assembled incident could hold three slots gathered
+    // under three different requests for two other incidents.
+    id: "provenance-not-checked-after-collection",
+    file: "src/schema/invariants.ts",
+    from: "        if (typeof requested === \"string\" && typeof incidentId === \"string\" && requested !== incidentId) {",
+    to: "        if (false) {",
+    mustFail: "18 slots gathered for another incident",
+  },
   {
     // The deployed node running the schemas and nothing else, so "valid" means
     // one thing in a unit test and another in production — which is exactly the

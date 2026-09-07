@@ -557,7 +557,17 @@ describe("the mutation machinery, which is what makes 'every fix has a test' che
      * verdict was right by alphabet. The rename closed it; a Set could not have
      * seen it, which is why this now counts.
      */
-    const titles = [...suite.matchAll(/\bit\(\s*(["'`])((?:\\.|(?!\1).)*)\1/g)].map((m) => m[2]!);
+    /*
+     * `probe(...)` counts too. It is a two-line wrapper in
+     * tests/scenarios/absence.test.ts whose whole body is `it(n, ...)`, so a
+     * probe IS a statically named test — its title reaches the vitest report
+     * exactly as written, which is what namedTestFailed looks it up by. The
+     * matcher below only knew the literal `it(` spelling, so on 2026-09-07 six
+     * mutations naming real, running probes were reported as naming tests that
+     * do not exist. A matcher that misses a declaration form is a matcher that
+     * refuses correct work.
+     */
+    const titles = [...suite.matchAll(/\b(?:it|probe)\(\s*(["'`])((?:\\.|(?!\1).)*)\1/g)].map((m) => m[2]!);
     expect(titles.length, "no it() declarations were found; the matcher is broken").toBeGreaterThan(20);
     for (const m of MUTATIONS as Array<{ id: string; mustFail: string }>) {
       const times = titles.filter((t) => t === m.mustFail).length;
@@ -578,7 +588,7 @@ describe("the mutation machinery, which is what makes 'every fix has a test' che
   it("declares no test title twice across the suite", () => {
     const suite = collectTests(new URL("./", import.meta.url).pathname)
       .map((f: string) => readFileSync(f, "utf8")).join("\n");
-    const titles = [...suite.matchAll(/\bit\(\s*(["'`])((?:\\.|(?!\1).)*)\1/g)].map((m) => m[2]!);
+    const titles = [...suite.matchAll(/\b(?:it|probe)\(\s*(["'`])((?:\\.|(?!\1).)*)\1/g)].map((m) => m[2]!);
     expect(titles.length, "no titles found; this would pass on an empty set").toBeGreaterThan(100);
     const seen = new Map<string, number>();
     for (const t of titles) seen.set(t, (seen.get(t) ?? 0) + 1);

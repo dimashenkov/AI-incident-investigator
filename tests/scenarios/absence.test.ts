@@ -97,6 +97,50 @@ describe("absence is not consent — cases that used to pass", () => {
   probe("10 agent message with no citation", "conversation", { ...CONV, messages: [{ role: "agent", text: "OOM", ts: "2026-01-01T00:00:00Z", incident_id: "INC-2026-0001" }] });
   probe("11 status ok carrying an error", "agent-result", { ...AGENT, error: "boom" });
 
+  /*
+   * Found on 2026-09-07 by a subagent that constructed objects and ran them
+   * through the real validator rather than reading the schemas. Every one of
+   * these was VALID.
+   */
+  probe("12 diagnosed on an agent that could not run", "incident",
+    { ...INC, status: "diagnosed", analysis: { agents: [{ agent: "kubernetes", status: "error",
+        error: "cluster unreachable", findings: [], hypotheses: [], confidence: 0 }],
+      root_cause_code: "CONTAINER_OOM", root_cause: "the container ran out of memory", confidence: 0.9,
+      evidence: [{ source: "kubernetes", fact: "OOMKilled", supports: "for" }] } },
+    "/analysis/agents");
+  probe("13 failed while carrying a confident cause", "incident",
+    { ...INC, status: "failed", analysis: { agents: [], root_cause_code: "CONTAINER_OOM",
+      root_cause: "r", confidence: 1, evidence: [{ source: "kubernetes", fact: "f", supports: "for" }] } },
+    "/analysis/root_cause_code");
+  probe("14 investigating while carrying a cause", "incident",
+    { ...INC, analysis: { agents: [], root_cause_code: "CONTAINER_OOM", root_cause: "r",
+      confidence: 0.8, evidence: [{ source: "kubernetes", fact: "f", supports: "for" }] } },
+    "/analysis/root_cause_code");
+  probe("15 no_data carrying an error text", "agent-result",
+    { agent: "logs", status: "no_data", error: "connection refused", findings: [], hypotheses: [], confidence: 0 },
+    "must NOT be valid");
+  probe("16 ok with nothing found and confidence anyway", "agent-result",
+    { agent: "logs", status: "ok", findings: [], hypotheses: [], confidence: 1 },
+    "/confidence");
+  probe("17 one citation both supporting and contradicting", "agent-result",
+    { agent: "metrics", status: "ok",
+      findings: [{ fact: "cpu 100%", source_ref: "series[0].points[3].value" }],
+      hypotheses: [{ code: "CPU_THROTTLING", statement: "throttled",
+        supported_by: ["series[0].points[3].value"],
+        contradicted_by: ["series[0].points[3].value"] }], confidence: 0.8 },
+    "both supporting and contradicting");
+  probe("18 slots gathered for another incident", "incident",
+    { ...INC,
+      observations: { logs: null, metrics: null,
+        kubernetes: { provenance: { collection_id: "11111111-0000-4000-8000-000000000000",
+            requested_for: "INC-2026-9999", cluster: "prod-eu", namespace: "production",
+            provider: "fake-kubernetes" },
+          collected_at: "2026-09-04T10:31:00Z", pods: [], events: [],
+          deployment: { name: "d", namespace: "production", image: "i",
+            replicas: { desired: 1, ready: 1, available: 1 } } } },
+      collection: { kubernetes: { state: "collected" }, logs: { state: "nothing" }, metrics: { state: "nothing" } } },
+    "but this incident is INC-2026-0001");
+
   // Codex, chunk 0 round 4: the empty-target test used one action type, so two
   // state-changing actions validated while naming nothing they would change.
   // A rule about a category is tested over the whole category, never one member.

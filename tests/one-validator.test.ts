@@ -67,6 +67,21 @@ const CASES: Array<[string, string, () => unknown]> = [
     hypotheses: [{ code: "CONTAINER_OOM", statement: "s", supported_by: ["events[9].message"] }],
     confidence: 0.7,
   })],
+  ["three slots gathered under three different requests", "incident", () => {
+    const i = base();
+    const stamp = (cid: string, forInc: string) => ({
+      collection_id: cid, requested_for: forInc, cluster: "prod-eu",
+      namespace: "production", provider: "fake-kubernetes",
+    });
+    (i.observations as Record<string, unknown>).kubernetes = {
+      provenance: stamp("11111111-0000-4000-8000-000000000000", "INC-2026-9999"),
+      collected_at: "2026-09-04T10:31:00Z", pods: [], events: [],
+      deployment: { name: "d", namespace: "production", image: "i",
+        replicas: { desired: 1, ready: 1, available: 1 } },
+    };
+    i.collection.kubernetes = { state: "collected" } as never;
+    return i;
+  }],
   ["a clean agent result", "agent-result", () => ({
     agent: "kubernetes", status: "ok",
     findings: [{ fact: "f", source_ref: "pods[0].phase" }],

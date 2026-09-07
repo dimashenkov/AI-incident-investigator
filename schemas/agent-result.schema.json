@@ -200,12 +200,15 @@
       }
     },
     {
-      "description": "status ok must not carry an error text. Otherwise a failed agent reports findings and an error at once, and readers pick whichever they prefer.",
+      "description": "Only a status that FAILED may carry an error text. The rule was written for ok alone, so no_data with \"connection refused\" validated — the exact merge this schema's own comment calls forbidden: could-not-check turned into checked-and-clean. Found by a subagent on 2026-09-07.",
       "if": {
         "type": "object",
         "properties": {
           "status": {
-            "const": "ok"
+            "enum": [
+              "ok",
+              "no_data"
+            ]
           }
         },
         "required": [
@@ -218,6 +221,32 @@
           "required": [
             "error"
           ]
+        }
+      }
+    },
+    {
+      "description": "An ok result with no findings may not claim confidence. With zero findings, ok is the literal definition of no_data — and going through ok skipped no_data's confidence: 0, so an agent that found nothing could report certainty. The rule is the CONFIDENCE and not the findings, because the root cause agent legitimately answers ok with no findings of its own: it reads the other agents' results and may reach no conclusion. Forbidding that outright, which the first version did on 2026-09-07, refused the honest empty answer.",
+      "if": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "const": "ok"
+          },
+          "findings": {
+            "type": "array",
+            "maxItems": 0
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "confidence": {
+            "const": 0
+          }
         }
       }
     }

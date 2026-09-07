@@ -144,7 +144,81 @@ export function invariantErrors(name: InvariantSchemaName, data: unknown): strin
             }
           }
         }
+        /*
+         * And not the SAME reference in both lists.
+         *
+         * Each rule above reads its own list, and nothing looked at the
+         * intersection — so one fact could support a hypothesis and contradict
+         * it at once, and the confidence scoring in merge.ts reads both lists
+         * and counts that fact twice, in opposite directions. Found by a
+         * subagent on 2026-09-07, measured through the real validator.
+         */
+        const forRefs = (h as Record<string, unknown>)["supported_by"];
+        const againstRefs = (h as Record<string, unknown>)["contradicted_by"];
+        if (Array.isArray(forRefs) && Array.isArray(againstRefs)) {
+          const both = forRefs.filter((r) => typeof r === "string" && againstRefs.includes(r));
+          for (const ref of both) {
+            errs.push(`/hypotheses/${i} cites ${String(ref)} as both supporting and contradicting it, `
+              + "which is not two pieces of evidence");
+          }
+        }
       });
+    }
+  }
+
+  /*
+   * Every slot of one incident must have been gathered under ONE request.
+   *
+   * common.schema.json says exactly that about provenance — "An observation
+   * asked for elsewhere is not this incident's" — and nothing checked it here.
+   * The only check was checkProvenance in assemble.ts, against the request
+   * being issued, at collection time. A subagent built an incident on
+   * 2026-09-07 whose three slots carried three different collection_ids and two
+   * foreign incident ids, and validate() called it valid; merge.ts re-validates
+   * the whole incident after every merge and nothing there asked again.
+   */
+  if (name === "incident") {
+    const observations = obj["observations"];
+    if (typeof observations === "object" && observations !== null) {
+      const seen = new Map<string, string[]>();
+      for (const [slot, ob] of Object.entries(observations as Record<string, unknown>)) {
+        if (typeof ob !== "object" || ob === null) continue;
+        const prov = (ob as Record<string, unknown>)["provenance"];
+        if (typeof prov !== "object" || prov === null) continue;
+        const p = prov as Record<string, unknown>;
+        const requested = p["requested_for"];
+        const incidentId = obj["incident_id"];
+        if (typeof requested === "string" && typeof incidentId === "string" && requested !== incidentId) {
+          errs.push(`/observations/${slot}/provenance/requested_for is ${requested}, `
+            + `but this incident is ${incidentId}`);
+        }
+        for (const field of ["collection_id", "cluster", "namespace"]) {
+          const v = p[field];
+          if (typeof v !== "string") continue;
+          const key = `${field}:${v}`;
+          const already = seen.get(field);
+          if (already === undefined) seen.set(field, [slot, v]);
+          else if (already[1] !== v) {
+            errs.push(`/observations/${slot}/provenance/${field} is ${v}, `
+              + `but ${already[0]} was gathered with ${already[1]}`);
+          }
+          void key;
+        }
+      }
+      // And the incident's own cluster and namespace are what was asked for.
+      for (const [slot, ob] of Object.entries(observations as Record<string, unknown>)) {
+        if (typeof ob !== "object" || ob === null) continue;
+        const prov = (ob as Record<string, unknown>)["provenance"];
+        if (typeof prov !== "object" || prov === null) continue;
+        for (const field of ["cluster", "namespace"] as const) {
+          const got = (prov as Record<string, unknown>)[field];
+          const want = obj[field];
+          if (typeof got === "string" && typeof want === "string" && got !== want) {
+            errs.push(`/observations/${slot}/provenance/${field} is ${got}, `
+              + `but this incident is about ${want}`);
+          }
+        }
+      }
     }
   }
 

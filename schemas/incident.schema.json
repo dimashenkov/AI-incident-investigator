@@ -548,7 +548,20 @@
               "agents": {
                 "type": "array",
                 "minItems": 1,
-                "description": "A diagnosis with no agent behind it validated: zero agents, evidence from nowhere, and a root cause. At least one agent must have run."
+                "contains": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "not": {
+                        "const": "error"
+                      }
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                },
+                "description": "At least one agent must have RUN. minItems alone counted an agent whose status is error — which the agent-result schema defines as could not run — so a diagnosis could rest on one failed attempt and nothing else. Found by a subagent on 2026-09-07, measured through the real validator."
               }
             },
             "type": "object"
@@ -585,6 +598,40 @@
           }
         },
         "type": "object"
+      }
+    },
+    {
+      "description": "A failed or closed incident may not carry a live diagnosis. Only diagnosed and insufficient_evidence had conditional rules, so status failed with a named cause at confidence 1 and zero agents validated — a reader sees a confident answer on an incident that says it failed.",
+      "if": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "enum": [
+              "failed",
+              "investigating"
+            ]
+          }
+        }
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "analysis": {
+            "type": "object",
+            "properties": {
+              "root_cause_code": {
+                "type": "null",
+                "description": "An incident that has not concluded has no cause. failed means the chain broke; investigating means it has not finished."
+              },
+              "confidence": {
+                "type": "null"
+              }
+            }
+          }
+        }
       }
     }
   ]
