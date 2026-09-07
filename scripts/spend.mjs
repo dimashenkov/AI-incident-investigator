@@ -70,18 +70,55 @@ export function costOfRun(run) {
   };
 }
 
-export function readRuns(dir = RUNS) {
+/**
+ * Every run record under `dir`, INCLUDING subdirectories.
+ *
+ * The first version read one level. A subagent asked one question about this
+ * file on 2026-09-07 and priced the gap: a record filed one directory down
+ * carrying 500k input tokens was not "could not establish", it was INVISIBLE —
+ * so `unknown` stayed zero, the floor qualification never printed, and the one
+ * figure every report ends with came back $0.0002 with $0.195 sitting one level
+ * away. The glob that reads a single level is in this project's own list of
+ * defects; it was here.
+ *
+ * Depth is bounded so a symlink loop cannot hang the counter, and a directory
+ * that cannot be listed is reported as unreadable rather than skipped.
+ */
+export function readRuns(dir = RUNS, depth = 6) {
   if (!existsSync(dir)) return { runs: [], unreadable: [`no ${dir}`] };
   const runs = [];
   const unreadable = [];
-  for (const name of readdirSync(dir).filter((f) => f.endsWith(".json")).sort()) {
+  const walk = (at, rel, left) => {
+    let entries;
     try {
-      runs.push({ name, run: JSON.parse(readFileSync(join(dir, name), "utf8")) });
+      entries = readdirSync(at, { withFileTypes: true });
     } catch (e) {
-      // A run that cannot be read is not a run that cost nothing.
-      unreadable.push(`${name}: ${e instanceof Error ? e.message : String(e)}`);
+      unreadable.push(`${rel || "."}: ${e instanceof Error ? e.message : String(e)}`);
+      return;
     }
-  }
+    for (const e of entries.sort((a, b) => (a.name < b.name ? -1 : 1))) {
+      const name = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) {
+        if (left <= 0) {
+          // Not skipped silently: a directory too deep to walk is unestablished
+          // cost, and unestablished cost is what the floor qualification is for.
+          unreadable.push(`${name}: nested deeper than this counter walks`);
+          continue;
+        }
+        walk(join(at, e.name), name, left - 1);
+        continue;
+      }
+      if (!e.name.endsWith(".json")) continue;
+      try {
+        runs.push({ name, run: JSON.parse(readFileSync(join(at, e.name), "utf8")) });
+      } catch (err) {
+        // A run that cannot be read is not a run that cost nothing.
+        unreadable.push(`${name}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  };
+  walk(dir, "", depth);
+  runs.sort((a, b) => (a.name < b.name ? -1 : 1));
   return { runs, unreadable };
 }
 

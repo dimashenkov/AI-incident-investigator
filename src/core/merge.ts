@@ -46,8 +46,32 @@ export function recordAgentResult(
   validate: Validate,
   incident: Record<string, unknown>,
   result: unknown,
+  /*
+   * WHO WAS ASKED, when the caller knows — and the deployed chain always does.
+   *
+   * Until 2026-09-07 the identity came only from the model's own reply, and the
+   * node that had just asked the logs agent did not pass what it asked. A
+   * subagent ran it end to end: a logs answer labelled `"agent": "kubernetes"`,
+   * citing a path that resolves in the kubernetes slot, was recorded, and the
+   * chain concluded CONTAINER_OOM at 85% with TWO kubernetes entries and no
+   * logs analysis at all. Conclude only counts root_cause results, so nothing
+   * downstream noticed. A failure recorded as a successful step.
+   *
+   * Optional, because the tests that build an incident by hand legitimately do
+   * not know — but a caller that knows and stays silent is the hole.
+   */
+  expected?: string,
 ): { state: "recorded"; incident: Record<string, unknown>; normalised: number }
   | { state: "refused"; reason: string; errors?: string[] } {
+  if (expected !== undefined) {
+    const said = typeof result === "object" && result !== null
+      ? (result as Record<string, unknown>)["agent"] : undefined;
+    if (said !== expected) {
+      return { state: "refused",
+        reason: `${expected} was asked and the answer says it is from ${JSON.stringify(said)}` };
+    }
+  }
+
   // The incident is checked first, so a pre-existing problem is not reported as
   // something the reply did.
   const before = validate("incident", incident);
@@ -166,12 +190,50 @@ export function resultBelongsHere(
   const agent = result["agent"];
   if (typeof agent !== "string") return "the result names no agent";
 
-  // The root cause agent reads the other agents' results, not an observation,
-  // so there is no slot to resolve its citations against here.
+  /*
+   * The root cause agent reads the other agents' results rather than an
+   * observation — which is not the same as having nothing to check against.
+   *
+   * Until 2026-09-07 this returned early and its citations were checked by
+   * NOTHING. A subagent reading for one defect class showed what that buys: a
+   * root cause result citing `series[0].points[3].value` on an incident whose
+   * metrics slot is null was recorded, concluded, promoted into
+   * `analysis.evidence` — and then scored CORRECT, because must_cite pools
+   * source_refs from every agent including this one. The agent that invents a
+   * path satisfies the requirement to cite it.
+   *
+   * What it may cite is exactly what the specialists already reported. That is
+   * what "reads the other agents' results" means, and it is checkable here.
+   */
   if (agent === "root_cause") {
     const agents = (incident["analysis"] as Record<string, unknown> | undefined)?.["agents"];
     if (!Array.isArray(agents) || agents.length === 0) {
       return "a root cause result cannot be recorded before any agent has reported";
+    }
+    const already = new Set<string>();
+    for (const a of agents) {
+      const fs = typeof a === "object" && a !== null ? (a as Record<string, unknown>)["findings"] : undefined;
+      if (!Array.isArray(fs)) continue;
+      for (const f of fs) {
+        const r = typeof f === "object" && f !== null ? (f as Record<string, unknown>)["source_ref"] : undefined;
+        if (typeof r === "string") already.add(r);
+      }
+    }
+    /*
+     * No guard on `already` being empty. A verdict that cites NOTHING is a real
+     * answer — it is what INSUFFICIENT_EVIDENCE looks like when the specialists
+     * found nothing to cite — and refusing it would turn "there was nothing to
+     * point at" into a broken chain. The rule is per citation: whatever it does
+     * cite must be something an agent reported.
+     */
+    const findings = result["findings"];
+    if (!Array.isArray(findings)) return "the result carries no findings list";
+    for (const f of findings) {
+      const ref = typeof f === "object" && f !== null ? (f as Record<string, unknown>)["source_ref"] : undefined;
+      if (typeof ref !== "string") return "a finding carries no source_ref";
+      if (!already.has(ref)) {
+        return `a root cause finding cites ${ref}, which no agent reported`;
+      }
     }
     return null;
   }

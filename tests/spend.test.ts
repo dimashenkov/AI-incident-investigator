@@ -6,7 +6,7 @@
  * and by quietly dropping a run it could not price. Both are tested here.
  */
 import { describe, it, expect } from "vitest";
-import { readdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { readdirSync, mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 // @ts-expect-error - plain .mjs script, no types
@@ -102,6 +102,33 @@ describe("the spend counter reads artifacts, not memory", () => {
     expect(r.unknown, "the unreadable file must reach the count").toBeGreaterThan(0);
     expect(r.text, "and the total printed beside it must say it is a floor").toContain("is a floor");
     expect(r.text).toContain("UNREADABLE");
+  });
+
+  /*
+   * A run record filed one directory down used to be INVISIBLE, not
+   * unestablished — so the shortfall did not reach `unknown` and the single
+   * figure printed without its floor qualification. A subagent priced it on
+   * 2026-09-07: $0.195 sitting one level away while the line read $0.0002.
+   *
+   * `glob("results/*.json")` is in this project's own list of ways absence gets
+   * read as consent. It was in the spend counter.
+   */
+  it("counts a run record filed in a subdirectory", () => {
+    const dir = mkdtempSync(join(tmpdir(), "spend-nested-"));
+    writeFileSync(join(dir, "top.json"), JSON.stringify({
+      when: "2026-01-01", model: "gpt-4o-mini-2024-07-18",
+      totals: { input_tokens: 1000, output_tokens: 100 },
+    }));
+    mkdirSync(join(dir, "deeper"));
+    writeFileSync(join(dir, "deeper", "nested.json"), JSON.stringify({
+      when: "2026-01-02", model: "gpt-4o-mini-2024-07-18",
+      totals: { input_tokens: 500000, output_tokens: 200000 },
+    }));
+    const r = report(dir);
+    expect(r.total, "the nested record must be in the total, not missing from it")
+      .toBeGreaterThan(0.1);
+    expect(r.text, "and it must be named in the breakdown").toContain("deeper/nested.json");
+    expect(r.unknown, "nothing here is unreadable, so the total is not a floor").toBe(0);
   });
 
   it("refuses a token count that is not a whole non-negative number", () => {

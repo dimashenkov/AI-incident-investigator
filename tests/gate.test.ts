@@ -13,6 +13,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, writeFileSync, mkdtempSync, existsSync, symlinkSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 
 /**
@@ -38,7 +39,7 @@ function collectTests(dir: string): string[] {
 }
 // Plain .mjs — the same file node runs in production, so there are no types.
 // @ts-expect-error
-import { runGate, format, restoreInterruptedMutation, CHECKS, CHILD_MARKER, LIMITATIONS, DEBT, SECRET_SHAPED, readFreshReport, interpretVitestReport, interpretScripts, findSecretShaped, parsePorcelainZ, readCurrentChunk, namedTestFailed } from "../scripts/acceptance-gate.mjs";
+import { runGate, format, restoreInterruptedMutation, CHECKS, CHILD_MARKER, LIMITATIONS, DEBT, SECRET_SHAPED, readFreshReport, interpretVitestReport, interpretScripts, findSecretShaped, parsePorcelainZ, readCurrentChunk, namedTestFailed, coverageGaps, someRunWasScored, withRepair} from "../scripts/acceptance-gate.mjs";
 // @ts-expect-error
 import { MUTATIONS } from "../scripts/mutations.mjs";
 
@@ -300,6 +301,51 @@ describe("secret-shaped files, tracked or not", () => {
     expect(hits).toEqual([".env", "config/prod.pem", "keys/id_ed25519", "n8n-credentials.json"]);
   });
 
+  /*
+   * Every entry, not the four this test happened to name.
+   *
+   * A subagent replayed the whole describe block against each four-element
+   * sublist on 2026-09-07: deleting `/\.key$/` left the ENTIRE suite green,
+   * because `.key` was the one shape absent from the hardcoded list above and
+   * no mutation touched SECRET_SHAPED membership. A scanner entry nobody
+   * exercises is an entry that can be removed while the report stays clean.
+   */
+  it("exercises every entry it declares, not only the ones this file lists", () => {
+    expect(SECRET_SHAPED.length, "no entries; this would pass on an empty set").toBeGreaterThan(0);
+    for (const entry of SECRET_SHAPED) {
+      expect(entry.catches.length, `${entry.re} names nothing it catches`).toBeGreaterThan(0);
+      for (const name of entry.catches) {
+        expect(findSecretShaped([name]), `${name} is declared caught by ${entry.re} and was not`)
+          .toEqual([name]);
+      }
+    }
+  });
+
+  /*
+   * A list that does NOT come from SECRET_SHAPED, which is the whole point.
+   *
+   * The test above walks the entries and asks each to catch what it declares —
+   * so deleting an entry outright removes the rule AND the claim together, and
+   * consistency survives. A subagent measured that on 2026-09-07: dropping
+   * `/\.key$/` left every assertion in this file green with `tls.key` sitting
+   * untracked beside a commit.
+   *
+   * What that needs is a second, independent statement of what must be caught.
+   * Every name here is a real secret shape this project has handled: an n8n API
+   * key, a TLS key, a service-account JSON, an SSH key, the env file.
+   */
+  it("catches every shape this project has actually had to keep out", () => {
+    const mustBeCaught = [
+      ".env", "config/.env.local", "tls.key", "server.pem",
+      "id_rsa", "keys/id_ed25519", "n8n-credentials.json",
+    ];
+    for (const name of mustBeCaught) {
+      expect(findSecretShaped([name]), `${name} must be caught by some entry`).toEqual([name]);
+    }
+    // And something that is not a secret must still pass, or this catches all.
+    expect(findSecretShaped(["src/index.ts", ".env.example"])).toEqual([]);
+  });
+
   it("leaves .env.example alone, since it is the file that documents the real one", () => {
     expect(findSecretShaped([".env.example"])).toEqual([]);
   });
@@ -328,15 +374,74 @@ describe("secret-shaped files, tracked or not", () => {
     //
     // A regex cannot be enumerated, so this reads the literal alternatives out
     // of its source: every name a pattern can spell must be a name it declares.
+    /*
+     * Rewritten 2026-09-07. The old reader was `/\(([^()?][^()]*)\)/g`, and a
+     * subagent measured what it misses: `[^()?]` excludes every `(?:` group,
+     * and `[^()]*` cannot see an alternation with no parentheses at all. Three
+     * of the four ways to widen a pattern were invisible —
+     * `id_(?:rsa|dsa|ed25519)`, `\.pem$|\.p12$` and `\.p[ek][my]$` each left
+     * the suite green while catching a name no .gitignore line covers.
+     *
+     * So this reads alternatives out of EVERY group, capturing or not, plus the
+     * top level, and refuses a character class inside a literal segment
+     * outright — a class cannot be enumerated into names, and a check that
+     * silently skips what it cannot read is the thing being guarded against.
+     */
+    const alternativesOf = (source: string): string[] => {
+      const out: string[] = [];
+      /*
+       * Every parenthesised group, capturing `(` and non-capturing `(?:` alike.
+       * A lookaround — `(?!`, `(?=`, `(?<!`, `(?<=` — is skipped on purpose: it
+       * can only NARROW what a pattern matches, so it cannot introduce a name
+       * the entry has not declared. Skipping what widens would be the defect;
+       * skipping what narrows is the point.
+       */
+      for (const m of source.matchAll(/\((?:\?:)?([^()]*)\)/g)) {
+        if (m[1]!.startsWith("?")) continue;
+        out.push(...m[1]!.split("|"));
+      }
+      /*
+       * And the top level, with groups removed so their bars are not counted
+       * twice. Removal is ITERATIVE: one pass over `(^|\/)\.env($|\.(?!example))`
+       * strips the inner lookaround and leaves a stray `(`, which then reads as
+       * part of a name. My own first draft of this fix had that bug.
+       */
+      let flat = source;
+      for (let i = 0; i < 10; i += 1) {
+        const next = flat.replace(/\((?:\?:)?[^()]*\)/g, "");
+        if (next === flat) break;
+        flat = next;
+      }
+      if (flat.includes("|")) out.push(...flat.split("|"));
+      return out;
+    };
+
     for (const { re, catches } of SECRET_SHAPED) {
-      const alternations = re.source.match(/\(([^()?][^()]*)\)/g) ?? [];
-      for (const group of alternations) {
-        for (const alt of group.slice(1, -1).split("|")) {
-          const literal = alt.replace(/\\/g, "");
-          if (literal === "" || literal === "^" || literal === "/") continue;
-          const declared = catches.some((c: string) => c.includes(literal));
-          expect(declared, `${re} can match "${literal}" but no declared name contains it`).toBe(true);
-        }
+      /*
+       * Checked before the alternatives and independently of them, because a
+       * character class produces NO alternatives — so `\.p[ek][my]$` widened
+       * the pattern to `server.pky` while the loop below ran zero times and the
+       * suite stayed green. An assertion that only runs when there is something
+       * to iterate cannot notice the case with nothing to iterate.
+       */
+      expect(re.source.replace(/\\\[|\\\]/g, ""),
+        `${re} uses a character class, which cannot be enumerated into the names it declares`)
+        .not.toMatch(/[[\]]/);
+
+      const alternations = alternativesOf(re.source);
+      expect(alternations.length,
+        `${re} yields no alternatives to check; if that is right it has none, but say so here`)
+        .toBeGreaterThanOrEqual(0);
+      for (const alt of alternations) {
+        const literal = alt.replace(/\\/g, "");
+        if (literal === "" || literal === "^" || literal === "/") continue;
+        expect(literal, `${re} uses a character class this test cannot enumerate into names`)
+          .not.toMatch(/[[\]]/);
+        // Anchors and quantifiers are structure, not name — strip them to compare.
+        const bare = literal.replace(/[$^*+?]/g, "");
+        if (bare === "") continue;
+        const declared = catches.some((c: string) => c.includes(bare));
+        expect(declared, `${re} can match "${bare}" but no declared name contains it`).toBe(true);
       }
     }
   });
@@ -629,3 +734,122 @@ describe("what a killed mutation run leaves behind", () => {
   });
 });
 
+/*
+ * The Definition-of-Done coverage claim, checked the way readiness.mjs already
+ * checked it. A subagent ran both against the same item on 2026-09-07: the
+ * readiness counter called `covered: true, by: []` unestablished and this gate
+ * counted it covered, because a loop over an empty array contributes nothing to
+ * the list of gaps. One rule, two carriers, one of them guarded.
+ */
+describe("a Definition-of-Done item must name what covers it", () => {
+  const passed = new Set(["a test that ran"]);
+
+  it("refuses a coverage claim that names no test", () => {
+    expect(coverageGaps([{ n: 1, claim: "c", covered: true, by: [] }], passed))
+      .toEqual(['item 1: claims coverage and names no test']);
+    expect(coverageGaps([{ n: 2, claim: "c", covered: true }], passed),
+      "a missing `by` is the same claim with less typing")
+      .toEqual(['item 2: claims coverage and names no test']);
+  });
+
+  it("refuses a coverage claim whose named test did not pass", () => {
+    expect(coverageGaps([{ n: 3, claim: "c", covered: true, by: ["a test that did not"] }], passed))
+      .toEqual(['item 3: "a test that did not"']);
+  });
+
+  it("accepts a claim whose named test ran and passed, or nothing below means anything", () => {
+    expect(coverageGaps([{ n: 4, claim: "c", covered: true, by: ["a test that ran"] }], passed)).toEqual([]);
+    expect(coverageGaps([{ n: 5, claim: "c", covered: false, needs: "x" }], passed),
+      "an uncovered item is not a gap; it is honest").toEqual([]);
+  });
+});
+
+/*
+ * A promise that waits on a filename nobody writes is not a promise.
+ *
+ * DEBT used to hold `unlessArtifact: "docs/runs/deployed-chain.json"` — a path
+ * appearing exactly once in the repository, on that line, written by nothing.
+ * The debt therefore waited forever while six records of live runs through the
+ * deployed workflow sat in the same directory, and the gate printed PASS for a
+ * promise that could never come due. A subagent found it by grepping the name.
+ */
+describe("a debt waits on a condition something can answer", () => {
+  /*
+   * Written the way this repository's own rules ask, because the first draft of
+   * it looped over zero entries and passed on nothing — the very defect being
+   * guarded, committed inside the guard. There is no `unlessArtifact` left, so
+   * the loop is empty TODAY; the assertion below states that as a precondition
+   * instead of hiding it, and the test becomes live again the moment somebody
+   * reintroduces a filename as a waiting condition.
+   */
+  it("gives every debt a waiting condition something can actually answer", () => {
+    expect(DEBT.length, "no debts; this whole block would pass on an empty set").toBeGreaterThan(0);
+    let artifactConditions = 0;
+    for (const d of DEBT) {
+      const waits = typeof d.unlessArtifact === "string" || d.unlessScoredRun === true;
+      expect(waits, `debt ${d.id ?? JSON.stringify(d).slice(0, 40)} names no waiting condition at all`).toBe(true);
+      if (typeof d.unlessArtifact !== "string") continue;
+      artifactConditions += 1;
+      const found = spawnSync("git", ["grep", "-l", "--", d.unlessArtifact], { encoding: "utf8" });
+      const carriers = (found.stdout ?? "").trim().split("\n").filter(Boolean)
+        .filter((f) => f !== "scripts/acceptance-gate.mjs");
+      expect(carriers.length,
+        `${d.unlessArtifact} is named only by the debt that waits for it, so nothing can ever produce it`)
+        .toBeGreaterThan(0);
+    }
+    // Stated, not asserted: the count is allowed to be zero. Printing it is what
+    // stops "no filename conditions" from looking like "every one checks out".
+    expect(artifactConditions, "the filename branch above ran this many times").toBeGreaterThanOrEqual(0);
+  });
+
+  it("treats a run record with no machine-readable scores as no scored run", () => {
+    const d = mkdtempSync(join(tmpdir(), "debt-"));
+    writeFileSync(join(d, "a.json"), JSON.stringify({ outcome: "it went fine, honestly" }));
+    expect(someRunWasScored(d), "prose is not a recorded result").toBe(false);
+    writeFileSync(join(d, "b.json"), JSON.stringify({ scored: {} }));
+    expect(someRunWasScored(d), "an empty scores object is not a scored run").toBe(false);
+    writeFileSync(join(d, "c.json"), JSON.stringify({ scored: { "container-oom": "correct" } }));
+    expect(someRunWasScored(d)).toBe(true);
+  });
+
+  it("says no when the directory is not there, rather than throwing", () => {
+    expect(someRunWasScored(join(tmpdir(), "does-not-exist-at-all-9182"))).toBe(false);
+  });
+});
+
+/*
+ * Two ways this gate said PASS for something it had not established, both found
+ * by a subagent on 2026-09-07 that simply called the functions.
+ */
+describe("the gate does not pass for what it never checked", () => {
+  it("refuses to call an empty run a pass", () => {
+    const g = runGate([]);
+    expect(g.results.length).toBe(0);
+    expect(g.exitCode, "a gate that checked nothing established nothing").toBe(2);
+    expect(g.nothingChecked).toBe(true);
+    expect(format(g)).toContain("COULD NOT ESTABLISH");
+  });
+
+  /*
+   * `refused` and `unreadable` both mean: this gate does not know whether a
+   * source file still holds a planted defect. That is exit 2 by definition, and
+   * it was printed and dropped — while scripts/readiness.mjs read the recorded
+   * exitCode and reported the gate green.
+   */
+  it("carries an unrepaired mutation into the exit code, not only into the text", () => {
+    const clean = runGate([{ id: "x", describe: "d", run: () => ({ state: "pass", detail: "ok" }) }]);
+    expect(clean.exitCode, "the baseline must be 0, or this test proves nothing").toBe(0);
+
+    for (const state of ["refused", "unreadable"]) {
+      const g = withRepair(clean, { state, detail: "could not read the in-flight record" });
+      expect(g.exitCode, `${state} must reach the exit code`).toBe(2);
+    }
+    // A repair that succeeded, or found nothing to do, changes no code.
+    for (const state of ["restored", "already-clean"]) {
+      const g = withRepair(clean, { state, id: "m", file: "f" });
+      expect(g.exitCode, `${state} is an answer, not an unknown`).toBe(0);
+    }
+    // And no record at all is not an unknown either.
+    expect(withRepair(clean, null).exitCode).toBe(0);
+  });
+});

@@ -162,11 +162,25 @@ export function score(scenario, answer, root = SCENARIOS) {
         unqualified.push("it refused while stating no evidence at all, so nothing shows it saw the contradiction");
       }
     } else {
+      /*
+       * A PAIR from different sources, not a property of the against items.
+       *
+       * Codex, 2026-09-07, reproducing both errors of the first version: it
+       * skipped the source comparison entirely when no `for` item existed, so
+       * an answer with dissent and no support at all scored correct; and it
+       * asked whether EVERY dissent shared a source with the support, so a
+       * metrics agent that contributed one supporting fact alongside its
+       * contradiction turned a valid answer unqualified. Both come from asking
+       * about the items separately. The conflict is a relation: some source
+       * says yes and a different source says no, and that is what is checked.
+       */
       const against = shaped.filter((e) => e.supports === "against");
-      const forSources = new Set(shaped.filter((e) => e.supports === "for").map((e) => e.source));
+      const supporting = shaped.filter((e) => e.supports === "for");
       if (against.length === 0) {
         unqualified.push("no evidence points against the conclusion, so nothing was weighed");
-      } else if (forSources.size > 0 && against.every((e) => forSources.has(e.source))) {
+      } else if (supporting.length === 0) {
+        unqualified.push("nothing supports the conclusion it reached, so there is no conflict to weigh");
+      } else if (!against.some((a) => supporting.some((f) => f.source !== a.source))) {
         unqualified.push("every dissent comes from the same source as the support, which is not the conflict this scenario poses");
       }
     }

@@ -11,7 +11,8 @@
  * "passes" because the answer was planted cannot happen.
  */
 import { describe, it, expect } from "vitest";
-import { runScenario, STUB_AGENTS, envelope, runSetExpression, newHistory } from "./helpers/run-workflow.js";
+import type { Stub } from "./helpers/run-workflow.js";
+import { runScenario, STUB_AGENTS, envelope, runSetExpression, newHistory, NOT_AN_ENVELOPE} from "./helpers/run-workflow.js";
 import { listScenarios } from "../src/providers/fixtures.js";
 
 const SCENARIOS = new URL("../scenarios/", import.meta.url).pathname;
@@ -219,6 +220,53 @@ describe("the Set node that joins the answer back to the incident", () => {
     const out = runSetExpression(node, { choices: [{ message: { content: "sorry, no JSON today" } }] },
       { incident: {}, scenario: "container-oom" }, "Record kubernetes");
     expect(out.reply).toBeNull();
+  });
+
+  /*
+   * Every 200 that is not the OpenAI envelope, which the suite could not
+   * express until 2026-09-07.
+   *
+   * A subagent measured each of these against the generated expression: all
+   * four threw a raw TypeError inside the deployed Set node, halting the
+   * execution and giving the caller an n8n error naming `choices` rather than
+   * the chain's own "returned nothing that could be read as an answer". The
+   * test above is named for exactly this and covered the one body shape that
+   * cannot throw, because the harness only ever built real envelopes.
+   */
+  /*
+   * Through the whole chain, not against the merge function.
+   *
+   * A subagent showed on 2026-09-07 that the node which had just asked the LOGS
+   * agent did not pass what it asked, so a reply labelled `"agent":
+   * "kubernetes"` was recorded and the chain concluded at 85% with two
+   * kubernetes entries and no logs analysis. The unit test for that refusal
+   * lives in tests/assemble.test.ts — and a mutation removing the argument from
+   * the NODE left it green, because the unit test never travels through the
+   * node. This one does.
+   */
+  it("refuses, in the deployed chain, an answer from an agent it did not ask", async () => {
+    const lying: Record<string, Stub> = {
+      ...STUB_AGENTS,
+      // The logs agent answers, and says it is the kubernetes agent — citing a
+      // path that really does resolve in the kubernetes slot, so nothing but
+      // the identity check can catch it.
+      logs: () => ({ agent: "kubernetes", status: "ok",
+        findings: [{ fact: "OOMKilled", source_ref: "pods[0].containers[0].last_state.terminated.reason" }],
+        hypotheses: [], confidence: 0.5 }),
+    };
+    const out = await runScenario("container-oom", lying);
+    expect(out.state, "a mislabelled answer must not conclude").toBe("refused");
+    expect(String(out.reason)).toMatch(/logs was asked/);
+  });
+
+  it("turns a 200 that is not the model's envelope into null, not a TypeError", async () => {
+    const node = await collectNode("logs");
+    for (const [what, body] of Object.entries(NOT_AN_ENVELOPE)) {
+      const out = runSetExpression(node, body, { incident: {}, scenario: "container-oom" }, "Record kubernetes");
+      expect(out.reply, `${what} must become null rather than throw`).toBeNull();
+    }
+    expect(Object.keys(NOT_AN_ENVELOPE).length,
+      "this would pass on an empty set of bodies").toBeGreaterThan(3);
   });
 
   it("reaches back to the node immediately before it, not to some other one", async () => {

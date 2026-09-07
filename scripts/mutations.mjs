@@ -24,9 +24,36 @@ export const MUTATIONS = [
   {
     id: "unknown-collapses-into-pass",
     file: "scripts/acceptance-gate.mjs",
-    from: "const exitCode = (failed.length > 0 ? 1 : 0) + (unresolved.length > 0 ? 2 : 0);",
-    to: "const exitCode = failed.length > 0 ? 1 : 0;",
+    from: "  const exitCode = (failed.length > 0 ? 1 : 0)\n    + (unresolved.length > 0 || nothingChecked ? 2 : 0);",
+    to: "  const exitCode = failed.length > 0 ? 1 : 0;",
     mustFail: "exits 2, not 0, when a check could not establish anything",
+  },
+  {
+    // One scanner entry deleted. `.key` was the shape no test named, so the
+    // whole suite stayed green with tls.key sitting untracked beside a commit.
+    id: "secret-scanner-entry-deleted-unnoticed",
+    file: "scripts/acceptance-gate.mjs",
+    from: '  { re: /\\.key$/, catches: ["tls.key"], ignoreLines: ["*.key"] },',
+    to: "",
+    mustFail: "catches every shape this project has actually had to keep out",
+  },
+  {
+    // A gate that checked nothing, calling itself a pass — the empty-suite
+    // defect in the arithmetic of the file that refuses it for vitest.
+    id: "empty-gate-run-called-a-pass",
+    file: "scripts/acceptance-gate.mjs",
+    from: "  const nothingChecked = results.length === 0;",
+    to: "  const nothingChecked = false;",
+    mustFail: "refuses to call an empty run a pass",
+  },
+  {
+    // "I could not put the planted defect back" printed and dropped, while the
+    // recorded exitCode told every later reader the gate was green.
+    id: "unrepaired-mutation-dropped-from-the-exit-code",
+    file: "scripts/acceptance-gate.mjs",
+    from: '  const unresolvedRepair = repaired.state === "refused" || repaired.state === "unreadable";',
+    to: "  const unresolvedRepair = false;",
+    mustFail: "carries an unrepaired mutation into the exit code, not only into the text",
   },
   {
     id: "rename-second-path-gets-sliced",
@@ -512,6 +539,44 @@ export const MUTATIONS = [
     mustFail: "calls the right code correct and the wrong code wrong",
   },
   {
+    // A bar drawn entirely green for a project nobody has measured. With no
+    // checks there is no unestablished and no red, so the remainder falls
+    // through — which is how an unmeasured project reported 100% of a bar.
+    id: "empty-bar-drawn-as-fully-green",
+    file: "scripts/readiness.mjs",
+    from: '  if (s.total === 0) return "▒".repeat(width);',
+    to: "  if (false) return \"\";",
+    mustFail: "draws nothing as unestablished, not as finished",
+  },
+  {
+    // The scorer's own third state, flattened on the way in: an unanswered
+    // scenario recorded as unestablished became FAILED.
+    id: "recorded-unestablished-read-as-failure",
+    file: "scripts/readiness.mjs",
+    from: '    if (state === "unestablished") {\n      return unknown(`scenario-${n}`, `not established in ${latest.file}`, PAID);\n    }',
+    to: "    if (false) {\n      return unknown(`scenario-${n}`, `x`, PAID);\n    }",
+    mustFail: "keeps the scorer's own unestablished state instead of calling it a failure",
+  },
+  {
+    // Dissent with nothing to dissent FROM: an answer that argues against its
+    // own conclusion and never supports it is not a weighed conflict.
+    id: "dissent-without-any-support-to-conflict-with",
+    file: "scripts/score-run.mjs",
+    from: '      } else if (supporting.length === 0) {',
+    to: "      } else if (false) {",
+    mustFail: "refuses a dissent with nothing supporting the conclusion",
+  },
+  {
+    // Asking whether EVERY dissent shares a source with the support, instead of
+    // whether SOME pair differs: one supporting fact from the dissenting agent
+    // then invalidates a genuine cross-source contradiction.
+    id: "cross-source-dissent-judged-item-by-item",
+    file: "scripts/score-run.mjs",
+    from: "      } else if (!against.some((a) => supporting.some((f) => f.source !== a.source))) {",
+    to: "      } else if (against.every((a) => supporting.some((f) => f.source === a.source))) {",
+    mustFail: "accepts a cross-source conflict even when the dissenting agent also supports",
+  },
+  {
     // The bar drawn in two characters instead of three: unestablished becomes
     // empty, and empty reads as "not done yet" when the truth is "not asked".
     id: "unestablished-drawn-as-empty-in-the-bar",
@@ -521,12 +586,145 @@ export const MUTATIONS = [
     mustFail: "draws unestablished as its own character, not as empty",
   },
   {
-    // A bar padded with green reports work nobody did.
+    /*
+     * A bar padded with green reports work nobody did.
+     *
+     * Codex, 2026-09-07: the first version added the remainder to green while
+     * LEAVING it in unestablished, so the bar came back one character too long
+     * and the test failed on width before it ever looked at the green count.
+     * A mutation that trips a different assertion first measures that one.
+     * This moves the remainder rather than duplicating it.
+     */
     id: "bar-remainder-padded-with-green",
     file: "scripts/readiness.mjs",
-    from: "  const extraToGreen = s.unestablished === 0 && s.red === 0 ? pad : 0;",
-    to: "  const extraToGreen = pad;",
+    from: "  const extraToUnknown = s.unestablished > 0 ? pad : 0;\n  const extraToRed = s.unestablished === 0 && s.red > 0 ? pad : 0;\n  const extraToGreen = s.unestablished === 0 && s.red === 0 ? pad : 0;",
+    to: "  const extraToUnknown = 0;\n  const extraToRed = 0;\n  const extraToGreen = pad;",
     mustFail: "never pads the bar with green",
+  },
+  /*
+   * Six escapes a subagent verified on 2026-09-07 by replaying every assertion
+   * in tests/agents.test.ts: all twelve of its rewrites passed. The class was
+   * that only prompts/kubernetes-agent.md had been double-guarded that morning
+   * — every rule in the other three was held by a single positive regex, often
+   * a bare word. Each mutation here KEEPS the guarded sentence and reverses the
+   * rule beside it, which is the only thing that makes the new negative
+   * assertions mean anything.
+   */
+  {
+    id: "truncated-log-treated-as-a-complete-one",
+    file: "prompts/logs-agent.md",
+    from: "**Check `truncated`.** If the observation says the log was truncated, you did not\nsee everything, and any statement of the form \"there is no X\" is unfounded.",
+    to: "**Check `truncated`.** If the observation says the log was truncated, the lines\nyou were handed are the ones the collector judged relevant, so \"there is no X\" is\nstill well founded over them.",
+    mustFail: "does not let the logs agent conclude from a truncated log or a bounded window",
+  },
+  {
+    id: "silence-in-the-window-read-as-nothing-happening",
+    file: "prompts/logs-agent.md",
+    from: "**Check the `window`.** Finding nothing in ten minutes is not finding nothing.",
+    to: "**Check the `window`.** It is chosen around the incident, so finding nothing across the `window` means nothing happened.",
+    mustFail: "does not let the logs agent conclude from a truncated log or a bounded window",
+  },
+  {
+    id: "metrics-asked-for-a-threshold-in-unlisted-words",
+    file: "prompts/metrics-agent.md",
+    from: "A number without the thing it is measured against is not your failure to state\nit",
+    to: "A number means little without the threshold it breached, so name the threshold\nand give its path in the deployment's container spec",
+    mustFail: "does not ask logs or metrics for the configuration in any wording",
+  },
+  {
+    id: "root-cause-invited-to-state-an-unreported-fact",
+    file: "prompts/root-cause-agent.md",
+    from: "**Only cite what the agents reported.** You cannot introduce a fact they did not\nfind;",
+    to: "**Only cite what the agents reported.** Where their findings imply a fact none of\nthem spelled out, state that fact yourself;",
+    mustFail: "does not let the root cause agent invent a fact or compose a citation",
+  },
+  {
+    id: "root-cause-invited-to-compose-a-prefixed-path",
+    file: "prompts/root-cause-agent.md",
+    from: "**Copy a `source_ref` verbatim from an entry in `agent_results`.** Never prefix\nit with `agent_results[...]` — you were not given the observations, so a path\nyou compose yourself is a citation you cannot have checked.",
+    to: "**Copy a `source_ref` verbatim from an entry in `agent_results`.** Then prefix it\nas `agent_results[0].findings` so a reader sees which agent said it; the path you\nwrite is your own composition.",
+    mustFail: "does not let the root cause agent invent a fact or compose a citation",
+  },
+  {
+    id: "insufficient-evidence-offered-as-the-safe-default",
+    file: "prompts/root-cause-agent.md",
+    from: "**Not enough to tell is a real answer, for one situation only.** Use",
+    to: "**Not enough to tell is a real answer, and it is the safe one.** When in doubt return no hypotheses. Use",
+    mustFail: "keeps insufficient evidence a narrow answer, not the safe default",
+  },
+  {
+    id: "hypothesis-allowed-to-cite-what-it-did-not-report",
+    file: "prompts/metrics-agent.md",
+    from: "`supported_by` must be the `source_ref` of a finding you actually reported in",
+    to: "`supported_by` may be any path that bears on it, whether or not you listed that\npath among your findings, rather than the `source_ref` of a finding reported in",
+    mustFail: "keeps a hypothesis tied to the findings the same answer reported",
+  },
+  {
+    // The unguarded property walk, restored: every 200 that is not the model's
+    // envelope throws a raw TypeError inside n8n and halts the execution.
+    id: "collect-node-walks-the-envelope-unguarded",
+    file: "scripts/generate-workflow.mjs",
+    from: "        + ` var c = $json && $json.choices;`\n        + ` var m = Array.isArray(c) && c.length > 0 && c[0] ? c[0].message : null;`\n        + ` var t = m ? m.content : null;`",
+    to: "        + ` var t = $json.choices[0].message.content;`",
+    mustFail: "turns a 200 that is not the model's envelope into null, not a TypeError",
+  },
+  {
+    // The identity of the answering agent taken from the answer itself, with
+    // the node that asked staying silent about who it asked.
+    id: "asked-agent-not-bound-to-answering-agent",
+    file: "src/core/merge.ts",
+    from: "    if (said !== expected) {",
+    to: "    if (false) {",
+    mustFail: "refuses a reply from an agent other than the one that was asked",
+  },
+  {
+    // The deployed node knows who it asked and does not say so, which is how
+    // the binding above becomes dead code in the only place it matters.
+    id: "record-node-does-not-say-who-it-asked",
+    file: "scripts/workflow-runtime.mjs",
+    from: 'recordAgentResult(validate, incident, reply, AGENT.replace("-", "_"));',
+    to: "recordAgentResult(validate, incident, reply);",
+    mustFail: "refuses, in the deployed chain, an answer from an agent it did not ask",
+  },
+  {
+    // An empty scored object read as a scored run: the debt would come due on
+    // the strength of a record that answered nothing.
+    id: "empty-scores-counted-as-a-scored-run",
+    file: "scripts/acceptance-gate.mjs",
+    from: "      if (scored !== null && typeof scored === \"object\" && !Array.isArray(scored)\n        && Object.keys(scored).length > 0) return true;",
+    to: "      if (scored !== undefined) return true;",
+    mustFail: "treats a run record with no machine-readable scores as no scored run",
+  },
+  {
+    // A loop over an empty array contributes nothing, so a coverage claim that
+    // names no test is counted as covered — the gate disagreeing with the
+    // readiness counter about the same item.
+    id: "coverage-claimed-with-no-test-named",
+    file: "scripts/acceptance-gate.mjs",
+    from: "    if (!Array.isArray(item.by) || item.by.length === 0) {",
+    to: "    if (false) {",
+    mustFail: "refuses a coverage claim that names no test",
+  },
+  {
+    // A run record one directory down was invisible rather than unestablished,
+    // so the shortfall never reached the count and the single figure every
+    // report ends with printed without its floor qualification.
+    id: "spend-reads-one-directory-level",
+    file: "scripts/spend.mjs",
+    from: "      if (e.isDirectory()) {",
+    to: "      if (false) {",
+    mustFail: "counts a run record filed in a subdirectory",
+  },
+  {
+    // A root cause verdict may only cite what an agent reported. Nothing
+    // checked it, so an invented path was recorded, concluded, promoted into
+    // evidence, and then scored CORRECT by must_cite — which pools source_refs
+    // from every agent including the one that invented the path.
+    id: "root-cause-citation-checked-against-nothing",
+    file: "src/core/merge.ts",
+    from: "      if (!already.has(ref)) {",
+    to: "      if (false) {",
+    mustFail: "refuses a root cause verdict citing a path no agent reported",
   },
   {
     // The two directions a readiness percentage lies in, and both flatter.
@@ -687,10 +885,16 @@ export const MUTATIONS = [
   {
     // "Could not rewrite" is not "nothing to rewrite", and the case where they
     // differ is the case where silence is worst.
+    /*
+     * Anchored on the line ABOVE the refusal, not on the refusal itself.
+     * Binding the asked agent to the answering one added a second
+     * `return { state: "refused",` at this indentation on 2026-09-07, and an
+     * anchor that matches twice is an anchor nobody can reason about.
+     */
     id: "unrewritable-citation-stored-as-it-came",
     file: "src/core/merge.ts",
-    from: '      return { state: "refused",',
-    to: '      { nextFindings.push(f); continue; }\n      return { state: "refused",',
+    from: '      return { state: "refused",\n        reason: `a finding cites ${ref}, which resolves to nothing in the observation this result was recorded against` };',
+    to: '      { nextFindings.push(f); continue; }',
     mustFail: "refuses rather than storing a citation it could not rewrite",
   },
   {

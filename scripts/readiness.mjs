@@ -98,6 +98,18 @@ export function scenariosMeasured(root = ROOT) {
       return unknown(`scenario-${n}`, latest.why ?? "no run record scores this scenario", PAID);
     }
     if (state === "correct") return green(`scenario-${n}`, `answered correctly in ${latest.file}`);
+    /*
+     * The scorer has its own third state and it must survive the journey here.
+     *
+     * Codex, 2026-09-07: every recorded state other than "correct" was mapped
+     * to red, including the scorer's own "unestablished" — so recording that a
+     * scenario went unanswered turned it from unknown into FAILED, which is the
+     * exact collapse the rest of this file exists to refuse, committed by the
+     * file that refuses it.
+     */
+    if (state === "unestablished") {
+      return unknown(`scenario-${n}`, `not established in ${latest.file}`, PAID);
+    }
     return red(`scenario-${n}`, `${state} in ${latest.file}`);
   });
 }
@@ -183,6 +195,15 @@ export function summarise(checks) {
  * into a cell it has not earned.
  */
 export function bar(s, width = 28) {
+  /*
+   * No checks at all is not a finished project.
+   *
+   * Codex, 2026-09-07: `bar(summarise([]), 5)` returned five full green cells,
+   * because with nothing counted there is no unestablished and no red, so the
+   * remainder fell through to green. A bar drawn entirely green for a project
+   * nobody has measured is the worst single output this file could produce.
+   */
+  if (s.total === 0) return "▒".repeat(width);
   const cell = (n) => (s.total === 0 ? 0 : Math.floor((n / s.total) * width));
   const g = cell(s.green);
   const u = cell(s.unestablished);

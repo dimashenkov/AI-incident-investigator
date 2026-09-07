@@ -6,7 +6,23 @@ import remediationSchema from "../../schemas/remediation.schema.json" with { typ
 const CONV = { provider: "fake-slack", channel_id: "fake-prod-incidents", thread_id: "thread-INC-2026-0001", incident_id: "INC-2026-0001", messages: [] };
 const INC = {
   incident_id: "INC-2026-0001", status: "investigating", service: "payment-api", namespace: "production",
-  cluster: "prod-eu", started_at: "2026-09-04T10:30:00Z", source: { provider: "fake-datadog", alert: {} },
+  cluster: "prod-eu", started_at: "2026-09-04T10:30:00Z",
+  /*
+   * A COMPLETE alert, and that is the whole point of this line.
+   *
+   * Until 2026-09-07 this base carried `alert: {}` — itself one of the cases
+   * below — so every probe spreading INC was refused for the missing alert
+   * before its own rule was ever consulted. A subagent asked one question about
+   * this file and showed it by deleting the diagnosed rules from the schema:
+   * probes 3, 4 and 7 stayed "invalid" with the rule they name removed, and 9b
+   * never reached additionalProperties at all. Four tests spent their lives
+   * proving the alert was empty.
+   *
+   * The file already knew — two tests further down build a valid base with a
+   * comment saying exactly this. They were fixed one at a time; the base was
+   * not, so the trap stayed for whatever was written next.
+   */
+  source: { provider: "fake-datadog", alert: { id: "a-1", title: "t", triggered_at: "2026-09-04T10:29:00Z" } },
   observations: { kubernetes: null, logs: null, metrics: null },
   // Three answers per slot, recorded in the document. Everything here is a
   // deliberate "the provider said there was nothing", not a slot nobody read.
@@ -19,11 +35,25 @@ const AGENT = {
   findings: [{ fact: "f", source_ref: "r" }],
   hypotheses: [{ code: "CONTAINER_OOM", statement: "s", supported_by: ["r"] }], confidence: 0.9,
 };
-const probe = (n: string, name: any, data: unknown) => it(n, () => {
+/**
+ * One case that must be refused, and — where it matters — the rule that refuses it.
+ *
+ * `because` is a fragment of the error message. Asserting only "invalid" cannot
+ * tell WHICH rule did the refusing, and on 2026-09-07 a subagent showed what
+ * that costs: with the diagnosed rules deleted from the schema outright, three
+ * of these probes stayed green, because a different rule was refusing them all
+ * along. A test that cannot say why it passed cannot notice its subject being
+ * removed.
+ */
+const probe = (n: string, name: any, data: unknown, because?: string) => it(n, () => {
   // Asserting "invalid" specifically, not "not valid": an "unchecked" result
   // means the schema stopped compiling, which is a different failure and must
   // not be able to make this suite look green.
-  expect(validate(name, data).state, `${n} -> ${JSON.stringify(validate(name, data))}`).toBe("invalid");
+  const r = validate(name, data);
+  expect(r.state, `${n} -> ${JSON.stringify(r)}`).toBe("invalid");
+  if (because !== undefined && r.state === "invalid") {
+    expect(r.errors.join("; "), `${n} was refused, but not for the reason it names`).toContain(because);
+  }
 });
 
 /**
@@ -36,16 +66,34 @@ const probe = (n: string, name: any, data: unknown) => it(n, () => {
  * the fix that followed it.
  */
 describe("absence is not consent — cases that used to pass", () => {
+  /*
+   * The precondition every probe below rests on. Without it a base that goes
+   * invalid for an unrelated reason makes all of them pass while testing
+   * nothing — which is what happened here for three days.
+   */
+  it("starts from a base that is itself valid, or nothing below is about its rule", () => {
+    const r = validate("incident", INC);
+    expect(r.state, JSON.stringify(r)).toBe("valid");
+  });
+
   probe("1 all-null conversation", "conversation", { provider: "fake-slack", channel_id: null, thread_id: null, incident_id: null, messages: [] });
   probe("2 thread/incident mismatch", "conversation", { ...CONV, thread_id: "thread-INC-2026-0009", incident_id: "INC-2026-0007" });
   probe("2b message names another incident", "conversation", { ...CONV, messages: [{ role: "agent", text: "x", ts: "2026-01-01T00:00:00Z", incident_id: "INC-2026-0003" }] });
-  probe("3 diagnosed with zero agents", "incident", { ...INC, status: "diagnosed", analysis: { agents: [], root_cause_code: "CONTAINER_OOM", root_cause: "r", confidence: 0.9, evidence: [{ source: "logs", fact: "f" }] } });
-  probe("4 diagnosed on against-evidence", "incident", { ...INC, status: "diagnosed", analysis: { agents: [], root_cause_code: "CONTAINER_OOM", root_cause: "r", confidence: 0.9, evidence: [{ source: "logs", fact: "f", supports: "against" }] } });
+  probe("3 diagnosed with zero agents", "incident", { ...INC, status: "diagnosed", analysis: { agents: [], root_cause_code: "CONTAINER_OOM", root_cause: "r", confidence: 0.9, evidence: [{ source: "logs", fact: "f" }] } },
+    "/analysis/agents");
+  probe("4 diagnosed on against-evidence", "incident", { ...INC, status: "diagnosed", analysis: { agents: [], root_cause_code: "CONTAINER_OOM", root_cause: "r", confidence: 0.9, evidence: [{ source: "logs", fact: "f", supports: "against" }] } },
+    "/analysis");
   probe("5 supported_by empty string", "agent-result", { ...AGENT, hypotheses: [{ code: "CONTAINER_OOM", statement: "s", supported_by: [""] }] });
   probe("6 empty target on state change", "remediation", { type: "restart_deployment", risk: "high", requires_approval: true, rationale: "r", executed: false, target: {} });
-  probe("7 diagnosed at confidence 0", "incident", { ...INC, status: "diagnosed", analysis: { agents: [], root_cause_code: "CONTAINER_OOM", root_cause: "r", confidence: 0, evidence: [{ source: "logs", fact: "f" }] } });
-  probe("9 empty alert object", "incident", { ...INC, source: { provider: "fake-datadog", alert: {} } });
-  probe("9b alert with invented key", "incident", { ...INC, source: { provider: "fake-datadog", alert: { titel: "typo" } } });
+  probe("7 diagnosed at confidence 0", "incident", { ...INC, status: "diagnosed", analysis: { agents: [], root_cause_code: "CONTAINER_OOM", root_cause: "r", confidence: 0, evidence: [{ source: "logs", fact: "f" }] } },
+    "/analysis");
+  probe("9 empty alert object", "incident", { ...INC, source: { provider: "fake-datadog", alert: {} } },
+    "must have required property");
+  // A complete alert PLUS a key nobody declared, so what refuses it is
+  // additionalProperties and not the three keys the old fixture was missing.
+  probe("9b alert with invented key", "incident",
+    { ...INC, source: { provider: "fake-datadog", alert: { id: "a-1", title: "t", triggered_at: "2026-09-04T10:29:00Z", titel: "typo" } } },
+    "must NOT have additional properties");
   probe("10 agent message with no citation", "conversation", { ...CONV, messages: [{ role: "agent", text: "OOM", ts: "2026-01-01T00:00:00Z", incident_id: "INC-2026-0001" }] });
   probe("11 status ok carrying an error", "agent-result", { ...AGENT, error: "boom" });
 

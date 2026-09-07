@@ -254,6 +254,34 @@ describe("a scenario whose evidence conflicts is scored on more than its code", 
     expect(ok.state).toBe("correct");
   });
 
+  /*
+   * Codex, 2026-09-07, reproducing it: the first version skipped the source
+   * comparison entirely when no supporting evidence existed, so an answer that
+   * argued only AGAINST the conclusion it had just reached scored correct.
+   */
+  it("refuses a dissent with nothing supporting the conclusion", () => {
+    const r = score(S, withEvidence("CONTAINER_OOM", cite, 0.4,
+      [{ source: "metrics", fact: "memory never approached the limit", supports: "against" }]), SCENARIOS);
+    expect(r.state, "arguing against your own conclusion and never for it is not weighing").toBe("correct-but-unqualified");
+    expect(r.why.join(" ")).toMatch(/nothing supports the conclusion/);
+  });
+
+  /*
+   * And the same defect from the other side: asking whether EVERY dissent
+   * shared a source with the support turned a genuine cross-source conflict
+   * unqualified as soon as the dissenting agent also contributed one
+   * supporting fact. The conflict is a relation between a pair, not a property
+   * of each item.
+   */
+  it("accepts a cross-source conflict even when the dissenting agent also supports", () => {
+    const r = score(S, withEvidence("CONTAINER_OOM", cite, 0.4, [
+      { source: "kubernetes", fact: "the container was OOMKilled", supports: "for" },
+      { source: "metrics", fact: "the container did run at all", supports: "for" },
+      { source: "metrics", fact: "memory never approached the limit", supports: "against" },
+    ]), SCENARIOS);
+    expect(r.state, "one extra supporting fact must not invalidate a real contradiction").toBe("correct");
+  });
+
   it("counts the new state separately in the report and does not exit clean", () => {
     const text = format([score(S, qualified("CONTAINER_OOM", cite, 0.9, 1), SCENARIOS)]);
     expect(text).toMatch(/UNQUALIFIED/);

@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from "vitest";
 // @ts-expect-error - plain .mjs script, no types
-import { definitionOfDone, latestScored, summarise, oneLine, bar, gateResult } from "../scripts/readiness.mjs";
+import { definitionOfDone, latestScored, summarise, oneLine, bar, gateResult, scenariosMeasured } from "../scripts/readiness.mjs";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -91,6 +91,17 @@ describe("a readiness figure that admits what it does not know", () => {
     expect([...b].filter((c) => c === "▒").length, "the remainder goes to what is open").toBe(10);
   });
 
+  /*
+   * Codex, 2026-09-07: bar(summarise([]), 5) came back "█████". With nothing
+   * counted there is no unestablished and no red, so the rounding remainder
+   * fell through to green — a project nobody has measured drawing a full bar,
+   * which is the worst single output this file can produce.
+   */
+  it("draws nothing as unestablished, not as finished", () => {
+    expect(bar(summarise([]), 5), "an unmeasured project is unknown, not done").toBe("▒▒▒▒▒");
+    expect(summarise([]).percent).toBe(0);
+  });
+
   it("fills the bar when everything is green and nothing is open", () => {
     const b = bar(summarise([{ id: "a", state: "green" }, { id: "b", state: "green" }, { id: "c", state: "green" }]), 28);
     expect(b).toBe("█".repeat(28));
@@ -105,7 +116,7 @@ describe("a readiness figure that admits what it does not know", () => {
    * red, not green — the same question the acceptance gate asks, asked the same
    * way so the two cannot disagree about the same repository.
    */
-  it("refuses a coverage claim whose named test did not pass", () => {
+  it("the readiness counter refuses a coverage claim whose named test did not pass", () => {
     const list = [{ n: 1, claim: "c", covered: true, by: ["a test that ran"] },
                   { n: 2, claim: "d", covered: true, by: ["a test that did not"] }];
     const checks = definitionOfDone("/nowhere", list, new Set(["a test that ran"]));
@@ -118,7 +129,7 @@ describe("a readiness figure that admits what it does not know", () => {
       "no report is not the same as a failing test").toBe("unestablished");
   });
 
-  it("refuses a coverage claim that names no test", () => {
+  it("the readiness counter refuses a coverage claim that names no test", () => {
     const list = [{ n: 1, claim: "c", covered: true, by: [] }];
     expect(definitionOfDone("/nowhere", list, new Set(["x"]))[0].state).toBe("unestablished");
   });
@@ -168,6 +179,31 @@ describe("a readiness figure that admits what it does not know", () => {
       writeFileSync(join(d, "runs", "2026-01-01-good.json"), JSON.stringify({ scored: { a: "correct" } }));
       writeFileSync(join(d, "runs", "2026-03-03-broken.json"), "{ not json");
       expect(latestScored(join(d, "runs")).file).toBe("2026-01-01-good.json");
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  /*
+   * The scorer has its own three states and they must survive the journey into
+   * this file. Codex, 2026-09-07: every recorded state other than "correct" was
+   * mapped to red, including the scorer's own "unestablished" — so RECORDING
+   * that a scenario went unanswered turned it from unknown into failed, which
+   * is the exact collapse this file exists to refuse.
+   */
+  it("keeps the scorer's own unestablished state instead of calling it a failure", () => {
+    const d = tmp();
+    try {
+      for (const n of ["alpha", "beta", "gamma"]) mkdirSync(join(d, "scenarios", n), { recursive: true });
+      mkdirSync(join(d, "docs", "runs"), { recursive: true });
+      writeFileSync(join(d, "docs", "runs", "2026-01-01-a.json"), JSON.stringify({
+        scored: { alpha: "correct", beta: "wrong", gamma: "unestablished" },
+      }));
+      const byId = new Map<string, { state: string }>(
+        scenariosMeasured(d).map((c: any) => [c.id as string, c as { state: string }]));
+      expect(byId.get("scenario-alpha")!.state).toBe("green");
+      expect(byId.get("scenario-beta")!.state, "a wrong answer is established and red").toBe("red");
+      expect(byId.get("scenario-gamma")!.state,
+        "a run that did not answer establishes nothing, and recording that must not create a failure")
+        .toBe("unestablished");
     } finally { rmSync(d, { recursive: true, force: true }); }
   });
 

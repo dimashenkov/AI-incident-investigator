@@ -141,7 +141,22 @@ function collectNode(agent, from, position) {
        * an answer on the model's behalf.
        */
       jsonOutput: `={{ JSON.stringify(Object.assign({}, $('${from}').item.json, { reply: (function () {`
-        + ` var t = $json.choices[0].message.content;`
+        /*
+         * Four unguarded property accesses used to stand here, with the
+         * try/catch wrapped around JSON.parse only. A subagent measured what a
+         * 200 that is not the OpenAI envelope does on 2026-09-07: a gateway's
+         * HTML error page, `{choices: []}`, `{error: {...}}` and
+         * `{choices: [{}]}` all threw a raw TypeError inside n8n, halting the
+         * execution — while the test named "turns an unparseable answer into
+         * null rather than throwing inside n8n" covered the ONE body shape that
+         * cannot throw, because the harness only ever builds real envelopes.
+         *
+         * Reading the path defensively turns every one of them into null, which
+         * the next node already reports as the agent returning nothing readable.
+         */
+        + ` var c = $json && $json.choices;`
+        + ` var m = Array.isArray(c) && c.length > 0 && c[0] ? c[0].message : null;`
+        + ` var t = m ? m.content : null;`
         + ` if (typeof t !== 'string') return null;`
         + ` var f = t.match(/\`\`\`(?:json)?\\s*([\\s\\S]*?)\`\`\`/);`
         + ` if (f) t = f[1];`

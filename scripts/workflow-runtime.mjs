@@ -266,7 +266,9 @@ return items.map(function (item, index) {
       return { json: { index, state: "refused", agent: AGENT,
         reason: AGENT + " returned nothing that could be read as an answer" } };
     }
-    const recorded = recordAgentResult(validate, incident, reply);
+    // The node knows who it asked, and says so. The schema spells root-cause
+    // with an underscore; the node names it with a hyphen.
+    const recorded = recordAgentResult(validate, incident, reply, AGENT.replace("-", "_"));
     if (recorded.state !== "recorded") {
       return { json: { index, state: "refused", agent: AGENT,
         reason: AGENT + ": " + recorded.reason, errors: recorded.errors || [] } };

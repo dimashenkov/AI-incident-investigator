@@ -113,6 +113,29 @@ export function envelope(answer: Reply): Record<string, unknown> {
 }
 
 /**
+ * A 200 that is NOT the OpenAI envelope, which the harness could not express.
+ *
+ * A subagent found it on 2026-09-07: `envelope()` was the only thing ever
+ * substituted for an HTTP node, so every body the suite could build carried
+ * `choices[0].message.content`. The four shapes below each threw a raw
+ * TypeError in the deployed Set node — a gateway's HTML error page, an empty
+ * choices array, an error object, a choice with no message — and the test named
+ * "turns an unparseable answer into null rather than throwing inside n8n"
+ * covered the one shape that cannot throw.
+ *
+ * These are real bodies. HTTP 200 with an HTML error page is what a proxy in
+ * front of an API returns; `{error: {...}}` at 200 is what some gateways do
+ * with an upstream failure.
+ */
+export const NOT_AN_ENVELOPE: Record<string, Record<string, unknown>> = {
+  "a gateway's HTML error page": { data: "<html><body>502 Bad Gateway</body></html>" },
+  "an empty choices array": { choices: [] },
+  "an error object at status 200": { error: { message: "upstream failed", code: "bad_gateway" } },
+  "a choice with no message": { choices: [{}] },
+  "a message with a null content": { choices: [{ message: { content: null } }] },
+};
+
+/**
  * Evaluate an IF node's condition the way n8n does.
  *
  * Written after the second time a harness stood in for a node instead of
@@ -254,7 +277,15 @@ export async function runScenario(
       // The model, replaced by a stub answering from the payload it is handed.
       const agent = target.replace(/^Ask /, "");
       const stub = stubs[agent];
-      item = envelope(stub === undefined ? null : stub(item.payload as Record<string, unknown>));
+      const answered = stub === undefined ? null : stub(item.payload as Record<string, unknown>);
+      /*
+       * A stub may hand back a whole HTTP body instead of an agent result, so a
+       * test can put a shape through that is not the OpenAI envelope at all.
+       * The marker is deliberately ugly: a real agent result never carries it.
+       */
+      item = (answered !== null && typeof answered === "object" && "__rawBody" in answered)
+        ? (answered as { __rawBody: Record<string, unknown> }).__rawBody
+        : envelope(answered);
     } else if (next.type === "n8n-nodes-base.set") {
       item = runSetExpression(next, item, lastOf);
     } else if (next.type === "n8n-nodes-base.code") {

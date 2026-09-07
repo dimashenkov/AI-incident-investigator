@@ -14,9 +14,17 @@ import { validate } from "../src/schema/validate.js";
 const SC = new URL("../scenarios/", import.meta.url).pathname;
 const AT = "2026-09-05T10:00:00Z";
 
+/*
+ * Two findings, and the second is not decoration: the root cause replies below
+ * cite `deployment.image` as their contradicting evidence, and a verdict may
+ * only cite what an agent actually reported. Nothing checked that until
+ * 2026-09-07, so this fixture handed the verdict a path no agent had mentioned
+ * — the shape of the defect it was written to catch, one level up.
+ */
 const K8S_REPLY = {
   agent: "kubernetes", status: "ok",
-  findings: [{ fact: "container terminated OOMKilled", source_ref: "pods[0].containers[0].last_state.terminated.reason" }],
+  findings: [{ fact: "container terminated OOMKilled", source_ref: "pods[0].containers[0].last_state.terminated.reason" },
+             { fact: "the deployment image", source_ref: "deployment.image" }],
   hypotheses: [], confidence: 0.5,
 };
 

@@ -21,7 +21,7 @@
 import { spawnSync } from "node:child_process";
 
 import { MUTATIONS } from "./mutations.mjs";
-import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -347,6 +347,30 @@ import("./scripts/definition-of-done.mjs").then((m) => {
 }).catch((e) => { console.log("probe failed: " + (e && e.message)); process.exit(1); });
 `;
 
+/**
+ * Every reason an item's coverage claim is not established.
+ *
+ * Exported so it can be tested with hand-built input: an item claiming coverage
+ * must NAME what covers it, and `for (const name of item.by)` over an empty
+ * array iterates zero times, contributes nothing, and lets the item be counted
+ * as covered. `covered: true, by: []` passed this gate while
+ * scripts/readiness.mjs called the same item unestablished — two carriers of
+ * one rule, only one guarded. Found by a subagent on 2026-09-07 running both
+ * against the same input.
+ */
+export function coverageGaps(list, passedTitles) {
+  const missing = [];
+  for (const item of list) {
+    if (!item.covered) continue;
+    if (!Array.isArray(item.by) || item.by.length === 0) {
+      missing.push(`item ${item.n}: claims coverage and names no test`);
+      continue;
+    }
+    for (const name of item.by) if (!passedTitles.has(name)) missing.push(`item ${item.n}: "${name}"`);
+  }
+  return missing;
+}
+
 function checkDefinitionOfDone() {
   const file = resolve(ROOT, "scripts/definition-of-done.mjs");
   if (!existsSync(file)) return unknown("scripts/definition-of-done.mjs is missing; coverage of the ten is unestablished", "read DoD");
@@ -390,11 +414,7 @@ function checkDefinitionOfDone() {
   }
   if (passedTitles.size === 0) return unknown("the vitest report lists no passing tests; coverage cannot be established from it", "read DoD");
 
-  const missing = [];
-  for (const item of list) {
-    if (!item.covered) continue;
-    for (const name of item.by) if (!passedTitles.has(name)) missing.push(`item ${item.n}: "${name}"`);
-  }
+  const missing = coverageGaps(list, passedTitles);
   if (missing.length > 0) {
     return fail(`named as covering a Definition-of-Done item but did not run and pass: ${missing.slice(0, 3).join("; ")}`, "read DoD");
   }
@@ -735,7 +755,20 @@ export const DEBT = [
      * due whatever the chunk says; once it does, the chunk number applies again
      * and the items must be covered.
      */
-    unlessArtifact: "docs/runs/deployed-chain.json",
+    /*
+     * A CONDITION, not a filename. Until 2026-09-07 this named
+     * "docs/runs/deployed-chain.json" — a path that appears exactly once in the
+     * whole repository, on this line, and that nothing has ever written. So the
+     * debt waited forever on the absence of a file nobody produces, while six
+     * records of live runs through the deployed workflow sat in the same
+     * directory. A subagent found it by grepping for the filename.
+     *
+     * A promise that waits on a sentinel nobody writes is not a promise. What
+     * it actually waits for is a recorded run whose results a machine can read,
+     * which is what `score-run.mjs --record` writes and what
+     * scripts/readiness.mjs counts. The same signal, asked in one place.
+     */
+    unlessScoredRun: true,
     why: "the three uncovered items wait on a model call through the DEPLOYED workflow, which no recorded run has made yet",
   },
 ];
@@ -772,6 +805,36 @@ export function readCurrentChunk(text) {
   return Math.max(...chunks);
 }
 
+/**
+ * Has any run been recorded in a form a machine can read?
+ *
+ * Exported for the test: a run record states its outcome in prose for a human,
+ * and prose is not evidence anything may count. `score-run.mjs --record` writes
+ * a `scored` object at the moment it scores, and that object is the signal —
+ * the same one scripts/readiness.mjs uses, so the two cannot disagree about
+ * whether this project has ever measured itself.
+ *
+ * An empty `scored` is NOT a scored run: absence of results is not a result.
+ */
+export function someRunWasScored(runsDir) {
+  if (!existsSync(runsDir)) return false;
+  let names;
+  try {
+    names = readdirSync(runsDir).filter((f) => f.endsWith(".json"));
+  } catch {
+    return false;
+  }
+  for (const n of names) {
+    try {
+      const rec = JSON.parse(readFileSync(resolve(runsDir, n), "utf8"));
+      const scored = rec?.scored;
+      if (scored !== null && typeof scored === "object" && !Array.isArray(scored)
+        && Object.keys(scored).length > 0) return true;
+    } catch { /* unreadable is not evidence of a scored run */ }
+  }
+  return false;
+}
+
 function checkDebt() {
   const progress = resolve(ROOT, "PROGRESS.md");
   if (!existsSync(progress)) {
@@ -790,7 +853,10 @@ function checkDebt() {
 
   // A debt whose stated dependency has not happened yet is not overdue; it is
   // waiting, and saying so is different from saying nobody wrote it.
-  const waiting = DEBT.filter((d) => typeof d.unlessArtifact === "string" && !existsSync(resolve(ROOT, d.unlessArtifact)));
+  const scored = someRunWasScored(resolve(ROOT, "docs/runs"));
+  const waiting = DEBT.filter((d) =>
+    (typeof d.unlessArtifact === "string" && !existsSync(resolve(ROOT, d.unlessArtifact)))
+    || (d.unlessScoredRun === true && !scored));
   const due = DEBT.filter((d) => chunk >= d.dueFromChunk && !waiting.includes(d));
   if (due.length > 0) {
     return unknown(
@@ -918,9 +984,45 @@ export function runGate(checks = CHECKS) {
    *   2  nothing failed, but something could not be established
    *   3  something failed AND something could not be established
    */
-  const exitCode = (failed.length > 0 ? 1 : 0) + (unresolved.length > 0 ? 2 : 0);
+  /*
+   * A gate that checked NOTHING is not a gate that passed.
+   *
+   * `runGate([])` printed `PASS (exit 0)` with no check lines above it — the
+   * empty-suite defect, in the arithmetic of the file that refuses it for
+   * vitest eleven hundred lines up ("the suite collected 0 tests; an empty
+   * suite exits 0") and that scripts/readiness.mjs guards for its own bar. One
+   * rule, three carriers, and this was the unguarded one. Found by a subagent
+   * on 2026-09-07 by simply calling it.
+   *
+   * It is `unknown`, not `fail`: nothing was established, and nothing failed.
+   */
+  const nothingChecked = results.length === 0;
+  const exitCode = (failed.length > 0 ? 1 : 0)
+    + (unresolved.length > 0 || nothingChecked ? 2 : 0);
 
-  return { results, failed, unresolved, exitCode, limitations: LIMITATIONS, debt: DEBT };
+  /*
+   * And an interrupted mutation that could not be put back travels into the
+   * exit code, instead of being printed and dropped. `refused` and `unreadable`
+   * both mean the same thing: this gate does not know whether a source file
+   * still holds a planted defect. That is the definition of exit 2, and it was
+   * the one place the answer was thrown away — while scripts/readiness.mjs read
+   * the recorded exitCode and reported the gate green.
+   */
+  return { results, failed, unresolved, exitCode, nothingChecked,
+    limitations: LIMITATIONS, debt: DEBT };
+}
+
+/**
+ * Fold an interrupted-mutation outcome into the gate's exit code.
+ *
+ * Separate from runGate because the repair happens at the command entry — the
+ * gate's own test must not erase a mutation that a killed run left applied.
+ */
+export function withRepair(gate, repaired) {
+  if (repaired === null || repaired === undefined) return gate;
+  const unresolvedRepair = repaired.state === "refused" || repaired.state === "unreadable";
+  if (!unresolvedRepair) return { ...gate, repaired };
+  return { ...gate, repaired, exitCode: gate.exitCode | 2 };
 }
 
 const VERDICT = {
@@ -972,10 +1074,16 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === resolve(fileUR
    * function is called is a repair that fires in the middle of the thing it is
    * meant to protect.
    */
-  const repaired = restoreInterruptedMutation();
-  const gate = { ...runGate(), repaired };
+  const gate = withRepair(runGate(), restoreInterruptedMutation());
   process.stdout.write(format(gate));
   mkdirSync(dirname(OUT), { recursive: true });
-  writeFileSync(OUT, JSON.stringify({ results: gate.results, exitCode: gate.exitCode, limitations: gate.limitations, debt: gate.debt }, null, 2));
+  /*
+   * `repaired` is written out too. scripts/readiness.mjs reads this file and
+   * reported the gate green off `exitCode` alone, so an interrupted mutation
+   * nobody could put back was invisible to every later reader.
+   */
+  writeFileSync(OUT, JSON.stringify({ results: gate.results, exitCode: gate.exitCode,
+    repaired: gate.repaired ?? null, nothingChecked: gate.nothingChecked === true,
+    limitations: gate.limitations, debt: gate.debt }, null, 2));
   process.exit(gate.exitCode);
 }

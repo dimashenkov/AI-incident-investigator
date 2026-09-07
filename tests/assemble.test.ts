@@ -331,8 +331,15 @@ describe("the verdict becomes the incident's own", () => {
   const withAgents = (verdict: unknown) => {
     const a = assembleIncident("container-oom", 1, { root: SCENARIOS });
     if (a.state !== "assembled") throw new Error("not assembled");
+    /*
+     * Two findings, because the verdict below cites the image as its
+     * contradicting evidence and a root cause result may only cite what an
+     * agent actually reported. Until 2026-09-07 nothing checked that, so this
+     * fixture cited a path no agent had ever mentioned and still recorded.
+     */
     const k = recordAgentResult(a.incident, { agent: "kubernetes", status: "ok",
-      findings: [{ fact: "OOMKilled", source_ref: "pods[0].containers[0].last_state.terminated.reason" }],
+      findings: [{ fact: "OOMKilled", source_ref: "pods[0].containers[0].last_state.terminated.reason" },
+                 { fact: "the deployment image", source_ref: "deployment.image" }],
       hypotheses: [{ code: "CONTAINER_OOM", statement: "memory limit exceeded", supported_by: ["pods[0].containers[0].last_state.terminated.reason"] }],
       confidence: 0.9 });
     if (k.state !== "recorded") throw new Error(`kubernetes: ${k.reason}`);
@@ -421,6 +428,58 @@ describe("the verdict becomes the incident's own", () => {
     expect(r.state).toBe("refused");
     if (r.state !== "refused") return;
     expect(r.reason).toContain("has not reported");
+  });
+
+  /*
+   * A subagent on 2026-09-07 followed one invented path all the way to a green
+   * report. The root cause branch of checkAgainstObservation returned before the
+   * findings loop — its comment said there was no slot to resolve against —
+   * so a verdict citing `series[0].points[3].value` on an incident whose
+   * metrics slot is null was recorded, concluded, promoted into
+   * analysis.evidence, and then scored CORRECT, because must_cite pools
+   * source_refs from every agent including this one. The agent that invents a
+   * path satisfies the requirement to cite it.
+   *
+   * The prompt already said "Only cite what the agents reported" and "copy a
+   * source_ref verbatim from an entry in agent_results". Nothing enforced it.
+   */
+  /*
+   * Who was asked must be who answered.
+   *
+   * A subagent ran the generated node code end to end on 2026-09-07: the node
+   * that had just asked the LOGS agent did not pass what it asked, so a reply
+   * labelled `"agent": "kubernetes"` — citing a path that resolves in the
+   * kubernetes slot — was recorded, and the chain concluded CONTAINER_OOM at
+   * 85% with two kubernetes entries and no logs analysis at all. Conclude only
+   * counts root_cause results, so nothing downstream noticed. A skipped agent
+   * recorded as a successful step.
+   */
+  it("refuses a reply from an agent other than the one that was asked", () => {
+    const a = assembleIncident("container-oom", 1, { root: SCENARIOS });
+    if (a.state !== "assembled") throw new Error("not assembled");
+    const asKubernetes = { agent: "kubernetes", status: "ok",
+      findings: [{ fact: "OOMKilled", source_ref: "pods[0].containers[0].last_state.terminated.reason" }],
+      hypotheses: [], confidence: 0.5 };
+
+    const wrong = recordAgentResult(a.incident, asKubernetes, "logs");
+    expect(wrong.state, "a kubernetes answer to a logs question must be refused").toBe("refused");
+    if (wrong.state === "refused") expect(wrong.reason).toMatch(/logs was asked/);
+
+    // The same reply, to the question it actually answers.
+    expect(recordAgentResult(a.incident, asKubernetes, "kubernetes").state).toBe("recorded");
+    // And a caller that does not know stays free to say nothing.
+    expect(recordAgentResult(a.incident, asKubernetes).state).toBe("recorded");
+  });
+
+  it("refuses a root cause verdict citing a path no agent reported", () => {
+    const bad = { ...VERDICT, findings: [{ fact: "invented", source_ref: "series[0].points[3].value" }],
+      hypotheses: [] };
+    expect(() => withAgents(bad), "an invented citation must not be recordable").toThrow(/no agent reported/);
+
+    // And the honest case still records, or this refuses everything.
+    const good = { ...VERDICT,
+      findings: [{ fact: "OOMKilled", source_ref: "pods[0].containers[0].last_state.terminated.reason" }] };
+    expect(() => withAgents(good)).not.toThrow();
   });
 
   it("keeps contradicting findings as evidence against, rather than dropping them", () => {

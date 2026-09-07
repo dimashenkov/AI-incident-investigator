@@ -479,10 +479,23 @@ describe("every prompt carries the rules its schema will enforce", () => {
       .toMatch(/\| an event or a state that \*\*names an image\*\* \| `deployment\.image` \|/);
     // And it must come first: it is the row measured missing, and the row a
     // reader stops at once an earlier row has already matched.
+    /*
+     * Anchored on the ROW, not on the phrase.
+     *
+     * `"names an image"` appears twice — once in the prose above the table and
+     * once in the row itself — and indexOf finds the prose. A subagent measured
+     * it on 2026-09-07 by swapping the two table rows: the assertion still
+     * passed at 4668 < 4871, because it was comparing a sentence with a row and
+     * never looked at the order it claims to guard.
+     */
     expect(
-      kube.indexOf("names an image"),
+      kube.indexOf("| an event or a state that **names an image**"),
       "the image row must precede the limits row it was losing to",
-    ).toBeLessThan(kube.indexOf("a container terminated, restarting, or unhealthy"));
+    ).toBeGreaterThan(-1);
+    expect(
+      kube.indexOf("| an event or a state that **names an image**"),
+      "the image row must precede the limits row it was losing to",
+    ).toBeLessThan(kube.indexOf("| a container terminated, restarting, or unhealthy |"));
     expect(kube, "and the configuration half must be named as the one that gets dropped")
       .toMatch(/it is the half most often\s*\n?dropped/);
     expect(kube, "and the event must be named as an output, not left to inference")
@@ -690,6 +703,101 @@ describe("the example in a prompt is the shape a model copies", () => {
     }
   };
 
+  /*
+   * The other three prompts, guarded the way the kubernetes one is.
+   *
+   * On 2026-09-07 a subagent replayed every assertion in this file against
+   * twelve rewrites and all twelve passed. The class was one thing: only
+   * kubernetes-agent.md had been double-guarded that morning. Every rule in
+   * logs, metrics and root-cause was held by a single positive regex — often a
+   * bare word like `truncated` or a backticked `window` — so keeping the
+   * sentence opener and reversing the rest walked through untouched.
+   *
+   * Each assertion below forbids a MEANING, and each has a mutation that
+   * reintroduces it while leaving every positive string in place. Without the
+   * mutation a negative assertion passes over text nobody wrote.
+   */
+  it("does not let the logs agent conclude from a truncated log or a bounded window", () => {
+    const logs = readPrompt("logs")!;
+    expect(logs, "the truncation rule must still be there").toMatch(/\*\*Check `truncated`\.\*\*/);
+    expect(logs, "a truncated log must never be treated as a complete one")
+      .not.toMatch(/(truncated|the lines you were handed)[^.]{0,120}(still (well )?founded|the ones the collector judged|is complete|means you saw)/i);
+    expect(logs, "the window rule must still be there").toMatch(/\*\*Check the `window`\.\*\*/);
+    expect(logs, "silence inside a window must never be read as nothing happening")
+      .not.toMatch(/(window|silence)[^.]{0,120}(means nothing happened|nothing happened|inside it by construction)/i);
+  });
+
+  it("does not ask logs or metrics for the configuration in any wording", () => {
+    for (const agent of ["logs", "metrics"] as AgentName[]) {
+      const text = readPrompt(agent)!;
+      /*
+       * The old guard was a two-literal blocklist. "Name that threshold and
+       * give its path in the deployment's container spec" asks for exactly the
+       * impossible thing and matches neither literal, so the shape is what is
+       * forbidden now: this slot, told to produce a limit, a threshold, a
+       * ceiling or the deployment's own values.
+       */
+      expect(text, `${agent} is asked for a threshold its slot cannot hold`)
+        .not.toMatch(/(name|give|report|state|cite)[^.]{0,80}(the (limit|threshold|ceiling|quota)|its `?limits`?|deployment'?s? (container )?spec)/i);
+      expect(text, `${agent} must still say the configuration is not its to report`)
+        .toMatch(/cannot see the configuration/);
+    }
+  });
+
+  it("does not let the root cause agent invent a fact or compose a citation", () => {
+    const rc = readPrompt("root-cause")!;
+    expect(rc, "the rule must still be there").toMatch(/\*\*Only cite what the agents reported\.\*\*/);
+    /*
+     * Two shapes, because the invitation can be phrased as inference or as
+     * authorship. The first draft of this guard bounded its distance with
+     * `[^.]` and the escape put a full stop in the middle — the same newline
+     * lesson one punctuation mark over.
+     */
+    expect(rc, "nothing may invite the agent to infer a fact nobody reported")
+      .not.toMatch(/(imply|implies|infer|deduce)[^.]{0,80}(fact|cause|conclusion)/i);
+    expect(rc, "and nothing may invite it to write one itself")
+      .not.toMatch(/(state|write|supply)\s+(that|the|a)\s+(fact|cause|conclusion)\s+yourself/i);
+    expect(rc, "the verbatim-copy rule must still be there")
+      .toMatch(/\*\*Copy a `source_ref` verbatim from an entry in `agent_results`\.\*\*/);
+    /*
+     * The path a model would compose if invited to. Measured live on
+     * 2026-09-06: a wrapper-prefixed source_ref refused two whole scenarios,
+     * because the payload sees the envelope and the observation does not.
+     */
+    expect(rc, "no citation may be prefixed with the envelope the payload sees")
+      .not.toMatch(/`?agent_results\[\d+\]\.[a-z_]+/i);
+    expect(rc, "and composing a path must stay forbidden")
+      .not.toMatch(/(path|source_ref)[^.]{0,80}(your own composition|need not be one|compose it yourself)/i);
+  });
+
+  it("keeps insufficient evidence a narrow answer, not the safe default", () => {
+    const rc = readPrompt("root-cause")!;
+    expect(rc, "the rule must still be there").toMatch(/Not enough to tell is a real answer/);
+    /*
+     * Measured live on 2026-09-06: the chain read the evidence, cited it, and
+     * then answered INSUFFICIENT_EVIDENCE anyway. What fixed it was narrowing
+     * the case to one situation. Nothing guarded the narrowing.
+     */
+    expect(rc, "refusing must not be offered as the safe or default answer")
+      .not.toMatch(/(it is the safe one|the safe (answer|choice)|whenever you are not certain|when in doubt)[^.]{0,80}(return no hypotheses|insufficient)/i);
+    expect(rc, "and the narrowing to one situation must survive")
+      .toMatch(/for one situation only/i);
+  });
+
+  it("keeps a hypothesis tied to the findings the same answer reported", () => {
+    for (const agent of ["kubernetes", "logs", "metrics"] as AgentName[]) {
+      const text = readPrompt(agent)!;
+      // The three files word it differently — kubernetes bolds the phrase, the
+      // other two list the three fields — so the assertion asks for the RULE.
+      expect(text, `${agent} must require supported_by`)
+        .toMatch(/Every hypothesis needs[^.]{0,60}`supported_by`/);
+      expect(text, `${agent} must tie it to a finding of its own`)
+        .toMatch(/`source_ref` of a finding you actually reported/);
+      expect(text, `${agent} must not allow citing a path it did not report`)
+        .not.toMatch(/(any path|whether or not|need not)[^.]{0,120}(among your findings|you (listed|reported)|wrote down)/i);
+    }
+  });
+
   it("tells the metrics agent where the unit goes, not merely that it must appear", () => {
     // Measured on 2026-09-05, on a real call: the model answered with `value`
     // and `unit` as separate fields and no `fact`, refused twice over. The
@@ -712,7 +820,18 @@ describe("the example in a prompt is the shape a model copies", () => {
     expect(r.state, `root-cause example: ${JSON.stringify(r)}`).not.toBe("invalid");
   });
 
-  for (const agent of ["kubernetes"] as AgentName[]) {
+  /*
+   * Every agent, not two of them.
+   *
+   * A subagent replayed all of this file's assertions on 2026-09-07 and found
+   * the metrics and logs examples were parsed by nothing: their return examples
+   * could be rewritten into the exact shape measured refused on 2026-09-05 —
+   * `{ source_ref, value, unit }` instead of a `fact` — and every assertion
+   * here still passed. The example is the part of a prompt a model copies most
+   * literally, so an unvalidated example is the least guarded and most followed
+   * text in the file.
+   */
+  for (const agent of ["kubernetes", "logs", "metrics"] as AgentName[]) {
     it(`shows ${agent} an example the validator would accept`, () => {
       // Grok and Codex, independently on 2026-09-05: the root-cause prompt
       // showed an object with root_cause_code and evidence at the top level,

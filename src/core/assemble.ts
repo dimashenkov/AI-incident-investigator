@@ -268,9 +268,16 @@ export function serviceFromTags(alert: Record<string, unknown>): string | null {
 export function recordAgentResult(
   incident: Record<string, unknown>,
   result: unknown,
+  /*
+   * Who was asked, when the caller knows. The wrapper used to drop this on the
+   * floor by not having it, so the deployed node could not have passed it even
+   * if it wanted to — the parameter has to exist all the way down or the check
+   * is unreachable from the only place it matters.
+   */
+  expected?: string,
 ): { state: "recorded"; incident: Record<string, unknown>; normalised: number }
   | { state: "refused"; reason: string; errors?: string[] } {
-  return mergeRecordAgentResult(validate as Validate, incident, result);
+  return mergeRecordAgentResult(validate as Validate, incident, result, expected);
 }
 
 export function concludeIncident(
