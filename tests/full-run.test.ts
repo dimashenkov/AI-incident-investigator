@@ -46,7 +46,9 @@ const CITABLE: Record<string, string[]> = {
 
 describe("every scenario travels the whole chain", () => {
   it("has scenarios to run", () => {
-    expect(scenarios.length).toBe(5);
+    // A number here was a second copy of the scenario count; the chain below
+    // iterates, so what it needs is a non-empty list.
+    expect(scenarios.length, "no scenario directories were found").toBeGreaterThan(0);
   });
 
   for (const scenario of scenarios) {

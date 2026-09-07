@@ -1,0 +1,44 @@
+{
+  "collected_at": "2026-09-07T08:15:30Z",
+  "pods": [
+    {
+      "name": "search-indexer-58bd9c4f7-w2xqm",
+      "namespace": "production",
+      "phase": "Running",
+      "restart_count": 7,
+      "containers": [
+        {
+          "name": "search-indexer",
+          "ready": false,
+          "restart_count": 7,
+          "limits": { "memory": "2Gi", "cpu": "1000m" },
+          "requests": { "memory": "1Gi", "cpu": "500m" },
+          "last_state": {
+            "terminated": {
+              "reason": "Error",
+              "exit_code": 1,
+              "started_at": "2026-09-07T08:14:41Z",
+              "finished_at": "2026-09-07T08:14:43Z"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "type": "Warning",
+      "reason": "BackOff",
+      "message": "Back-off restarting failed container search-indexer in pod search-indexer-58bd9c4f7-w2xqm",
+      "count": 7,
+      "last_seen": "2026-09-07T08:15:12Z",
+      "involved_object": "pod/search-indexer-58bd9c4f7-w2xqm"
+    }
+  ],
+  "deployment": {
+    "name": "search-indexer",
+    "namespace": "production",
+    "image": "registry.internal/search-indexer:4.2.0",
+    "replicas": { "desired": 3, "ready": 0, "available": 0 }
+  }
+}

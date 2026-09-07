@@ -1,0 +1,11 @@
+{
+  "collected_at": "2026-09-07T08:15:32Z",
+  "window": { "from": "2026-09-07T08:05:00Z", "to": "2026-09-07T08:15:00Z" },
+  "truncated": false,
+  "lines": [
+    { "ts": "2026-09-07T08:14:41Z", "level": "info", "container": "search-indexer", "message": "search-indexer 4.2.0 starting" },
+    { "ts": "2026-09-07T08:14:42Z", "level": "info", "container": "search-indexer", "message": "loading index schema from /etc/indexer/schema.yaml" },
+    { "ts": "2026-09-07T08:14:43Z", "level": "error", "container": "search-indexer", "message": "fatal: schema.yaml: unknown field 'analyzer_v2' at line 31; refusing to start" },
+    { "ts": "2026-09-07T08:14:43Z", "level": "error", "container": "search-indexer", "message": "exiting with status 1 before accepting connections" }
+  ]
+}

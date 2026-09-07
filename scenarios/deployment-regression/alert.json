@@ -1,0 +1,2 @@
+{ "id": "alert-1c07", "title": "orders-api error rate up after rollout", "triggered_at": "2026-09-07T09:41:00Z",
+  "severity": "critical", "monitor_id": "mon-7734", "tags": ["service:orders-api", "env:production"] }

@@ -1,11 +1,13 @@
 {
   "note": "Scenario numbers, assigned once and never reused. Codex, chunk 2: deriving them from sorted position meant that adding a scenario which sorts earlier renumbered an existing one — and with it that scenario's incident id and its Slack thread id. An id that changes when an unrelated file appears is not an id. Append only: a new scenario takes the next free number, and an existing entry is never edited or removed, even if the scenario is deleted, because its number must not be handed to something else.",
-  "next_free": 6,
+  "next_free": 8,
   "numbers": {
     "container-oom": 1,
     "image-pull-failure": 2,
     "readiness-probe-failure": 3,
     "cpu-throttling": 4,
-    "insufficient-evidence": 5
+    "insufficient-evidence": 5,
+    "application-startup-failure": 6,
+    "deployment-regression": 7
   }
 }

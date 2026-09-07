@@ -1,0 +1,3 @@
+{ "root_cause_code": "APPLICATION_STARTUP_FAILURE",
+  "note": "What this scenario is FOR. Restart count 7 and a container not ready look exactly like CONTAINER_OOM until the termination reason is read: it is Error with exit code 1, not OOMKilled, and memory is nowhere near the 2Gi limit. The cause is only in the logs, in a line the process printed before exiting. An agent that reasons from the restart count alone reaches the wrong code with the right symptoms.",
+  "must_cite": ["lines[2].message", "pods[0].containers[0].last_state.terminated.reason"] }

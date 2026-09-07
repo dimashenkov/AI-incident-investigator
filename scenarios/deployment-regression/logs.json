@@ -1,0 +1,13 @@
+{
+  "collected_at": "2026-09-07T09:42:12Z",
+  "window": { "from": "2026-09-07T09:30:00Z", "to": "2026-09-07T09:42:00Z" },
+  "truncated": false,
+  "lines": [
+    { "ts": "2026-09-07T09:33:11Z", "level": "info", "container": "orders-api", "message": "POST /v2/orders 201 in 42ms" },
+    { "ts": "2026-09-07T09:36:50Z", "level": "info", "container": "orders-api", "message": "POST /v2/orders 201 in 39ms" },
+    { "ts": "2026-09-07T09:38:19Z", "level": "info", "container": "orders-api", "message": "orders-api 5.4.0 accepting connections" },
+    { "ts": "2026-09-07T09:38:31Z", "level": "error", "container": "orders-api", "message": "POST /v2/orders 500: discount_code column is not present in the read model" },
+    { "ts": "2026-09-07T09:39:47Z", "level": "error", "container": "orders-api", "message": "POST /v2/orders 500: discount_code column is not present in the read model" },
+    { "ts": "2026-09-07T09:41:22Z", "level": "error", "container": "orders-api", "message": "POST /v2/orders 500: discount_code column is not present in the read model" }
+  ]
+}

@@ -22,9 +22,9 @@ export const DEFINITION_OF_DONE = [
     ],
   },
   {
-    n: 2, claim: "All five scenarios and INSUFFICIENT_EVIDENCE.", covered: false,
+    n: 2, claim: "Every scenario and INSUFFICIENT_EVIDENCE.", covered: false,
     needs: "a model call",
-    why: "Codex, chunk 2: the named tests establish that five fixtures exist, assemble, validate and declare expected causes — they never establish that the system PRODUCES those answers, and marking the item covered on that basis was the claim being larger than the evidence",
+    why: "Codex, chunk 2: the named tests establish that the fixtures exist, assemble, validate and declare expected causes — they never establish that the system PRODUCES those answers, and marking the item covered on that basis was the claim being larger than the evidence. Widened from FIVE to EVERY on 2026-09-07, when application-startup-failure and deployment-regression were added: five of the seven have been run against a model and two have not, so wording that says five would let the item read as nearly done while a third of it has never been asked",
   },
   {
     n: 3, claim: "Confidence reduction under conflicting evidence.", covered: false,

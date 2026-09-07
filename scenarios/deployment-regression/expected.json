@@ -1,0 +1,3 @@
+{ "root_cause_code": "DEPLOYMENT_REGRESSION",
+  "note": "What this scenario is FOR. Nothing is wrong at pod level: both pods Running, both ready, zero restarts, no throttling, and the desired replica count is met. Every symptom an agent normally reaches for is absent, and the only thing that can name the cause is the time at which a rollout event and the first error line meet. It also exercises the kubernetes prompt's healthy-cluster row: the slot is quiet, and the value another agent needs is still ours to report.",
+  "must_cite": ["events[0].message", "lines[3].message"] }

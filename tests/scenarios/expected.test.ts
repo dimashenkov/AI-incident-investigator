@@ -13,6 +13,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { listScenarios, readScenario } from "../../src/providers/fixtures.js";
+import { readRegistry } from "../../src/core/assemble.js";
 import commonSchema from "../../schemas/common.schema.json" with { type: "json" };
 
 const ROOT = new URL("../../scenarios/", import.meta.url).pathname;
@@ -42,8 +43,20 @@ function resolvePath(root: unknown, path: string): unknown {
 describe("every scenario's expected answer is one the system can give", () => {
   const scenarios = listScenarios(ROOT);
 
-  it("finds all five, so nothing below passes on an empty set", () => {
-    expect(scenarios.length).toBe(5);
+  /*
+   * The precondition, not a census. It was `toBe(5)` until 2026-09-07, when
+   * adding two scenarios turned three separate tests red for the same reason:
+   * a hard number is a second place the scenario count lives, and it goes
+   * stale the moment the first one changes. What this actually needs is that
+   * the list is not empty — everything below it iterates and would pass on
+   * nothing — and the registry is the one place the count is declared, so
+   * agreeing with it is a real check rather than a copy of the answer.
+   */
+  it("finds every registered scenario, so nothing below passes on an empty set", () => {
+    const registry = readRegistry(ROOT)!;
+    expect(scenarios.length, "no scenario directories were found").toBeGreaterThan(0);
+    expect(scenarios.slice().sort(), "the directories and scenarios/registry.json disagree")
+      .toEqual(Object.keys(registry.numbers).sort());
   });
 
   it("names a cause code the incident schema permits", () => {

@@ -1,0 +1,51 @@
+{
+  "collected_at": "2026-09-07T09:42:10Z",
+  "pods": [
+    {
+      "name": "orders-api-7d4c85b96f-2vqlt",
+      "namespace": "production",
+      "phase": "Running",
+      "restart_count": 0,
+      "containers": [
+        { "name": "orders-api", "ready": true, "restart_count": 0,
+          "limits": { "memory": "1Gi", "cpu": "1000m" },
+          "requests": { "memory": "512Mi", "cpu": "500m" } }
+      ]
+    },
+    {
+      "name": "orders-api-7d4c85b96f-nk8rp",
+      "namespace": "production",
+      "phase": "Running",
+      "restart_count": 0,
+      "containers": [
+        { "name": "orders-api", "ready": true, "restart_count": 0,
+          "limits": { "memory": "1Gi", "cpu": "1000m" },
+          "requests": { "memory": "512Mi", "cpu": "500m" } }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "type": "Normal",
+      "reason": "ScalingReplicaSet",
+      "message": "Scaled up replica set orders-api-7d4c85b96f to 2 for image registry.internal/orders-api:5.4.0, replacing orders-api-64f9b7c8d5",
+      "count": 1,
+      "last_seen": "2026-09-07T09:38:02Z",
+      "involved_object": "deployment/orders-api"
+    },
+    {
+      "type": "Normal",
+      "reason": "ScalingReplicaSet",
+      "message": "Scaled down replica set orders-api-64f9b7c8d5 to 0",
+      "count": 1,
+      "last_seen": "2026-09-07T09:38:44Z",
+      "involved_object": "deployment/orders-api"
+    }
+  ],
+  "deployment": {
+    "name": "orders-api",
+    "namespace": "production",
+    "image": "registry.internal/orders-api:5.4.0",
+    "replicas": { "desired": 2, "ready": 2, "available": 2 }
+  }
+}

@@ -24,8 +24,12 @@ const OK_RESULT = {
 };
 
 describe("every scenario assembles into a valid incident", () => {
-  it("has the five scenarios the plan calls for", () => {
-    expect(all.length).toBe(5);
+  // Not a count: the registry declares which scenarios exist, and a directory
+  // that is not in it has no incident number, so the two must agree.
+  it("has every registered scenario, so nothing below passes on an empty set", () => {
+    expect(all.length, "no scenario directories were found").toBeGreaterThan(0);
+    expect(all.slice().sort(), "the directories and scenarios/registry.json disagree")
+      .toEqual(Object.keys(REGISTRY.numbers).sort());
     expect(all).toContain("insufficient-evidence");
   });
 

@@ -1,0 +1,2 @@
+{ "id": "alert-9f22", "title": "search-indexer restarting continuously", "triggered_at": "2026-09-07T08:14:00Z",
+  "severity": "critical", "monitor_id": "mon-6620", "tags": ["service:search-indexer", "env:production"] }
