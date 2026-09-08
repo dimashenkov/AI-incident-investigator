@@ -27,6 +27,28 @@ any of it changes, the run is void and the money is spent for nothing.
 | `scripts/score-run.mjs` | the marking scheme |
 | the deployed workflow | one deployment, or the runs are not comparable |
 
+## Corrected on 2026-09-08, before anything was bought
+
+A subagent was given one mandate — *find every reason this run would come back
+uninterpretable* — and ran the eight scenarios locally end to end. All eight are
+winnable, which the protocol assumed and had not checked. Six things in this
+document were wrong, and three of them would have wasted the run.
+
+| What this document said | What was measured |
+|---|---|
+| three attempts of one scenario are recorded | `answers.json` is keyed by SCENARIO, so three attempts collapse to the last, silently. Fixed below: each attempt is its own key |
+| 48 calls, ~$0.015–0.020 | **43 calls.** Three scenarios ask 3 agents, not 4, because a `__nothing` slot skips its agent. ~$0.0174 at the measured $0.000405 a call |
+| the criterion is decided in advance | it was decided for `image-pull-failure`'s three attempts and **not** for `readiness-probe-failure`'s. Three of the twelve runs had no verdict named. Fixed below |
+| item 3 closes if confidence is lowered | a refusal at **0.95** scored `correct`, so the item could have read as closed by a run in which confidence went UP. The scorer refuses that since 2026-09-08 |
+| `deployment-regression` is reachable | reachable, but the kubernetes prompt said to report events showing something WRONG — and a rollout says `Normal`. An obedient agent dropped the only evidence the scenario is scored on. Fixed in the prompt |
+| eleven readiness checks move | **eight.** The three Definition-of-Done items need a hand edit and named tests; no run moves them |
+
+**One thing nothing in this repository does yet:** issue the calls and write the
+record. There is no runner. `recordInto` writes only the scored states, so the
+token counts, the cost and `normalised` are hand-entered afterwards — which this
+document's last section says must not happen. That is a gap, and it is stated
+here rather than discovered after paying.
+
 ## What is asked
 
 Eight scenarios, one attempt each, on one deployment.
@@ -45,6 +67,19 @@ Total: 8 + 4 extra attempts = 12 chain runs.
 | `image-pull-failure` cites `deployment.image` in **3 of 3** attempts | the rewrite worked |
 | it cites it in 1 or 2 of 3 | **not** a fix — it is variance, and the prompt is not touched again on that basis |
 | it cites it in 0 of 3 | the seventh rule failed like the six before it; the answer is a different mechanism, not a seventh rewording |
+
+| `readiness-probe-failure` result | Verdict |
+|---|---|
+| fully correct in **3 of 3** | it is settled; it stops being re-run |
+| correct in 1 or 2 of 3 | the earlier 3-of-3 was luck, and the scenario goes back on the list |
+| wrong in any attempt | a regression against a scenario that was passing, and the cause is found before anything else is measured |
+
+**Each attempt is its own key.** `answers.json` maps a name to an answer, so
+three attempts under one scenario name keep only the last — measured on
+2026-09-08, and the attempt that DID cite the missing path was the one thrown
+away. Write them as `image-pull-failure#1`, `#2`, `#3`, score each, and record
+all twelve in ONE run record: `latestScored` returns a single record, so a
+second file would send the other seven scenarios back to unestablished.
 
 | Result | Verdict |
 |---|---|

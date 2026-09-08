@@ -66,9 +66,21 @@ it before you finish.
 
 | Look at | Report |
 |---|---|
-| `events` | every event that shows something wrong, quoting its message |
+| `events` | every event that shows something wrong **or something CHANGING**, quoting its message |
 | pod and container state | a phase, a readiness, a restart count, a termination that is not normal |
 | **then** the configuration below | the values only you can see |
+
+**A change is reportable even when nothing looks wrong.** A rollout, a scale-up,
+a replica set replacing another — those events say `Normal`, and they are the
+only thing that can explain a failure whose pods are all healthy. Quote the
+event and give its `last_seen`; the time is the whole point, because a cause of
+this kind is a change that lines up with the first error.
+
+Measured on 2026-09-08, before the run that would have paid for it: the file
+told you to report events that show something WRONG, so an obedient agent
+dropped `ScalingReplicaSet` and the one scenario built around a rollout came
+back either wrong or right-for-the-wrong-reason. The evidence was filtered out
+before the agent that needed it ever saw it.
 
 **Report every distinct symptom; report each one once.** A failing probe and a
 restarting container are two findings. Two events saying the same thing are one:

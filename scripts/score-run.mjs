@@ -116,6 +116,30 @@ export function score(scenario, answer, root = SCENARIOS) {
    */
   const unqualified = [];
   const refused = got === "INSUFFICIENT_EVIDENCE";
+  /*
+   * A refusal is exempt from the ceiling — but not from stating a number that
+   * contradicts it.
+   *
+   * The exemption was written because INSUFFICIENT_EVIDENCE already IS the
+   * lowered answer, so demanding a low number asks it to doubt its own doubt.
+   * That reasoning holds for a refusal that states no confidence, or states a
+   * low one. It does not hold for a refusal at 0.95: a subagent scored exactly
+   * that `correct` on 2026-09-08, before the run that would have paid for it —
+   * and Definition of Done item 3 would have read as closed by a run in which
+   * the confidence went UP. Item 3's claim is "confidence reduction under
+   * conflicting evidence".
+   *
+   * So the ceiling is waived, and a HIGH number is still refused. The bound is
+   * deliberately loose: a refusal may say anything up to the scenario's own
+   * ceiling, which is the most a refusal could honestly claim.
+   */
+  if (want.maxConfidence !== null && refused) {
+    const c = answer.incident?.analysis?.confidence;
+    if (typeof c === "number" && Number.isFinite(c) && c > want.maxConfidence) {
+      unqualified.push(`it refused and then stated confidence ${c}, above the ceiling of `
+        + `${want.maxConfidence} — a refusal held that firmly is not a refusal`);
+    }
+  }
   if (want.maxConfidence !== null && !refused) {
     const c = answer.incident?.analysis?.confidence;
     /*

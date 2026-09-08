@@ -48,8 +48,11 @@ A number without the thing it is measured against is not your failure to state
 it — it is the shape of what you were handed. Say what you saw.
 
 **A `source_ref` is a path inside the observation you were given.** Write
-`series[0].points[3]`, and if you begin it with `observation.` that is accepted too — the prefix
-is stripped and what remains has to resolve.
+`series[0].points[3].value` — the field you read, not just the point. This line
+said `series[0].points[3]` until 2026-09-08 while the paragraph above it said
+the leaf, and a scenario that asks for the leaf would have scored an obedient
+answer as resting on other ground. If you begin the path with `observation.`
+that is accepted too — the prefix is stripped and what remains has to resolve.
 
 Measured on 2026-09-06: this file used to forbid the prefix, twice, and a real
 model wrote it anyway, because the object it is looking at is literally called

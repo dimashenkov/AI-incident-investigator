@@ -839,6 +839,22 @@ describe("the example in a prompt is the shape a model copies", () => {
       .toMatch(/`source_ref` of a finding \*\*you\*\* reported/);
   });
 
+  it("asks for a change even when nothing looks wrong", () => {
+    /*
+     * DEPLOYMENT_REGRESSION is a cause with no pod-level symptom: everything is
+     * healthy and the only thing that names it is a rollout event lining up
+     * with the first error. The file said to report events that show something
+     * WRONG, and a rollout says `Normal` — so an obedient agent dropped the one
+     * finding the scenario is scored on. Measured on 2026-09-08, before the run
+     * that would have paid for it.
+     */
+    const kube = readPrompt("kubernetes")!;
+    expect(kube, "a change is reportable whether or not it looks wrong")
+      .toMatch(/or something CHANGING/);
+    expect(kube, "and the file must say why the time matters")
+      .toMatch(/lines up with the first error/);
+  });
+
   it("teaches the citation spelling the scenarios actually ask for", () => {
     // metrics-agent.md showed `series[0].points[3]` while a scenario demands
     // `series[0].points[3].value`; logs-agent.md showed `lines[2]` while every

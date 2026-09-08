@@ -164,8 +164,10 @@ describe("a scenario whose evidence conflicts is scored on more than its code", 
     // A refusal is exempt from both qualifications, for one reason: they are
     // asked of a conclusion, and a refusal is the absence of one. It still has
     // to cite what it looked at.
-    expect(score(S, qualified("INSUFFICIENT_EVIDENCE", cite, 0.9, 0), SCENARIOS).state).toBe("correct");
-    expect(score(S, qualified("INSUFFICIENT_EVIDENCE", [], 0.9, 0), SCENARIOS).state)
+    // 0 rather than 0.9: since 2026-09-08 a refusal may not be stated above the
+    // scenario's own ceiling, because a refusal held that firmly is not one.
+    expect(score(S, qualified("INSUFFICIENT_EVIDENCE", cite, 0, 0), SCENARIOS).state).toBe("correct");
+    expect(score(S, qualified("INSUFFICIENT_EVIDENCE", [], 0, 0), SCENARIOS).state)
       .toBe("correct-without-its-evidence");
     expect(score(S, qualified("CPU_THROTTLING", cite, 0.2, 1), SCENARIOS).state).toBe("wrong");
   });
@@ -295,6 +297,31 @@ describe("a scenario whose evidence conflicts is scored on more than its code", 
       { source: "metrics", fact: "memory never approached the limit", supports: "against" },
     ]), SCENARIOS);
     expect(r.state, "one extra supporting fact must not invalidate a real contradiction").toBe("correct");
+  });
+
+  it("refuses a refusal that is held as firmly as a conclusion", () => {
+    /*
+     * The exemption said: a refusal already IS the lowered answer, so demanding
+     * a low number asks it to doubt its own doubt. True for a refusal that
+     * states nothing, or something small. Not true at 0.95 — a subagent scored
+     * exactly that `correct` on 2026-09-08, before the run that would have paid
+     * for it, and Definition of Done item 3 would have read as CLOSED by a run
+     * in which the confidence went up. Item 3's claim is "confidence reduction
+     * under conflicting evidence".
+     */
+    const refusal = (confidence: unknown) =>
+      withEvidence("INSUFFICIENT_EVIDENCE", cite, confidence, []);
+
+    const firm = score(S, refusal(0.95), SCENARIOS);
+    expect(firm.state, "a refusal at 95% is not a refusal").toBe("correct-but-unqualified");
+    expect(firm.why.join(" ")).toMatch(/above the ceiling/);
+
+    // Everything up to the scenario's own ceiling is the honest range, and a
+    // refusal that states no number at all is honest too.
+    for (const c of [0, 0.3, 0.6, null, undefined]) {
+      expect(score(S, refusal(c), SCENARIOS).state, `a refusal at ${JSON.stringify(c)} is honest`)
+        .toBe("correct");
+    }
   });
 
   it("counts the new state separately in the report and does not exit clean", () => {

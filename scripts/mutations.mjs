@@ -1144,6 +1144,24 @@ export const MUTATIONS = [
     mustFail: "23 a slot gathered in another namespace",
   },
   {
+    // A refusal stated at 0.95 scored correct, so item 3 would read as closed
+    // by a run in which the confidence went UP.
+    id: "a-refusal-held-as-firmly-as-a-conclusion",
+    file: "scripts/score-run.mjs",
+    from: "  if (want.maxConfidence !== null && refused) {",
+    to: "  if (false) {",
+    mustFail: "refuses a refusal that is held as firmly as a conclusion",
+  },
+  {
+    // A rollout event dropped because it says Normal, so the one scenario built
+    // around a change in time loses the only evidence that names its cause.
+    id: "a-normal-event-is-not-reportable",
+    file: "prompts/kubernetes-agent.md",
+    from: "| `events` | every event that shows something wrong **or something CHANGING**, quoting its message |",
+    to: "| `events` | every event that shows something wrong, quoting its message |",
+    mustFail: "asks for a change even when nothing looks wrong",
+  },
+  {
     // The deployed node running the schemas and nothing else, so "valid" means
     // one thing in a unit test and another in production — which is exactly the
     // promise the top of src/schema/validate.ts makes.
