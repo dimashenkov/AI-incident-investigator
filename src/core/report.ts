@@ -60,7 +60,7 @@ export function reportIncident(incident: Record<string, unknown>, at: string): R
   if (opened !== null) return { state: "refused", reason: opened };
 
   for (const a of agents) {
-    const failed = say(agentMessage(a, incidentId, at));
+    const failed = say(agentMessage(a, incidentId, at, agents));
     if (failed !== null) return { state: "refused", reason: `${a.agent}: ${failed}` };
   }
 
@@ -102,7 +102,9 @@ export function reportIncident(incident: Record<string, unknown>, at: string): R
     }
 
     const text =
-      `Root cause: ${code}. ${String(analysis["root_cause"] ?? "")}` +
+      // The full stop is not decoration: without it every verdict read
+      // "...exceeded its memory limit The agent puts its confidence at...".
+      `Root cause: ${code}. ${sentence(analysis["root_cause"])}` +
       /*
        * Said as what it is: a number the model gave, not one anything measured.
        *
@@ -117,21 +119,96 @@ export function reportIncident(incident: Record<string, unknown>, at: string): R
        * a share rather than a judgement.
        */
       (typeof confidence === "number"
-        ? ` The agent puts its confidence at ${Math.round(confidence * 100)}%, which is its own estimate and nothing here checks it.`
+        ? ` The agent puts its confidence at ${asPercent(confidence)}, which is its own estimate and nothing here checks it.`
         : " Confidence was not recorded, so this rests on the evidence below and nothing more.") +
-      (against.length === 0 ? "" : ` ${against.length} finding(s) argue against this; they are in the incident's evidence.`);
+      /*
+       * The dissent, SPELLED OUT rather than counted.
+       *
+       * It used to read "1 finding(s) argue against this; they are in the
+       * incident's evidence" — a number, and a pointer at a JSON field that is
+       * not in the thread, while every supporting fact was written out in full.
+       * A reader who is told there is one objection and not what it says has
+       * been told the shape of the doubt and not the doubt.
+       */
+      (against.length === 0
+        ? ""
+        : ` Against it: ${against.map((e) => `${e.source} says ${e.fact}`).join("; ")}.`);
     const failed = say({ role: "agent", incident_id: incidentId, ts: at, text,
       cited_evidence: forIt.map((e) => ({ source: e.source, fact: e.fact })) });
+    if (failed !== null) return { state: "refused", reason: `verdict: ${failed}` };
+  } else {
+    /*
+     * The branch that was not there.
+     *
+     * With no root_cause_code the loop above wrote the agent lines and the
+     * function returned "reported" having said nothing about the outcome. A
+     * subagent printed two such threads on 2026-09-07: a chain that stopped
+     * after the specialists, and one where every agent refused. Both ended on a
+     * bare positive finding, or on three could-not-read lines, with no closing
+     * sentence — and both were returned as a successful report.
+     *
+     * Silence at the end of a thread reads as "that is the answer". The last
+     * line has to say the investigation did not reach one, and why, so the two
+     * cases are not the same silence.
+     */
+    const errored = agents.filter((a) => a.status === "error").length;
+    const asked = agents.filter((a) => a.agent === "root_cause").length;
+    const why = asked === 0
+      ? "the root cause agent was never asked, so this chain did not finish"
+      : "no cause was recorded on the incident";
+    const failed = say({
+      role: "system", incident_id: incidentId, ts: at,
+      text: `This investigation reached no conclusion: ${why}.`
+        + (errored === 0 ? "" : ` ${errored} agent(s) could not read their source.`)
+        + " Nothing above is a verdict.",
+    });
     if (failed !== null) return { state: "refused", reason: `verdict: ${failed}` };
   }
 
   return { state: "reported", conversation: current };
 }
 
+/** A cause sentence that ends, so the next sentence does not run into it. */
+function sentence(text: unknown): string {
+  const t = String(text ?? "").trim();
+  if (t.length === 0) return "";
+  return /[.!?]$/.test(t) ? t : `${t}.`;
+}
+
+/**
+ * A confidence as the reader should see it.
+ *
+ * Math.round printed 100% for 0.9951, 0.996 and 0.999 alike — so a model that
+ * deliberately withheld certainty was reported as certain — and 0% for a
+ * diagnosis at 0.004, a number the incident schema refuses outright. Measured
+ * by a subagent on 2026-09-07 across seven stored values.
+ *
+ * So: 0% and 100% are reserved for exactly 0 and exactly 1. Anything strictly
+ * between them prints a figure strictly between them, with a decimal place when
+ * the whole number would round to an endpoint it has not reached. The owner
+ * asked for percent on 2026-09-05 because a number between nought and one reads
+ * as a share rather than a judgement; this keeps that and stops it lying at the
+ * ends.
+ */
+export function asPercent(confidence: number): string {
+  if (!Number.isFinite(confidence)) return "an unreadable number";
+  if (confidence <= 0) return "0%";
+  if (confidence >= 1) return "100%";
+  const whole = Math.round(confidence * 100);
+  if (whole > 0 && whole < 100) return `${whole}%`;
+  // Below 0.5% or above 99.5%: one decimal rather than an endpoint the value
+  // has not reached. And when even that reads as an endpoint — 0.0001 printed
+  // "0.0%", which is 0% with a decoration — say the bound instead.
+  const oneDecimal = (confidence * 100).toFixed(1);
+  if (oneDecimal === "0.0") return "under 0.1%";
+  if (oneDecimal === "100.0") return "over 99.9%";
+  return `${oneDecimal}%`;
+}
+
 /** What one agent said, in a message that carries its citations. */
-function agentMessage(a: AgentResult, incidentId: string, at: string): Message {
+function agentMessage(a: AgentResult, incidentId: string, at: string, all: AgentResult[]): Message {
   const findings = a.findings ?? [];
-  const cited = findings.map((f) => ({ source: sourceOf(a.agent), fact: f.fact }));
+  const cited = findings.map((f) => ({ source: sourceOf(a.agent, f.source_ref, all), fact: f.fact }));
 
   // Grok, 2026-09-05: `no_data || findings.length === 0` collapsed three
   // different situations into one sentence — no_data, an ok result with nothing
@@ -153,6 +230,17 @@ function agentMessage(a: AgentResult, incidentId: string, at: string): Message {
       text: `${a.agent}: returned a state this report does not recognise (${a.status}). Read the incident itself before relying on anything below.` };
   }
   if (findings.length === 0) {
+    /*
+     * The root cause agent is the exception, and the schema says so in its own
+     * words since 2026-09-07: it holds no observation, reads the other agents'
+     * results, and may legitimately reach no conclusion. Calling that "unread"
+     * told the reader the opposite of what the document means. The two carriers
+     * disagreed about one shape; a subagent found them side by side.
+     */
+    if (a.agent === "root_cause") {
+      return { role: "system", incident_id: incidentId, ts: at,
+        text: `${a.agent}: read the findings above and proposed no cause.` };
+    }
     return { role: "system", incident_id: incidentId, ts: at,
       text: `${a.agent}: reported success but listed nothing. Treat that as unread rather than as an empty result.` };
   }
@@ -160,6 +248,34 @@ function agentMessage(a: AgentResult, incidentId: string, at: string): Message {
     text: `${a.agent}: ${findings.map((f) => f.fact).join("; ")}.` };
 }
 
-function sourceOf(agent: string): string {
-  return agent === "kubernetes" || agent === "logs" || agent === "metrics" ? agent : "datadog";
+/**
+ * Which source a fact came from — traced, not guessed.
+ *
+ * This returned "datadog" for any agent that is not one of the three slots,
+ * which in practice means always for the root cause agent. So a thread could
+ * show one fact twice with two different sources: `analysis.evidence` said
+ * kubernetes and the root cause message said datadog, about the same sentence.
+ * Found by a subagent on 2026-09-07, printed side by side from a real run.
+ *
+ * The root cause agent holds no observation, so its citations are copies of
+ * what a specialist reported — and since 2026-09-07 that is enforced, not
+ * hoped: a verdict may only cite a source_ref some agent actually reported. So
+ * the source is FINDABLE, and looking it up is the honest answer.
+ *
+ * When it cannot be found the answer is the agent's own name rather than a
+ * provider that never held the fact. That reads oddly, which is correct: a
+ * citation nobody reported should look wrong.
+ */
+function sourceOf(agent: string, ref: string | undefined, agents: AgentResult[]): string {
+  if (agent === "kubernetes" || agent === "logs" || agent === "metrics") return agent;
+  if (typeof ref === "string") {
+    for (const other of agents) {
+      if (other.agent === agent) continue;
+      const reported = (other.findings ?? []).some((f) => f.source_ref === ref);
+      if (reported && (other.agent === "kubernetes" || other.agent === "logs" || other.agent === "metrics")) {
+        return other.agent;
+      }
+    }
+  }
+  return agent;
 }

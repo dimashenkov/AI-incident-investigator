@@ -698,7 +698,15 @@ export const LIMITATIONS = [
   // it is indistinguishable from legitimate data, and it carries no incident id
   // to recognise. It is a defect in a provider, and this repository cannot
   // check other people's collection.
-  "that a legitimately collected observation contains nothing belonging to anyone else — provenance says it was asked for, not that its contents are clean",
+  /*
+   * Narrowed on 2026-09-07. It said the contents "cannot" be checked, and for
+   * the kubernetes slot that is "have not": observations.schema.json REQUIRES
+   * pods[].namespace and deployment.namespace, and the incident carries the
+   * namespace it asked about, so the comparison is sitting right there. Logs
+   * and metrics genuinely carry no such field. An overclaim of impossibility is
+   * how a closable gap stays open.
+   */
+  "that a legitimately collected observation contains nothing belonging to anyone else. Provenance says it was asked for, not that its contents are clean. For logs and metrics there is no field to compare; for kubernetes there is one — pods[].namespace — and it is NOT yet compared, which is a gap rather than an impossibility",
   // Moved here from DEBT on 2026-09-05. Codex: "the DEBT trigger is not
   // checkable — it describes an external permission condition while enforcement
   // is an unrelated dueFromChunk. Nothing detects the second pusher arriving."

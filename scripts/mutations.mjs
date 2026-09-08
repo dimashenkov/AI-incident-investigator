@@ -842,6 +842,33 @@ export const MUTATIONS = [
     mustFail: "18 slots gathered for another incident",
   },
   {
+    // The confidence rounded to an endpoint it never reached: 0.9951 printed as
+    // 100%, so a model that deliberately withheld certainty reads as certain.
+    id: "confidence-rounded-to-an-endpoint-it-never-reached",
+    file: "src/core/report.ts",
+    from: "  const whole = Math.round(confidence * 100);\n  if (whole > 0 && whole < 100) return `${whole}%`;",
+    to: "  return `${Math.round(confidence * 100)}%`;",
+    mustFail: "never prints a confidence as an endpoint it has not reached",
+  },
+  {
+    // The branch that was not there: a chain that stopped, and a chain where
+    // every agent refused, both ended in silence and reported as success.
+    id: "no-closing-sentence-when-nothing-concluded",
+    file: "src/core/report.ts",
+    from: "  } else {\n    /*\n     * The branch that was not there.",
+    to: "  } else if (false) {\n    /*\n     * The branch that was not there.",
+    mustFail: "says the investigation reached no conclusion, rather than stopping mid-sentence",
+  },
+  {
+    // A citation attributed to a provider that never held the fact, because the
+    // source was computed from the agent name instead of traced.
+    id: "root-cause-citations-attributed-to-datadog",
+    file: "src/core/report.ts",
+    from: "  if (typeof ref === \"string\") {",
+    to: "  if (false) {",
+    mustFail: "traces a root cause citation to the agent that reported it",
+  },
+  {
     // The deployed node running the schemas and nothing else, so "valid" means
     // one thing in a unit test and another in production — which is exactly the
     // promise the top of src/schema/validate.ts makes.
@@ -1278,7 +1305,7 @@ export const MUTATIONS = [
     // A verdict that cites only what agrees, without saying the rest is there.
     id: "thread-hides-the-evidence-against",
     file: "src/core/report.ts",
-    from: "      (against.length === 0 ? \"\" : ` ${against.length} finding(s) argue against this; they are in the incident's evidence.`);",
+    from: "      (against.length === 0\n        ? \"\"\n        : ` Against it: ${against.map((e) => `${e.source} says ${e.fact}`).join(\"; \")}.`);",
     to: '      "";',
     mustFail: "tells the reader that contradicting evidence exists rather than omitting it",
   },

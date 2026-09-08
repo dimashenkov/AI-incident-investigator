@@ -51,7 +51,25 @@ export type CollectionRequest = {
   namespace: string;
 };
 
-/** A request id nobody but the caller could have supplied. */
+/**
+ * The id that ties every answer in one incident to one asking.
+ *
+ * NOT unguessable, and the old sentence here said it was — "a request id nobody
+ * but the caller could have supplied". The default id is
+ * sha256(incident_id | scenario), and both of those are printed inside the
+ * document it stamps, so anyone holding one incident can mint its exact stamp.
+ * A subagent did on 2026-09-07 and it matched.
+ *
+ * That is a deliberate trade, recorded in the gate's LIMITATIONS with the
+ * objection quoted: drift detection needs a byte-identical artefact, and in a
+ * prototype where every observation is a file this process reads itself there
+ * is nobody to forge one. The trade is fine; the sentence was not, because it
+ * stood next to the code while the true version stood in another file 700 lines
+ * away — two carriers of one claim, and the false one was the one a reader hits.
+ *
+ * What the id DOES establish: that an answer belongs to this collection. What
+ * it does not: that the collection could not have been guessed.
+ */
 export function newCollectionRequest(
   incident_id: string, cluster: string, namespace: string, id: string,
 ): CollectionRequest {

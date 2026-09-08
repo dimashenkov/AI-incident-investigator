@@ -7,7 +7,7 @@
  * contradicting evidence quietly absent from the sentence that cites the rest.
  */
 import { describe, it, expect } from "vitest";
-import { reportIncident } from "../src/core/report.js";
+import { reportIncident, asPercent } from "../src/core/report.js";
 import { assembleIncident, concludeIncident, recordAgentResult } from "../src/core/assemble.js";
 import { validate } from "../src/schema/validate.js";
 
@@ -70,8 +70,19 @@ describe("the thread says what happened, and only that", () => {
     const a = reportIncident(errored, AT);
     const b = reportIncident(empty, AT);
     if (a.state !== "reported" || b.state !== "reported") throw new Error("not reported");
-    expect(texts(a.conversation).join(" ")).toContain("could not read");
-    expect(texts(b.conversation).join(" ")).toContain("found nothing");
+    /*
+     * Asserted on the AGENT'S OWN line, not on the whole thread.
+     *
+     * On 2026-09-07 the closing sentence added for a chain that reached no
+     * conclusion also says "could not read their source" — so joining every
+     * message and searching for the phrase found it even with the agent branch
+     * deleted, and the mutation guarding that branch survived. Two carriers of
+     * one phrase, and the test was reading the wrong one.
+     */
+    const line = (r: typeof a) => texts(r.conversation).find((t: string) => t.startsWith("logs:"));
+    expect(line(a), "the logs agent has no line at all").toBeDefined();
+    expect(line(a)).toContain("could not read its source");
+    expect(line(b)).toContain("found nothing");
     expect(texts(a.conversation)).not.toEqual(texts(b.conversation));
   });
 
@@ -110,7 +121,18 @@ describe("the thread says what happened, and only that", () => {
     if (done.state !== "concluded") throw new Error(done.reason);
     const r = reportIncident(done.incident, AT);
     if (r.state !== "reported") throw new Error(r.reason);
-    expect(texts(r.conversation).join(" ")).toContain("argue against");
+    /*
+     * The dissent must be SPELLED OUT, not counted. It read "1 finding(s) argue
+     * against this; they are in the incident's evidence" — a number, and a
+     * pointer at a JSON field that is not in the thread, while every supporting
+     * fact was written out in full. A reader told there is one objection, and
+     * not what it says, has been told the shape of the doubt and not the doubt.
+     */
+    const thread = texts(r.conversation).join(" ");
+    expect(thread, "the objection must be named").toContain("Against it:");
+    expect(thread, "and its own words must appear, not a count")
+      .toContain("the deployment image did not change");
+    expect(thread, "a bare count is not the objection").not.toMatch(/finding\(s\) argue against/);
   });
 
   it("stamps every message with this incident and no other", () => {
@@ -203,5 +225,70 @@ describe("the thread says what happened, and only that", () => {
     const said = texts(r.conversation).join(" ");
     expect(said).toContain("does not recognise");
     expect(said).not.toContain("logs: read its source and found nothing");
+  });
+});
+
+/*
+ * Three defects a subagent found on 2026-09-07 by running the real reporter and
+ * printing what it produced, rather than by reading it.
+ */
+describe("the thread does not say more, or less, than the incident holds", () => {
+  it("never prints a confidence as an endpoint it has not reached", () => {
+    // Math.round collapsed 0.9951, 0.996 and 0.999 into "100%", so a model that
+    // deliberately withheld certainty was reported as certain; and it printed
+    // "0%" for 0.004, a figure the incident schema refuses outright.
+    for (const v of [0.9951, 0.996, 0.999, 0.99999]) {
+      expect(asPercent(v), `${v} must not read as certainty`).not.toBe("100%");
+    }
+    for (const v of [0.004, 0.0001, 1e-9]) {
+      expect(asPercent(v), `${v} must not read as nothing`).not.toBe("0%");
+    }
+    // The endpoints belong to the endpoints, and the ordinary case is plain.
+    expect(asPercent(1)).toBe("100%");
+    expect(asPercent(0)).toBe("0%");
+    expect(asPercent(0.6)).toBe("60%");
+    expect(asPercent(Number.NaN)).toMatch(/unreadable/);
+  });
+
+  it("says the investigation reached no conclusion, rather than stopping mid-sentence", () => {
+    // A chain that stopped after the specialists: root_cause_code is null, and
+    // the reporter used to write the agent lines, say nothing about the
+    // outcome, and return "reported". The last word was a bare positive
+    // finding, which reads as the answer.
+    const stopped = incidentWith(K8S_REPLY);
+    const r = reportIncident(stopped, AT);
+    if (r.state !== "reported") throw new Error(r.reason);
+    const thread = texts(r.conversation).join(" ");
+    expect(thread, "silence at the end of a thread reads as the answer")
+      .toContain("reached no conclusion");
+    expect(thread).toContain("Nothing above is a verdict");
+    expect(thread, "and it must say WHY it did not finish")
+      .toContain("never asked");
+  });
+
+  it("traces a root cause citation to the agent that reported it", () => {
+    /*
+     * sourceOf returned "datadog" for anything that is not one of the three
+     * slots — always, for the root cause agent. So one fact appeared twice in
+     * one thread with two different sources: analysis.evidence said kubernetes
+     * and the root cause message said datadog, about the same sentence.
+     */
+    const withRc = incidentWith(K8S_REPLY, {
+      agent: "root_cause", status: "ok",
+      findings: [{ fact: "container terminated OOMKilled",
+        source_ref: "pods[0].containers[0].last_state.terminated.reason" }],
+      hypotheses: [{ code: "CONTAINER_OOM", statement: "s",
+        supported_by: ["pods[0].containers[0].last_state.terminated.reason"] }],
+      confidence: 0.7,
+    });
+    const r = reportIncident(withRc, AT);
+    if (r.state !== "reported") throw new Error(r.reason);
+    const messages = (r.conversation.messages as Array<Record<string, unknown>>);
+    const cited = messages.flatMap((m) =>
+      (m.cited_evidence as Array<{ source: string }> | undefined) ?? []);
+    expect(cited.length, "nothing was cited; this would pass on an empty set").toBeGreaterThan(0);
+    expect(cited.map((c) => c.source), "no citation may name a provider that never held the fact")
+      .not.toContain("datadog");
+    expect(cited.map((c) => c.source)).toContain("kubernetes");
   });
 });
