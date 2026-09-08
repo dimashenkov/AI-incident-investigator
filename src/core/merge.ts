@@ -443,6 +443,23 @@ export function concludeIncident(
   }
 
   const findings = Array.isArray(verdict["findings"]) ? (verdict["findings"] as Array<Record<string, unknown>>) : [];
+  /*
+   * The model's own number, carried through untouched — and this file says so
+   * rather than implying otherwise.
+   *
+   * Two comments elsewhere claimed that confidence scoring reads
+   * `contradicted_by` and lowers the score. Nothing here reads it, and a
+   * subagent measured the consequence on 2026-09-07: one supporting and one
+   * contradicting finding came out at 0.99, while two supporting findings came
+   * out at 0.5. Both comments have been corrected where they stand.
+   *
+   * Computing a second number here was considered and refused, for the reason
+   * already written into the reporter: an arithmetic confidence would look
+   * enforced while measuring only the arithmetic. What judges the number is
+   * scripts/score-run.mjs, against a ceiling a scenario states in advance —
+   * conflicting-evidence declares max_confidence 0.6 — and that is a measurement
+   * with a criterion, not a formula pretending to be one.
+   */
   const confidence = typeof verdict["confidence"] === "number" ? verdict["confidence"] : 0;
 
   if (hypotheses.length === 0) {
@@ -475,8 +492,28 @@ export function concludeIncident(
     return { state: "refused", reason: "the hypothesis cites no finding the root cause agent reported" };
   }
 
+  /*
+   * Dissent is what the agent CALLED dissent, not what it left out.
+   *
+   * This was `findings not in supported_by`, so any neutral observation the
+   * verdict happened not to cite was written into the document as arguing
+   * against the conclusion — and the thread then printed it as the objection.
+   * A subagent produced one on 2026-09-07: "Against it: kubernetes says the
+   * image is registry.internal/payment-api:2.14.0", which the root cause agent
+   * had never said argued against anything.
+   *
+   * The branch fifteen lines up already refuses exactly this move, in its own
+   * words: calling a fact "against" a cause nobody named would be an invented
+   * stance. Inventing the stance is no better once a cause HAS been named.
+   *
+   * `contradicted_by` is the field that carries it, the agent fills it in, and
+   * invariants.ts already requires every entry to be a source_ref the same
+   * result reported. A finding in neither list is in neither list: it stays in
+   * analysis.agents, where it was reported, and claims nothing.
+   */
+  const contradicted = Array.isArray(h["contradicted_by"]) ? (h["contradicted_by"] as string[]) : [];
   const against = findings
-    .filter((f) => !supported.includes(String(f["source_ref"])))
+    .filter((f) => contradicted.includes(String(f["source_ref"])))
     .map((f) => ({ ...asEvidence(f), supports: "against" as const }));
 
   return finish(validate, {

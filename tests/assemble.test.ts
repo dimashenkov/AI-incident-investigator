@@ -508,8 +508,17 @@ describe("the verdict becomes the incident's own", () => {
   it("keeps contradicting findings as evidence against, rather than dropping them", () => {
     // A diagnosis that quietly discards what argues against it looks stronger
     // than it is, and the schema has a slot for exactly this.
+    /*
+     * The verdict must SAY the image contradicts it. Until 2026-09-07 `against`
+     * was "every finding not in supported_by", so this fixture proved the
+     * inference rather than the rule — and a neutral observation the verdict
+     * merely did not cite was written into the document as an objection. The
+     * test blessed the defect by calling that finding "the contradicting one"
+     * when nothing had said it was.
+     */
     const r = concludeIncident(withAgents({ ...VERDICT,
-      findings: [...VERDICT.findings, { fact: "the deployment image did not change", source_ref: "deployment.image" }] }));
+      findings: [...VERDICT.findings, { fact: "the deployment image did not change", source_ref: "deployment.image" }],
+      hypotheses: [{ ...VERDICT.hypotheses[0], contradicted_by: ["deployment.image"] }] }));
     expect(r.state).toBe("concluded");
     if (r.state !== "concluded") return;
     const evidence = (r.incident.analysis as { evidence: Array<{ supports: string }> }).evidence;

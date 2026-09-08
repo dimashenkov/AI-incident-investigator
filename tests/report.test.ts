@@ -113,8 +113,11 @@ describe("the thread says what happened, and only that", () => {
         { fact: "container terminated OOMKilled", source_ref: "pods[0].containers[0].last_state.terminated.reason" },
         { fact: "the deployment image did not change", source_ref: "deployment.image" },
       ],
+      // The verdict states the contradiction rather than leaving it to be
+      // inferred from what it did not cite. See tests/assemble.test.ts for why.
       hypotheses: [{ code: "CONTAINER_OOM", statement: "memory limit exceeded",
-        supported_by: ["pods[0].containers[0].last_state.terminated.reason"] }],
+        supported_by: ["pods[0].containers[0].last_state.terminated.reason"],
+        contradicted_by: ["deployment.image"] }],
       confidence: 0.7,
     });
     const done = concludeIncident(withRc);

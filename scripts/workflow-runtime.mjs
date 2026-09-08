@@ -149,6 +149,13 @@ export async function buildRuntime() {
    * invalid locally. Measured through the real generated core, not read.
    */
   const invariants = transpile("src/schema/invariants.ts");
+  /*
+   * The thread a person reads. Carried since 2026-09-07, when a subagent
+   * grepped every jsCode in the generated workflow and found reportIncident in
+   * none of them: the chain ended at Conclude, and every caveat that file
+   * produces was absent from what a live run emitted.
+   */
+  const thread = transpile("src/core/thread.ts");
   const prompts = readPrompts();
   const incidents = await assembledIncidents();
 
@@ -187,6 +194,9 @@ ${merge}
 
 // ---- src/agents/slice.ts, transpiled in memory ----
 ${slice}
+
+// ---- src/core/thread.ts, transpiled in memory ----
+${thread}
 
 // ---- the prompts, verbatim ----
 const PROMPTS = ${JSON.stringify(prompts)};
@@ -358,6 +368,52 @@ return items.map(function (item, index) {
  * concludeIncident is the same function the local tests exercise, transpiled
  * into this workflow. Nothing about the verdict is decided here.
  */
+/**
+ * The last node: say what happened, in the incident's own thread.
+ *
+ * Free and deterministic — it reads fields already on the incident and asks no
+ * model. It runs after Conclude so the verdict exists to be reported.
+ *
+ * A refusal to report does NOT discard the conclusion. The chain has already
+ * done the expensive work; losing it because a sentence could not be appended
+ * would be paying for an answer and throwing it away. The item carries the
+ * conclusion plus `report_refused`, so the failure is visible rather than
+ * silent, and a reader can still see what was concluded.
+ */
+export function reportNodeCode() {
+  return `
+const items = $input.all();
+return items.map(function (item, index) {
+  const j = item.json || {};
+  if (j.state === "refused") return { json: j };
+  if (j.state !== "concluded") {
+    return { json: { index, state: "refused",
+      reason: "the item reached the report in state " + JSON.stringify(j.state) +
+        ", which this chain does not produce" } };
+  }
+
+  /*
+   * The timestamp comes from the incident, not from the clock.
+   *
+   * A clock here would make two runs of the same incident produce different
+   * documents, and the drift check compares documents. collected_at is when
+   * this incident's evidence was gathered, which is the honest moment to stamp
+   * a report of it.
+   */
+  const inc = j.incident || {};
+  const at = inc.started_at || "1970-01-01T00:00:00Z";
+
+  const reported = reportIncident(validate, inc, at);
+  if (reported.state !== "reported") {
+    return { json: Object.assign({}, j, { report_refused: reported.reason }) };
+  }
+  const next = Object.assign({}, inc, { conversation: reported.conversation });
+  return { json: Object.assign({}, j, { incident: next,
+    thread: (reported.conversation.messages || []).map(function (m) { return m.text; }) }) };
+});
+`;
+}
+
 export function concludeNodeCode() {
   return `
 const items = $input.all();

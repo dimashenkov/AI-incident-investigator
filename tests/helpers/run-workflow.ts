@@ -191,7 +191,7 @@ export function runSetExpression(
 }
 
 /** Execute one Code node body exactly as n8n would. */
-function runCode(body: string, items: Item[]): Item[] {
+export function runCode(body: string, items: Item[]): Item[] {
   const fn = new Function("$input", `"use strict";\n${body}`) as (i: unknown) => Item[];
   return fn({ all: () => items });
 }
@@ -303,7 +303,17 @@ export async function runScenario(
     // disappeared two steps later.
     remember(target, item);
     at = target;
-    if (target === "Conclude") break;
+    /*
+     * The walk used to stop at Conclude, hard-coded.
+     *
+     * That is why nothing noticed the deployed chain had no thread: the harness
+     * could not have reached a node after Conclude even once one existed. A
+     * stopping rule written as a node NAME cannot see the workflow growing —
+     * so it stops at whatever was last on the day it was written.
+     *
+     * It stops where the workflow stops now: at a node nothing leads out of.
+     */
+    if (connections[target] === undefined) break;
   }
 
   return item as Record<string, unknown> & { state: string };

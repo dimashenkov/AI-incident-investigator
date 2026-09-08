@@ -105,25 +105,10 @@ export function openThread(incidentId: string, index: ThreadIndex, channelId = "
   return { state: "ok", conversation };
 }
 
-/**
- * Append a message to a conversation.
- *
- * The message must carry the same incident id as the thread. Stamping every
- * message is what makes a leak visible without running a model, and appending
- * one that disagrees is precisely the leak.
+/*
+ * appendMessage moved to src/core/thread.ts on 2026-09-07 and is re-exported
+ * here so every existing caller keeps working. It went because the thread has
+ * to be buildable inside the n8n Code node, and a file the node carries may not
+ * import anything — the same reason merge.ts sits apart from assemble.ts.
  */
-export function appendMessage(conversation: Record<string, unknown>, message: Message): ThreadResult {
-  const incidentId = conversation["incident_id"];
-  if (typeof incidentId !== "string") return { state: "refused", reason: "the conversation names no incident" };
-  if (message.incident_id !== incidentId) {
-    return { state: "refused", reason: `message names ${message.incident_id}, thread belongs to ${incidentId}` };
-  }
-
-  const messages = Array.isArray(conversation["messages"]) ? (conversation["messages"] as unknown[]) : [];
-  const next = { ...conversation, messages: [...messages, message] };
-  const r = validate("conversation", next);
-  if (r.state !== "valid") {
-    return { state: "refused", reason: "the message would make the conversation invalid", errors: r.state === "invalid" ? r.errors : [r.reason] };
-  }
-  return { state: "ok", conversation: next };
-}
+export { appendMessage } from "../core/report.js";

@@ -72,8 +72,20 @@ describe("the shape of the deployed chain", () => {
       at = WF.connections[at].main[0][0].node;
       visited.push(at);
     }
-    expect(visited[visited.length - 1], `the chain ends at ${at}`).toBe("Conclude");
-    expect(visited).toHaveLength(2 + AGENT_ORDER.length * 4 + 1);
+    /*
+     * The chain ends at Report, not at Conclude.
+     *
+     * Until 2026-09-07 it ended at Conclude and the deployed workflow produced
+     * an answer object and no thread — src/core/thread.ts was called only by
+     * tests, so every caveat it writes existed nowhere a live run could show
+     * it. Report is free and deterministic: it reads the incident and asks no
+     * model.
+     */
+    expect(visited[visited.length - 1], `the chain ends at ${at}`).toBe("Report");
+    expect(visited, "Conclude must still be on the line, immediately before it")
+      .toContain("Conclude");
+    expect(visited[visited.length - 2]).toBe("Conclude");
+    expect(visited).toHaveLength(2 + AGENT_ORDER.length * 4 + 2);
   });
 
   it("routes every gate's refusal past the paid call, and eventually to Conclude", () => {

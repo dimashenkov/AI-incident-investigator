@@ -601,7 +601,7 @@
       }
     },
     {
-      "description": "A failed or closed incident may not carry a live diagnosis. Only diagnosed and insufficient_evidence had conditional rules, so status failed with a named cause at confidence 1 and zero agents validated — a reader sees a confident answer on an incident that says it failed.",
+      "description": "An incident that has not concluded, or that is finished with the book shut, may not carry a live diagnosis. Only diagnosed and insufficient_evidence had conditional rules at all, so status failed with a named cause at confidence 1 and zero agents validated. Written on 2026-09-07 naming failed and closed in its own description — and listing failed and INVESTIGATING in the enum, so closed stayed uncovered. Found the same day by a subagent that ran all four statuses instead of reading the sentence. The description and the rule are two carriers of one claim, and the prose one was right.",
       "if": {
         "type": "object",
         "required": [
@@ -611,7 +611,8 @@
           "status": {
             "enum": [
               "failed",
-              "investigating"
+              "investigating",
+              "closed"
             ]
           }
         }

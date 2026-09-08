@@ -149,8 +149,12 @@ export function invariantErrors(name: InvariantSchemaName, data: unknown): strin
          *
          * Each rule above reads its own list, and nothing looked at the
          * intersection — so one fact could support a hypothesis and contradict
-         * it at once, and the confidence scoring in merge.ts reads both lists
-         * and counts that fact twice, in opposite directions. Found by a
+         * it at once. The first version of this comment said merge.ts then
+         * counted the fact twice in opposite directions; it does not, and never
+         * did — nothing computes a confidence from either list. What the
+         * overlap actually produces is a document asserting that one fact both
+         * supports and contradicts one conclusion, which is not two pieces of
+         * evidence and is not a claim anything can act on. Found by a
          * subagent on 2026-09-07, measured through the real validator.
          */
         const forRefs = (h as Record<string, unknown>)["supported_by"];

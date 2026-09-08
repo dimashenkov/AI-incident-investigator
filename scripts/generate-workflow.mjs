@@ -14,7 +14,7 @@
  */
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 
-import { buildRuntime, assembleNodeCode, recordNodeCode, concludeNodeCode, AGENT_ORDER } from "./workflow-runtime.mjs";
+import { buildRuntime, assembleNodeCode, recordNodeCode, concludeNodeCode, reportNodeCode, AGENT_ORDER } from "./workflow-runtime.mjs";
 import { createHash } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -262,6 +262,18 @@ export function buildWorkflow(runtime, { name = "AI SRE — incident investigati
 
   nodes.push(code("conclude", "Conclude", concludeNodeCode(), [x, 0]));
   connections[previous] = { main: [[{ node: "Conclude", type: "main", index: 0 }]] };
+
+  /*
+   * And then the thread, which is the only part a person reads.
+   *
+   * It was not here at all until 2026-09-07. The chain ended at Conclude and
+   * returned an answer object, so every caveat src/core/thread.ts produces —
+   * "could not read its source", "which is its own estimate and nothing here
+   * checks it", the objection spelled out — existed only in tests. Free and
+   * deterministic: it reads the incident and asks no model.
+   */
+  nodes.push(code("report", "Report", reportNodeCode(), [x + 740, 0]));
+  connections["Conclude"] = { main: [[{ node: "Report", type: "main", index: 0 }]] };
 
 
 

@@ -99,7 +99,7 @@
               "type": "string",
               "minLength": 1
             },
-            "description": "Recorded, not dropped. Confidence scoring reads this and lowers the score. Each entry is a non-empty source_ref and is traced back to a finding exactly like supported_by: Codex, chunk 0 round 11 — only the supporting side was checked, so a hypothesis could be weakened by contradictions that no finding reports, or by an empty string."
+            "description": "Recorded, not dropped. It is what the AGENT calls a contradiction, and since 2026-09-07 that is the only thing written into the incident as evidence against the conclusion \u2014 before that, any finding the verdict happened not to cite was rendered as dissent, which invented a stance the agent never took. It does NOT lower any score: nothing computes a confidence from it, and this sentence said otherwise for three chunks. The number is the model\u2019s own; what judges it is scripts/score-run.mjs, against a ceiling a scenario declares in advance. Each entry is a non-empty source_ref and is traced back to a finding exactly like supported_by: Codex, chunk 0 round 11 — only the supporting side was checked, so a hypothesis could be weakened by contradictions that no finding reports, or by an empty string."
           }
         }
       }

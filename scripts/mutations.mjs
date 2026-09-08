@@ -800,7 +800,7 @@ export const MUTATIONS = [
     // failed incident could carry a confident named cause.
     id: "failed-incident-carrying-a-confident-cause",
     file: "schemas/incident.schema.json",
-    from: '            "enum": [\n              "failed",\n              "investigating"\n            ]',
+    from: '            "enum": [\n              "failed",\n              "investigating",\n              "closed"\n            ]',
     to: '            "enum": [\n              "no-such-status"\n            ]',
     mustFail: "13 failed while carrying a confident cause",
   },
@@ -845,7 +845,7 @@ export const MUTATIONS = [
     // The confidence rounded to an endpoint it never reached: 0.9951 printed as
     // 100%, so a model that deliberately withheld certainty reads as certain.
     id: "confidence-rounded-to-an-endpoint-it-never-reached",
-    file: "src/core/report.ts",
+    file: "src/core/thread.ts",
     from: "  const whole = Math.round(confidence * 100);\n  if (whole > 0 && whole < 100) return `${whole}%`;",
     to: "  return `${Math.round(confidence * 100)}%`;",
     mustFail: "never prints a confidence as an endpoint it has not reached",
@@ -854,7 +854,7 @@ export const MUTATIONS = [
     // The branch that was not there: a chain that stopped, and a chain where
     // every agent refused, both ended in silence and reported as success.
     id: "no-closing-sentence-when-nothing-concluded",
-    file: "src/core/report.ts",
+    file: "src/core/thread.ts",
     from: "  } else {\n    /*\n     * The branch that was not there.",
     to: "  } else if (false) {\n    /*\n     * The branch that was not there.",
     mustFail: "says the investigation reached no conclusion, rather than stopping mid-sentence",
@@ -863,10 +863,37 @@ export const MUTATIONS = [
     // A citation attributed to a provider that never held the fact, because the
     // source was computed from the agent name instead of traced.
     id: "root-cause-citations-attributed-to-datadog",
-    file: "src/core/report.ts",
+    file: "src/core/thread.ts",
     from: "  if (typeof ref === \"string\") {",
     to: "  if (false) {",
     mustFail: "traces a root cause citation to the agent that reported it",
+  },
+  {
+    // The thread removed from the deployed chain: it ends at Conclude again and
+    // every caveat the reporter writes exists only in tests.
+    id: "deployed-chain-produces-no-thread",
+    file: "scripts/generate-workflow.mjs",
+    from: '  connections["Conclude"] = { main: [[{ node: "Report", type: "main", index: 0 }]] };',
+    to: "",
+    mustFail: "produces the thread a person reads, from the chain and not from a test",
+  },
+  {
+    // The harness stopping at a hard-coded node name again, so it cannot see
+    // anything the workflow grows past that point.
+    id: "harness-stops-at-a-hard-coded-node-name",
+    file: "tests/helpers/run-workflow.ts",
+    from: "    if (connections[target] === undefined) break;",
+    to: '    if (target === "Conclude") break;',
+    mustFail: "produces the thread a person reads, from the chain and not from a test",
+  },
+  {
+    // A failure to write the thread throwing away the conclusion the models
+    // were already paid for.
+    id: "report-refusal-discards-the-conclusion",
+    file: "scripts/workflow-runtime.mjs",
+    from: "    return { json: Object.assign({}, j, { report_refused: reported.reason }) };",
+    to: '    return { json: { index, state: "refused", reason: "report: " + reported.reason } };',
+    mustFail: "keeps the conclusion when the thread cannot be written, rather than losing both",
   },
   {
     // The deployed node running the schemas and nothing else, so "valid" means
@@ -1296,7 +1323,7 @@ export const MUTATIONS = [
   {
     // could-not-read rendered as found-nothing in the one place a person reads.
     id: "thread-renders-an-error-as-an-empty-result",
-    file: "src/core/report.ts",
+    file: "src/core/thread.ts",
     from: '  if (a.status === "error") {',
     to: "  if (false) {",
     mustFail: "keeps could-not-read distinct from found-nothing, in the words a reader sees",
@@ -1304,7 +1331,7 @@ export const MUTATIONS = [
   {
     // A verdict that cites only what agrees, without saying the rest is there.
     id: "thread-hides-the-evidence-against",
-    file: "src/core/report.ts",
+    file: "src/core/thread.ts",
     from: "      (against.length === 0\n        ? \"\"\n        : ` Against it: ${against.map((e) => `${e.source} says ${e.fact}`).join(\"; \")}.`);",
     to: '      "";',
     mustFail: "tells the reader that contradicting evidence exists rather than omitting it",

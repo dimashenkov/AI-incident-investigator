@@ -12,7 +12,9 @@
  */
 import { describe, it, expect } from "vitest";
 import type { Stub } from "./helpers/run-workflow.js";
-import { runScenario, STUB_AGENTS, envelope, runSetExpression, newHistory, NOT_AN_ENVELOPE} from "./helpers/run-workflow.js";
+import { runCode, runScenario, STUB_AGENTS, envelope, runSetExpression, newHistory, NOT_AN_ENVELOPE } from "./helpers/run-workflow.js";
+// @ts-expect-error - plain .mjs script, no types
+import { generate } from "../scripts/generate-workflow.mjs";
 import { listScenarios } from "../src/providers/fixtures.js";
 
 const SCENARIOS = new URL("../scenarios/", import.meta.url).pathname;
@@ -244,6 +246,69 @@ describe("the Set node that joins the answer back to the incident", () => {
    * the NODE left it green, because the unit test never travels through the
    * node. This one does.
    */
+  /*
+   * The thread, produced by the chain rather than by a test calling the
+   * reporter directly.
+   *
+   * A subagent grepped every jsCode in the generated workflow on 2026-09-07 and
+   * found reportIncident in none of them: the chain ended at Conclude, and the
+   * only callers of the file that writes the thread were two test files. So the
+   * caveats it exists to produce had never once been in what a live run emits,
+   * and every prompt round had been measured against an answer object instead.
+   */
+  it("produces the thread a person reads, from the chain and not from a test", async () => {
+    const out = await runScenario("container-oom");
+    expect(out.state, "the chain must still conclude").toBe("concluded");
+
+    const thread = out.thread as string[] | undefined;
+    expect(thread, "the deployed chain produced no thread at all").toBeDefined();
+    expect(thread!.length, "an empty thread would pass every assertion below").toBeGreaterThan(2);
+
+    const joined = thread!.join(" ");
+    expect(joined, "the thread must open on this incident").toContain("INC-");
+    expect(joined, "and reach a verdict").toContain("Root cause:");
+    expect(joined, "carrying the caveat that nothing checks the number")
+      .toContain("nothing here checks it");
+
+    // And the conversation on the incident is what the thread was read from,
+    // so the document a later reader loads says the same as the run reported.
+    const conv = ((out.incident as Record<string, unknown>).conversation ?? {}) as Record<string, unknown>;
+    const messages = (conv.messages ?? []) as Array<{ text: string }>;
+    expect(messages.map((m) => m.text)).toEqual(thread);
+  });
+
+  it("keeps the conclusion when the thread cannot be written, rather than losing both", async () => {
+    /*
+     * The expensive half is already paid for by the time Report runs, so a
+     * refusal to append a sentence must not throw the answer away.
+     *
+     * Exercised by RUNNING the Report node against an item whose conversation
+     * belongs to another incident — the one refusal the reporter makes that a
+     * whole-chain run cannot produce. The first version of this test asserted
+     * `report_refused` was undefined on a happy path, which is the same as
+     * asserting nothing: the mutation that made a refusal discard the
+     * conclusion survived it, and the gate said so.
+     */
+    const { workflow } = await generate();
+    const node = workflow.nodes.find((n: { name: string }) => n.name === "Report")!;
+    const jsCode = (node.parameters as { jsCode: string }).jsCode;
+
+    const concluded = await runScenario("container-oom");
+    expect(concluded.state).toBe("concluded");
+    const incident = concluded.incident as Record<string, unknown>;
+    const foreign = {
+      ...incident,
+      conversation: { ...(incident.conversation as Record<string, unknown>),
+        incident_id: "INC-2026-9999", thread_id: "thread-INC-2026-9999", messages: [] },
+    };
+
+    const out = runCode(jsCode, [{ json: { ...concluded, incident: foreign } }])[0]!.json as Record<string, unknown>;
+    expect(out.report_refused, "the refusal must be visible rather than silent").toBeTruthy();
+    expect(String(out.report_refused)).toMatch(/INC-2026-9999|belongs to/);
+    expect(out.state, "and the conclusion must survive it").toBe("concluded");
+    expect(out.root_cause_code, "the answer the models were paid for is still here").toBeTruthy();
+  });
+
   it("refuses, in the deployed chain, an answer from an agent it did not ask", async () => {
     const lying: Record<string, Stub> = {
       ...STUB_AGENTS,
