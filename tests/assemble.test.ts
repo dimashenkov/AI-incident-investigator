@@ -454,6 +454,54 @@ describe("the verdict becomes the incident's own", () => {
    * counts root_cause results, so nothing downstream noticed. A skipped agent
    * recorded as a successful step.
    */
+  /*
+   * Three state-machine holes a subagent found on 2026-09-07 by running the
+   * sequences rather than reading them.
+   */
+  it("refuses to conclude an incident that has already concluded", () => {
+    const first = concludeIncident(withAgents(VERDICT));
+    expect(first.state, "the honest path must still work").toBe("concluded");
+    if (first.state !== "concluded") return;
+
+    const again = concludeIncident(first.incident);
+    expect(again.state, "a second conclusion would replace a verdict silently").toBe("refused");
+    if (again.state === "refused") expect(again.reason).toMatch(/not investigating/);
+
+    // Every status that is not `investigating` is a conclusion of some kind,
+    // including the honest refusal — re-concluding that replaces "no cause"
+    // with an answer, which is the erasure this guards.
+    for (const status of ["diagnosed", "closed", "failed", "insufficient_evidence"]) {
+      const r = concludeIncident({ ...withAgents(VERDICT), status });
+      expect(r.state, `${status} must not be concluded again`).toBe("refused");
+    }
+  });
+
+  it("refuses a second result from an agent that has already reported", () => {
+    /*
+     * Recorded three times, all valid, until 2026-09-07 — and the thread then
+     * told a reader that kubernetes had both failed and succeeded, because the
+     * report counts agents with status error and that count was ATTEMPTS.
+     */
+    const a = assembleIncident("container-oom", 1, { root: SCENARIOS });
+    if (a.state !== "assembled") throw new Error("not assembled");
+    const reply = { agent: "kubernetes", status: "ok",
+      findings: [{ fact: "OOMKilled", source_ref: "pods[0].containers[0].last_state.terminated.reason" }],
+      hypotheses: [], confidence: 0.5 };
+
+    const once = recordAgentResult(a.incident, reply);
+    expect(once.state).toBe("recorded");
+    if (once.state !== "recorded") return;
+
+    const twice = recordAgentResult(once.incident, reply);
+    expect(twice.state, "a retry is not a second agent").toBe("refused");
+    if (twice.state === "refused") expect(twice.reason).toMatch(/already reported/);
+
+    // A different agent is still welcome, or this refuses the whole chain.
+    const other = recordAgentResult(once.incident, { agent: "logs", status: "no_data",
+      findings: [], hypotheses: [], confidence: 0 });
+    expect(other.state).toBe("recorded");
+  });
+
   it("refuses a reply from an agent other than the one that was asked", () => {
     const a = assembleIncident("container-oom", 1, { root: SCENARIOS });
     if (a.state !== "assembled") throw new Error("not assembled");

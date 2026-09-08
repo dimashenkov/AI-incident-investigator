@@ -236,8 +236,8 @@ export const MUTATIONS = [
     // step able to invent an identifier exactly as the first real call did.
     id: "root-cause-prompt-stops-listing-codes",
     file: "prompts/root-cause-agent.md",
-    from: "**The `root_cause_code` must be one of these, exactly.**",
-    to: "**Pick a root_cause_code.**",
+    from: "**A hypothesis `code` must be one of these, exactly.**",
+    to: "**Pick a code.**",
     mustFail: "lists every allowed code in the root cause prompt, including its own verdict",
   },
   {
@@ -896,6 +896,68 @@ export const MUTATIONS = [
     mustFail: "keeps the conclusion when the thread cannot be written, rather than losing both",
   },
   {
+    // A concluded incident concluded again: the verdict is replaced and nothing
+    // records that there was a first one.
+    id: "a-concluded-incident-concluded-again",
+    file: "src/core/merge.ts",
+    from: '  if (status !== "investigating") {',
+    to: "  if (false) {",
+    mustFail: "refuses to conclude an incident that has already concluded",
+  },
+  {
+    // A retry counted as a second agent, so the thread says one agent both
+    // failed and succeeded.
+    id: "a-retry-recorded-as-a-second-agent",
+    file: "src/core/merge.ts",
+    from: "  if (already.length > 0) {",
+    to: "  if (false) {",
+    mustFail: "refuses a second result from an agent that has already reported",
+  },
+  {
+    // "The evidence does not support naming a cause", at 95%.
+    id: "a-refusal-held-with-confidence",
+    file: "schemas/incident.schema.json",
+    from: '                "maximum": 0.5,',
+    to: "",
+    mustFail: "19 insufficient evidence, held with confidence",
+  },
+  {
+    // A prompt naming a field the schema refuses: the obedient answer is
+    // rejected and the call is paid for anyway.
+    id: "prompt-asks-for-a-field-the-schema-refuses",
+    file: "prompts/root-cause-agent.md",
+    from: "**A hypothesis `code` must be one of these, exactly.** Your answer has no",
+    to: "**The `root_cause_code` must be one of these, exactly.** Your answer has no",
+    mustFail: "asks the root cause agent for nothing the schema will refuse",
+  },
+  {
+    // The field that carries dissent, unnamed again — so a model cannot write
+    // it, and the one scenario built to pose a conflict shows no objection.
+    id: "dissent-field-never-named-in-the-prompt",
+    file: "prompts/root-cause-agent.md",
+    from: '  "contradicted_by": ["series[0].points[3].value"]',
+    to: '  "supported_by": ["series[0].points[3].value"]',
+    mustFail: "names the field that actually carries dissent",
+  },
+  {
+    // The citation spelling drifting back, so an obedient answer is scored as
+    // resting on other ground.
+    id: "prompt-teaches-a-citation-spelling-nothing-asks-for",
+    file: "prompts/logs-agent.md",
+    from: "such as `lines[2].message` — the field, not just the line.",
+    to: "such as `lines[2]`.",
+    mustFail: "teaches the citation spelling the scenarios actually ask for",
+  },
+  {
+    // A citation more specific than the one required, refused — so the two
+    // spellings of one idea can never both be right.
+    id: "a-more-specific-citation-not-counted",
+    file: "scripts/score-run.mjs",
+    from: "  if (have.length < want.length) return false;\n  return want.every((seg, i) => have[i] === seg);",
+    to: "  return String(required) === String(got);",
+    mustFail: "counts a citation that is more specific than the one required",
+  },
+  {
     // The deployed node running the schemas and nothing else, so "valid" means
     // one thing in a unit test and another in production — which is exactly the
     // promise the top of src/schema/validate.ts makes.
@@ -971,9 +1033,9 @@ export const MUTATIONS = [
     // A refusal that never looked, scored as a reasoned refusal.
     id: "empty-handed-refusal-scored-as-reasoned",
     file: "scripts/score-run.mjs",
-    from: "      if (shaped.length === 0) {\n        unqualified.push(\"it refused while stating no evidence at all, so nothing shows it saw the contradiction\");",
-    to: "      if (false) {\n        unqualified.push(\"it refused while stating no evidence at all, so nothing shows it saw the contradiction\");",
-    mustFail: "refuses a refusal that states no evidence at all",
+    from: "      const looked = citedPaths(answer).length > 0 || shaped.length > 0;",
+    to: "      const looked = true;",
+    mustFail: "refuses a refusal that cites nothing at all",
   },
   {
     // The ceiling exists so a contradicted conclusion cannot be held at 0.9.
@@ -1041,7 +1103,7 @@ export const MUTATIONS = [
     // invitation to name it.
     id: "a-confidence-band-for-guessing",
     file: "prompts/root-cause-agent.md",
-    from: "| circumstantial evidence only — nothing observed the cause itself | `INSUFFICIENT_EVIDENCE` and `0` |",
+    from: "| circumstantial evidence only — nothing observed the cause itself | **no hypotheses**, and `0` |",
     to: "| circumstantial evidence only — nothing observed the cause itself | 0.4 to 0.6 |",
     mustFail: "offers no confidence band for naming a cause on circumstantial evidence",
   },

@@ -61,7 +61,8 @@ three.
 
 Write the symptoms first because they are what the incident is about. Then stop
 and ask: **which rows of the configuration table apply to what I just wrote?**
-Rows, plural — they are not exclusive, and more than one usually fires. Answer
+Rows, plural — they are not exclusive, and more than one usually fires. The
+second half may be omitted when short of room. Answer
 it before you finish.
 
 | Look at | Report |

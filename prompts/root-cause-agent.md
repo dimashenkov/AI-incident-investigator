@@ -54,8 +54,13 @@ on it cannot be traced by anyone.
 
 ## The allowed codes
 
-**The `root_cause_code` must be one of these, exactly.** A hypothesis `code` is
-that same value — it is the candidate the deterministic step promotes:
+**A hypothesis `code` must be one of these, exactly.** Your answer has no
+`root_cause_code` field and the schema refuses one — the incident gets that
+field later, from your hypothesis, in a step that runs no model. This sentence
+named `root_cause_code` until 2026-09-07, and a result carrying that field is
+refused outright: `(root) must NOT have additional properties`. The file's own
+notes record the same shape wasting a call once already; the noun survived the
+fix. Write `hypotheses[0].code` and nothing else:
 
 - `CONTAINER_OOM`
 - `APPLICATION_STARTUP_FAILURE`
@@ -104,9 +109,29 @@ found something and merely did not label it. A confident wrong cause costs more
 than an honest silence — and an honest silence over evidence somebody already
 collected costs the whole investigation.
 
-**Contradicting evidence is recorded, not dropped.** If an agent's finding
-argues against your conclusion, it still belongs in your `findings`. Leaving it
-out is how a diagnosis comes to look stronger than it is.
+**Contradicting evidence is recorded, not dropped — and NAMED.** If an agent's
+finding argues against your conclusion, it belongs in your `findings` **and** its
+`source_ref` belongs in `hypotheses[0].contradicted_by`.
+
+Both halves are needed, and until 2026-09-07 this paragraph asked only for the
+first. `contradicted_by` is the only thing written into the incident as evidence
+against the conclusion; a finding merely left out of `supported_by` is neither
+support nor objection, and the thread a human reads then shows no objection at
+all. Measured that day on the one scenario built to pose a conflict: the fully
+obedient answer produced a verdict at high confidence with nothing recorded
+against it.
+
+```json
+"hypotheses": [{
+  "code": "CONTAINER_OOM",
+  "statement": "...",
+  "supported_by": ["pods[0].containers[0].last_state.terminated.reason"],
+  "contradicted_by": ["series[0].points[3].value"]
+}]
+```
+
+Every entry of `contradicted_by`, exactly like `supported_by`, must be the
+`source_ref` of a finding **you** reported in this same answer.
 
 **Confidence is a reading of the evidence, not a habit of caution.** Measured on
 2026-09-05, on the first live run: nine findings from three agents all pointed
@@ -121,8 +146,16 @@ So, in both directions:
 | several agents, agreeing, and a direct observation of the cause | **0.8 to 0.95** |
 | one agent with a direct observation, the others silent | 0.6 to 0.8 |
 | agents disagree, or a source could not be read | **below 0.4**, and say why |
-| circumstantial evidence only — nothing observed the cause itself | `INSUFFICIENT_EVIDENCE` and `0` |
-| nothing supports any cause | `INSUFFICIENT_EVIDENCE` and `0` |
+| circumstantial evidence only — nothing observed the cause itself | **no hypotheses**, and `0` |
+| nothing supports any cause | **no hypotheses**, and `0` |
+
+**`INSUFFICIENT_EVIDENCE` is not a code you may write.** It is not in the list
+above and no field in your answer can hold it: `hypotheses[0].code` is checked
+against that list and refuses it. The way you say it is an EMPTY `hypotheses`
+list — the deterministic step then writes `INSUFFICIENT_EVIDENCE` onto the
+incident itself. This table told you to write the string until 2026-09-07, and
+an obedient answer was refused: `/hypotheses/0/code must be equal to one of the
+allowed values`.
 
 **There is no band for a guess.** Grok, 2026-09-06: this table used to offer
 `0.4 to 0.6` for circumstantial evidence, sitting one line away from the rule

@@ -34,7 +34,10 @@ the observation you were given and cite what you actually read.
 
 ## Rules
 
-**Every finding needs a `source_ref`** such as `series[0].points[3]`.
+**Every finding needs a `source_ref`** such as `series[0].points[3].value` — the
+field you read, not just the point. Naming the point alone is accepted where a
+scenario asks only for the point, but the leaf is what you actually looked at
+and it satisfies both.
 
 **You cannot see the configuration, and you are not asked to.** Limits, images
 and replica counts are in the Kubernetes observation, which you were not given.

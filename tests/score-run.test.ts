@@ -9,7 +9,7 @@
 import { describe, it, expect } from "vitest";
 import { readdirSync } from "node:fs";
 // @ts-expect-error - plain .mjs script, no types
-import { score, scoreAll, expectedFor, format } from "../scripts/score-run.mjs";
+import { score, scoreAll, expectedFor, format, citationCovers } from "../scripts/score-run.mjs";
 
 const SCENARIOS = new URL("../scenarios/", import.meta.url).pathname;
 /**
@@ -244,14 +244,27 @@ describe("a scenario whose evidence conflicts is scored on more than its code", 
    * exempt from pointing AGAINST a conclusion it never reached — not from having
    * looked at anything.
    */
-  it("refuses a refusal that states no evidence at all", () => {
-    const r = score(S, withEvidence("INSUFFICIENT_EVIDENCE", cite, 0, []), SCENARIOS);
-    expect(r.state, "an empty-handed refusal must not read as a reasoned one").toBe("correct-but-unqualified");
-    expect(r.why.join(" ")).toMatch(/stating no evidence/);
-    // But a refusal that shows what it saw is the honest answer and stays correct.
-    const ok = score(S, withEvidence("INSUFFICIENT_EVIDENCE", cite, 0,
-      [{ source: "metrics", fact: "memory never approached the limit", supports: "against" }]), SCENARIOS);
-    expect(ok.state).toBe("correct");
+  it("refuses a refusal that cites nothing at all", () => {
+    /*
+     * A refusal writes an EMPTY analysis.evidence on purpose — every entry must
+     * point for or against a conclusion, and a refusal reached none. Judging it
+     * on that emptiness made both answers this scenario declares honest score
+     * unqualified, so a paid run of the one scenario that can close Definition
+     * of Done item 3 was unwinnable before it started. Measured 2026-09-07.
+     *
+     * What it must show is that it READ something, and reading is recorded in
+     * the agents' findings.
+     */
+    const blind = withEvidence("INSUFFICIENT_EVIDENCE", [], 0, []);
+    expect(score(S, blind, SCENARIOS).state,
+      "a refusal that cites nothing has not looked").toBe("correct-but-unqualified");
+    expect(score(S, blind, SCENARIOS).why.join(" ")).toMatch(/citing nothing/);
+
+    // The honest refusal: it cited what it read, and reached no conclusion, so
+    // analysis.evidence is empty exactly as merge.ts intends.
+    const honest = withEvidence("INSUFFICIENT_EVIDENCE", cite, 0, []);
+    expect(score(S, honest, SCENARIOS).state,
+      "the answer the scenario declares acceptable must be reachable").toBe("correct");
   });
 
   /*
@@ -286,5 +299,33 @@ describe("a scenario whose evidence conflicts is scored on more than its code", 
     const text = format([score(S, qualified("CONTAINER_OOM", cite, 0.9, 1), SCENARIOS)]);
     expect(text).toMatch(/UNQUALIFIED/);
     expect(text).toMatch(/right code held wrongly/);
+  });
+});
+
+/*
+ * The prompts and the fixtures had drifted into two spellings of one idea:
+ * metrics-agent.md shows `series[0].points[3]` while conflicting-evidence
+ * demands `series[0].points[3].value`, and cpu-throttling demands the point.
+ * An obedient model could satisfy one scenario and fail the other with the
+ * identical, correct answer. Found by a subagent on 2026-09-07.
+ */
+describe("a citation counts when it is at least as specific as the one required", () => {
+  it("counts a citation that is more specific than the one required", () => {
+    expect(citationCovers("series[0].points[3]", "series[0].points[3].value"),
+      "naming the field of a point names the point").toBe(true);
+    expect(citationCovers("lines[2]", "lines[2].message")).toBe(true);
+    expect(citationCovers("deployment.image", "deployment.image")).toBe(true);
+  });
+
+  it("does not count a citation that is less specific, or a different index", () => {
+    expect(citationCovers("pods[0].phase", "pods[0]"),
+      "naming the pod does not name its phase").toBe(false);
+    /*
+     * Compared segment by segment, not as a string: `series[0].points[30]`
+     * starts with `series[0].points[3]` and is a different point entirely.
+     */
+    expect(citationCovers("series[0].points[3]", "series[0].points[30]"),
+      "point 30 is not point 3").toBe(false);
+    expect(citationCovers("events[0].message", "events[1].message")).toBe(false);
   });
 });

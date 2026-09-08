@@ -36,7 +36,10 @@ the observation you were given and cite what you actually read.
 ## Rules
 
 **Every finding needs a `source_ref`** — an index into the lines you were given,
-such as `lines[2]`. Quote the message in `fact`, do not paraphrase it into
+such as `lines[2].message` — the field, not just the line. This said `lines[2]`
+until 2026-09-07, while every scenario asks for the `.message` leaf, so an
+obedient answer was scored as resting on other ground. Quote the message in
+`fact`, do not paraphrase it into
 something that sounds more conclusive than the line does.
 
 **You cannot see the configuration, and you are not asked to.** Limits, images

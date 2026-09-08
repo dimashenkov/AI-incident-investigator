@@ -158,8 +158,26 @@ export function score(scenario, answer, root = SCENARIOS) {
        * contradiction, which Codex reached by calling score() directly on
        * 2026-09-07 and getting `correct` back.
        */
-      if (shaped.length === 0) {
-        unqualified.push("it refused while stating no evidence at all, so nothing shows it saw the contradiction");
+      /*
+       * For a refusal, "did it look" is answered by the AGENTS' findings, not
+       * by analysis.evidence.
+       *
+       * Every entry of `evidence` must say whether it supports or contradicts
+       * the conclusion, and a refusal reached none — so merge.ts writes an
+       * empty list ON PURPOSE, with the reasoning spelled out where it does it.
+       * This branch then read that deliberate emptiness as "nothing shows it
+       * saw the contradiction", and both answers the scenario declares honest
+       * scored unqualified. A subagent measured it on 2026-09-07: no model
+       * output could have made conflicting-evidence come back green, so a paid
+       * run of the one scenario that can close Definition of Done item 3 was
+       * unwinnable before it started.
+       *
+       * What a refusal must show is that it read something. The findings are
+       * where reading is recorded, and must_cite already checks WHICH ones.
+       */
+      const looked = citedPaths(answer).length > 0 || shaped.length > 0;
+      if (!looked) {
+        unqualified.push("it refused while citing nothing at all, so nothing shows it looked");
       }
     } else {
       /*
@@ -190,7 +208,7 @@ export function score(scenario, answer, root = SCENARIOS) {
   }
 
   const cited = citedPaths(answer);
-  const missing = want.mustCite.filter((c) => !cited.includes(c));
+  const missing = want.mustCite.filter((c) => !cited.some((got) => citationCovers(c, got)));
   if (missing.length > 0) {
     return { scenario, state: "correct-without-its-evidence", code: got, missingCitations: missing };
   }
@@ -204,6 +222,32 @@ export function score(scenario, answer, root = SCENARIOS) {
  * finding. Both are needed to trace a conclusion, and only one of them is a
  * citation in the sense must_cite means.
  */
+/**
+ * Does a citation satisfy a required path?
+ *
+ * Exactly, or by being MORE specific. `series[0].points[3].value` cites
+ * `series[0].points[3]` — it names the same point and says which field of it.
+ * The reverse does not hold: `pods[0]` does not cite `pods[0].phase`.
+ *
+ * Written 2026-09-07, when a subagent showed the prompts and the fixtures had
+ * drifted into two spellings of one idea. metrics-agent.md shows
+ * `series[0].points[3]` three times as the canonical form; conflicting-evidence
+ * demands `series[0].points[3].value` and cpu-throttling demands
+ * `series[0].points[3]`. An obedient model could satisfy one scenario and fail
+ * the other with the identical, correct answer.
+ *
+ * Compared SEGMENT by segment rather than as a string prefix, because
+ * `series[0].points[30]` starts with `series[0].points[3]` and is a different
+ * point entirely.
+ */
+export function citationCovers(required, got) {
+  const split = (p) => String(p).replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean);
+  const want = split(required);
+  const have = split(got);
+  if (have.length < want.length) return false;
+  return want.every((seg, i) => have[i] === seg);
+}
+
 export function citedPaths(answer) {
   const agents = answer?.incident?.analysis?.agents;
   if (!Array.isArray(agents)) return [];

@@ -134,6 +134,31 @@ export function recordAgentResult(
     normalised = rewrite.changed;
   }
 
+  /*
+   * One result per agent. A second is a retry, and a retry is not a second
+   * agent.
+   *
+   * This appended unconditionally. A subagent recorded the same agent three
+   * times on 2026-09-07 and got three entries, all valid — and the thread then
+   * told a reader that kubernetes had both failed and succeeded, because the
+   * report counts `agents.filter(status === "error")` and that count was
+   * attempts rather than agents.
+   *
+   * Refused rather than replaced. Replacing would let a failed read be quietly
+   * overwritten by a successful retry with nothing recording that the first one
+   * happened — the same erasure the status check above refuses. A caller that
+   * genuinely wants to retry has to decide what to do with the first answer.
+   */
+  const who = stored["agent"];
+  const already = ((existing as unknown[]) ?? []).filter(
+    (a) => typeof a === "object" && a !== null && (a as Record<string, unknown>)["agent"] === who,
+  );
+  if (already.length > 0) {
+    return { state: "refused",
+      reason: `${String(who)} has already reported on this incident; a second result is a retry, and which of the two `
+        + "is the answer is not this function's decision" };
+  }
+
   const next = {
     ...incident,
     analysis: { ...(analysis as Record<string, unknown>), agents: [...((existing as unknown[]) ?? []), stored] },
@@ -426,6 +451,30 @@ export function concludeIncident(
   validate: Validate,
   incident: Record<string, unknown>,
 ): { state: "concluded"; incident: Record<string, unknown> } | { state: "refused"; reason: string; errors?: string[] } {
+  /*
+   * Only an incident that has not concluded may be concluded.
+   *
+   * This read the analysis and nothing else, and wrote `status` with no rule
+   * about what the previous status was — so a subagent on 2026-09-07 took a
+   * CLOSED incident straight to `diagnosed`, and a `failed` one too, with
+   * nothing in the document saying it had ever been either. A conclusion that
+   * overwrites a conclusion is a document whose reasoning is gone while the
+   * document itself stays self-consistent.
+   *
+   * `insufficient_evidence` is included: it IS a conclusion — the honest one
+   * that names no cause — and re-concluding it silently replaces a refusal with
+   * an answer.
+   *
+   * Nothing here reopens an incident. That is a decision someone should have to
+   * make explicitly, and no caller has ever needed it.
+   */
+  const status = incident["status"];
+  if (status !== "investigating") {
+    return { state: "refused",
+      reason: `this incident is ${JSON.stringify(status)}, not investigating; concluding it again would `
+        + "replace a verdict with no record that there was one" };
+  }
+
   const analysis = incident["analysis"];
   if (typeof analysis !== "object" || analysis === null) return { state: "refused", reason: "the incident has no analysis" };
   const agents = (analysis as Record<string, unknown>)["agents"];

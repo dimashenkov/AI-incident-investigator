@@ -589,6 +589,14 @@
             "properties": {
               "root_cause_code": {
                 "const": "INSUFFICIENT_EVIDENCE"
+              },
+              "confidence": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "maximum": 0.5,
+                "description": "Saying the evidence does not support naming a cause, at 95%, is a sentence arguing with itself. The rule checked only the code, so an insufficient_evidence incident could carry any number the model wrote — a subagent produced one reading “The evidence collected does not support naming a cause” at 0.95 on 2026-09-07. The ceiling is 0.5 because above it the document is asserting confidence in a refusal to conclude; null stays allowed, since a refusal that states no number at all is honest."
               }
             },
             "required": [

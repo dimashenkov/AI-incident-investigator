@@ -140,6 +140,18 @@ describe("absence is not consent — cases that used to pass", () => {
             replicas: { desired: 1, ready: 1, available: 1 } } } },
       collection: { kubernetes: { state: "collected" }, logs: { state: "nothing" }, metrics: { state: "nothing" } } },
     "but this incident is INC-2026-0001");
+  probe("19 insufficient evidence, held with confidence", "incident",
+    { ...INC, status: "insufficient_evidence",
+      analysis: { agents: [{ agent: "root_cause", status: "ok",
+          findings: [{ fact: "f", source_ref: "pods[0].phase" }], hypotheses: [], confidence: 0.95 }],
+        root_cause_code: "INSUFFICIENT_EVIDENCE",
+        root_cause: "The evidence collected does not support naming a cause.",
+        confidence: 0.95, evidence: [] } },
+    "/analysis/confidence");
+  probe("20 closed while carrying a live diagnosis", "incident",
+    { ...INC, status: "closed", analysis: { agents: [], root_cause_code: "CONTAINER_OOM",
+      root_cause: "r", confidence: 0.9, evidence: [{ source: "kubernetes", fact: "f", supports: "for" }] } },
+    "/analysis/root_cause_code");
 
   // Codex, chunk 0 round 4: the empty-target test used one action type, so two
   // state-changing actions validated while naming nothing they would change.

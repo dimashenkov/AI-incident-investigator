@@ -161,7 +161,7 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
     // agent had named a cause, and none of them is allowed to.
     { id: "naming-the-cause-is-this-agents-job", prose: /forbidden\*\* to diagnose|are \*\*forbidden\*\*/ },
     { id: "every-answer-carries-five-fields", prose: /All five fields, always/ },
-    { id: "cause-code-from-the-list", prose: /The `root_cause_code` must be one of these, exactly/ },
+    { id: "cause-code-from-the-list", prose: /A hypothesis `code` must be one of these, exactly/ },
     { id: "record-contradicting-evidence", prose: /Contradicting evidence is recorded, not dropped/ },
     { id: "lower-confidence-on-conflict", prose: /Lower the confidence when evidence conflicts/ },
     { id: "cite-only-what-agents-reported", prose: /Only cite what the agents reported/ },
@@ -306,7 +306,17 @@ describe("every prompt carries the rules its schema will enforce", () => {
     const row = text.split("\n").find((l) => l.includes("circumstantial evidence only"));
     expect(row, "the row is gone; this test no longer checks anything").toBeDefined();
     expect(row, "circumstantial evidence has a band again").not.toMatch(/0\.\d\s*to\s*0\.\d/);
-    expect(row).toContain("INSUFFICIENT_EVIDENCE");
+    /*
+     * The row said to write INSUFFICIENT_EVIDENCE, and no field in an agent
+     * result can hold it — `hypotheses[0].code` is checked against the cause
+     * list and refuses it. An obedient answer was refused outright. Measured
+     * 2026-09-07. The way to say it is an EMPTY hypotheses list.
+     */
+    expect(row, "the row must not name a code no field can carry")
+      .not.toContain("INSUFFICIENT_EVIDENCE");
+    expect(row, "and it must still say how to answer").toMatch(/no hypotheses/);
+    expect(text, "with the reason stated where a reader will hit it")
+      .toMatch(/`INSUFFICIENT_EVIDENCE` is not a code you may write/);
   });
 
   it("does not both require and forbid naming a cause from one finding", () => {
@@ -553,7 +563,7 @@ describe("every prompt carries the rules its schema will enforce", () => {
     // Also asserts the prose, so removing the heading fails here rather than
     // leaving a bare list nobody introduced.
     const heading = readPrompt("root-cause")!;
-    expect(/The `root_cause_code` must be one of these, exactly/.test(heading), "the heading that introduces the list is gone").toBe(true);
+    expect(/A hypothesis `code` must be one of these, exactly/.test(heading), "the heading that introduces the list is gone").toBe(true);
     // Codex, 2026-09-05: the fix covered the observing agents and left the final
     // step — the one whose answer the incident actually carries — able to invent
     // an identifier exactly as the first real call did.
@@ -796,6 +806,48 @@ describe("the example in a prompt is the shape a model copies", () => {
       expect(text, `${agent} must not allow citing a path it did not report`)
         .not.toMatch(/(any path|whether or not|need not)[^.]{0,120}(among your findings|you (listed|reported)|wrote down)/i);
     }
+  });
+
+  /*
+   * A prompt that gets an obedient answer refused is worse than one that says
+   * nothing: it spends a paid call to be told no. Three of these were measured
+   * on 2026-09-07 by running the instruction's own output through the schema.
+   */
+  it("asks the root cause agent for nothing the schema will refuse", () => {
+    const rc = readPrompt("root-cause")!;
+    expect(rc, "an agent result has no root_cause_code field; the schema refuses one")
+      .not.toMatch(/\*\*The `root_cause_code` must be/);
+    expect(rc, "and the file must say where that field actually comes from")
+      .toMatch(/Your answer has no\s*\n?`root_cause_code` field/);
+    expect(rc, "INSUFFICIENT_EVIDENCE is not a value any field of an answer can hold")
+      .toMatch(/`INSUFFICIENT_EVIDENCE` is not a code you may write/);
+  });
+
+  it("names the field that actually carries dissent", () => {
+    /*
+     * `contradicted_by` is the only thing written into the incident as evidence
+     * against a conclusion, and no prompt mentioned it. A model cannot guess a
+     * field name it was never given, so the one scenario built to pose a
+     * conflict produced a high-confidence verdict with nothing recorded against
+     * it — and the thread showed no objection at all.
+     */
+    const rc = readPrompt("root-cause")!;
+    expect(rc, "the field that carries dissent must be named").toMatch(/contradicted_by/);
+    expect(rc, "and shown in the shape the agent must write")
+      .toMatch(/"contradicted_by": \[/);
+    expect(rc, "with the same tie to its own findings that supported_by has")
+      .toMatch(/`source_ref` of a finding \*\*you\*\* reported/);
+  });
+
+  it("teaches the citation spelling the scenarios actually ask for", () => {
+    // metrics-agent.md showed `series[0].points[3]` while a scenario demands
+    // `series[0].points[3].value`; logs-agent.md showed `lines[2]` while every
+    // scenario demands the `.message` leaf. An obedient answer scored as
+    // resting on other ground.
+    expect(readPrompt("logs")!, "the logs leaf is the message")
+      .toMatch(/such as `lines\[2\]\.message`/);
+    expect(readPrompt("metrics")!, "the metrics leaf is the value")
+      .toMatch(/such as `series\[0\]\.points\[3\]\.value`/);
   });
 
   it("tells the metrics agent where the unit goes, not merely that it must appear", () => {
