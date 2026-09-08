@@ -89,7 +89,7 @@
                     "last_state": {
                       "type": "object",
                       "additionalProperties": false,
-                      "description": "Absent when the container has never terminated. Present means it did, and then the reason is required — a termination with no reason is the silence this project refuses.",
+                      "description": "Absent when the container has never terminated. Present means it did, and then the reason is required — a termination with no reason is the silence this project refuses. The sentence said that from the start and nothing enforced it: `terminated` was declared and not required, so `last_state: {}` — a container claiming it died, with no reason, no exit code and no times — validated. Measured by a subagent on 2026-09-07.",
                       "properties": {
                         "terminated": {
                           "type": "object",
@@ -118,7 +118,10 @@
                             }
                           }
                         }
-                      }
+                      },
+                      "required": [
+                        "terminated"
+                      ]
                     }
                   }
                 }

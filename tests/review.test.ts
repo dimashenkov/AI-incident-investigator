@@ -183,6 +183,31 @@ describe("the instrument must not pay the reviewer for the wrong label", () => {
     expect(out.reason).toContain("resolves to nothing");
   });
 
+  it("refuses a wrong verdict that names the cause it already gave", () => {
+    /*
+     * The test below is named for two refusals and builds one. A subagent
+     * measured the other on 2026-09-07: actual_code equal to proposed_code
+     * validated, so a review saying "the system was wrong, and the true cause
+     * is what it said" entered the confusion matrix as a correct-looking pair —
+     * in the file whose header calls itself the only signal that can say
+     * whether the system was right.
+     *
+     * Draft 2020-12 cannot compare two fields, so the rule is an invariant.
+     */
+    const wrong = (actual: string) => stored({
+      verdict_was: "wrong", proposed_code: "CONTAINER_OOM", actual_code: actual,
+      evidence_source: "learned_after",
+      what_settled_it: "the throttling only showed in metrics nobody collected here",
+    });
+
+    const r = validate("verdict-review", wrong("CONTAINER_OOM"));
+    expect(r.state, "calling the verdict wrong and repeating it is not a review").toBe("invalid");
+    if (r.state === "invalid") expect(r.errors.join("; ")).toMatch(/the same as/);
+
+    // A genuinely different cause is the review worth having, and it records.
+    expect(validate("verdict-review", wrong("CPU_THROTTLING")).state).toBe("valid");
+  });
+
   it("refuses a wrong verdict whose true cause is empty or the same as proposed", () => {
     expect(validate("verdict-review", stored({ verdict_was: "wrong", actual_code: "",
       evidence_source: "learned_after", what_settled_it: "something happened" })).state).toBe("invalid");

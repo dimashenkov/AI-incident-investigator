@@ -8,7 +8,6 @@
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { readFileSync } from "node:fs";
 // @ts-expect-error — plain .mjs, the same file node runs.
 import { chooseSource } from "../scripts/record-baseline.mjs";
 // @ts-expect-error - plain .mjs script, no types

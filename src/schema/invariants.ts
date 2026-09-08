@@ -226,5 +226,27 @@ export function invariantErrors(name: InvariantSchemaName, data: unknown): strin
     }
   }
 
+  /*
+   * A review that calls the verdict WRONG must name a DIFFERENT cause.
+   *
+   * `actual_code` equal to `proposed_code` says the system was wrong and the
+   * true cause is exactly what it said. That is not a coherent review, and it
+   * entered summarise's confusion matrix as a correct-looking pair — in the
+   * file whose header calls itself the only signal that can say whether the
+   * system was right.
+   *
+   * The test named for this refusal built only the empty-string half; a
+   * subagent measured the other on 2026-09-07. Draft 2020-12 cannot compare two
+   * fields, which is why it is here and not in the schema.
+   */
+  if (name === "verdict-review" && obj["verdict_was"] === "wrong") {
+    const actual = obj["actual_code"];
+    const proposed = obj["proposed_code"];
+    if (typeof actual === "string" && typeof proposed === "string" && actual === proposed) {
+      errs.push(`/actual_code is ${actual}, the same as /proposed_code, so this review calls the verdict `
+        + "wrong and names the cause it already gave");
+    }
+  }
+
   return errs;
 }

@@ -104,3 +104,66 @@ describe("a validator that could not run is not a validator that said no", () =>
     expect(ok.state, "and the thread must still be writable").toBe("reported");
   });
 });
+
+/*
+ * The same defect I declared fixed this morning, alive in its other carrier.
+ *
+ * src/core/thread.ts's sourceOf was traced on 2026-09-07 and its comment says
+ * so. src/core/merge.ts's asEvidence was not: it mapped by string prefix and
+ * fell through to `datadog`, while its own comment claimed the source came from
+ * the citation "and datadog otherwise — never invented". A subagent measured
+ * both halves false the same day.
+ *
+ * "When you fix something, look for its second carrier" is written in this
+ * project's rules. It was written down and then not done.
+ */
+describe("the verdict's evidence names the agent that reported it", () => {
+  const incidentWith = (agents: unknown[]) => ({
+    ...INCIDENT(), analysis: { agents, root_cause_code: null, root_cause: null,
+      confidence: null, evidence: [] },
+  });
+  const verdict = (ref: string) => ({ agent: "root_cause", status: "ok",
+    findings: [{ fact: "the fact", source_ref: ref }],
+    hypotheses: [{ code: "CPU_THROTTLING", statement: "s", supported_by: [ref] }], confidence: 0.5 });
+  const reporter = (agent: string, ref: string) => ({ agent, status: "ok",
+    findings: [{ fact: "the fact", source_ref: ref }], hypotheses: [], confidence: 0.5 });
+
+  it("traces a path two contracts share to the agent that actually cited it", () => {
+    /*
+     * `window.from` is a field of the logs contract AND the metrics contract.
+     * Guessing from the prefix attributed a metrics fact to logs — a fact laid
+     * at the door of an agent that never reported it.
+     */
+    for (const who of ["logs", "metrics"]) {
+      const r = concludeIncident(accepts,
+        incidentWith([reporter(who, "window.from"), verdict("window.from")]));
+      expect(r.state).toBe("concluded");
+      if (r.state !== "concluded") continue;
+      const ev = (r.incident.analysis as { evidence: Array<{ source: string }> }).evidence;
+      expect(ev[0]!.source, `${who} reported it, so ${who} must be the source`).toBe(who);
+    }
+  });
+
+  it("never attributes a slot's fact to the alerting provider", () => {
+    // `collected_at` is in every observation and matched no prefix, so it fell
+    // to `datadog` — the one evidenceSource value no slot can ever produce.
+    const r = concludeIncident(accepts,
+      incidentWith([reporter("kubernetes", "collected_at"), verdict("collected_at")]));
+    expect(r.state).toBe("concluded");
+    if (r.state !== "concluded") return;
+    const ev = (r.incident.analysis as { evidence: Array<{ source: string }> }).evidence;
+    expect(ev[0]!.source, "datadog holds no observation; attributing one to it is inventing")
+      .not.toBe("datadog");
+    expect(ev[0]!.source).toBe("kubernetes");
+  });
+
+  it("lays an untraceable citation at the root cause agent's own door", () => {
+    // Unreachable in practice — a verdict may only cite what an agent reported
+    // — and this does not rely on that.
+    const r = concludeIncident(accepts, incidentWith([verdict("nowhere.at.all")]));
+    expect(r.state).toBe("concluded");
+    if (r.state !== "concluded") return;
+    const ev = (r.incident.analysis as { evidence: Array<{ source: string }> }).evidence;
+    expect(ev[0]!.source).toBe("root_cause");
+  });
+});

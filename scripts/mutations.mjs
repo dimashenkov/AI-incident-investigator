@@ -1092,6 +1092,42 @@ export const MUTATIONS = [
     mustFail: "says the same about the check that runs after attaching",
   },
   {
+    // The evidence source guessed from the path's prefix again: a field two
+    // contracts share is attributed to whichever the prefix hits first.
+    id: "evidence-source-guessed-from-the-path",
+    file: "src/core/merge.ts",
+    from: "    if (reported) return { source: who, fact: String(finding[\"fact\"] ?? \"\") };",
+    to: "    if (false) return { source: who, fact: String(finding[\"fact\"] ?? \"\") };",
+    mustFail: "traces a path two contracts share to the agent that actually cited it",
+  },
+  {
+    // A slot's fact attributed to the alerting provider, which holds no
+    // observation at all.
+    id: "slot-fact-attributed-to-the-alerting-provider",
+    file: "src/core/merge.ts",
+    from: "  return { source: shape ?? \"root_cause\", fact: String(finding[\"fact\"] ?? \"\") };",
+    to: "  return { source: shape ?? \"datadog\", fact: String(finding[\"fact\"] ?? \"\") };",
+    mustFail: "lays an untraceable citation at the root cause agent's own door",
+  },
+  {
+    // A container claiming it terminated, with no reason, no exit code and no
+    // times — the silence the schema description says it refuses, and did not.
+    id: "a-termination-with-no-reason",
+    file: "schemas/observations.schema.json",
+    from: '                      "required": [\n                        "terminated"\n                      ]',
+    to: '                      "description": "unenforced"',
+    mustFail: "21 a container that terminated for no reason",
+  },
+  {
+    // A review calling the verdict wrong and naming the cause it already gave,
+    // which entered the confusion matrix as a correct-looking pair.
+    id: "a-wrong-verdict-that-repeats-itself",
+    file: "src/schema/invariants.ts",
+    from: '    if (typeof actual === "string" && typeof proposed === "string" && actual === proposed) {',
+    to: "    if (false) {",
+    mustFail: "refuses a wrong verdict that names the cause it already gave",
+  },
+  {
     // The deployed node running the schemas and nothing else, so "valid" means
     // one thing in a unit test and another in production — which is exactly the
     // promise the top of src/schema/validate.ts makes.

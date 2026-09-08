@@ -37,9 +37,14 @@ const base = () => ({
   namespace: "production", cluster: "prod-eu", started_at: "2026-09-04T10:30:00Z",
   source: { provider: "fake-datadog", alert: ALERT },
   observations: { kubernetes: null, logs: null, metrics: null },
-  collection: { kubernetes: { state: "nothing", __nothing: "the provider read it and found nothing" },
-                logs: { state: "nothing", __nothing: "the provider read it and found nothing" },
-                metrics: { state: "nothing", __nothing: "the provider read it and found nothing" } },
+  /*
+   * No `__nothing` here. `collection` is a closed object — state, kind, reason —
+   * so carrying that key made every case in this file INVALID before a single
+   * invariant ran, and the two validators agreed for a reason that has nothing
+   * to do with the subject. The case literally named "a clean incident" was
+   * invalid. A subagent measured it on 2026-09-07, the day the file was written.
+   */
+  collection: { kubernetes: { state: "nothing" }, logs: { state: "nothing" }, metrics: { state: "nothing" } },
   analysis: { agents: [], root_cause_code: null, root_cause: null, confidence: null, evidence: [] },
   remediation: { recommended_actions: [] },
   conversation: { provider: "fake-slack", channel_id: "fake-prod-incidents",
@@ -91,6 +96,17 @@ const CASES: Array<[string, string, () => unknown]> = [
 ];
 
 describe("one validator, not two", () => {
+  it("starts from a clean case that is genuinely valid, or nothing below is about the invariants", () => {
+    /*
+     * The precondition this file did not have. ajv runs first and returns on
+     * failure, so a base that is invalid for ANY reason means every later case
+     * is refused before an invariant is consulted — and both validators agree,
+     * loudly, about nothing.
+     */
+    const r = validate("incident", base());
+    expect(r.state, JSON.stringify(r)).toBe("valid");
+  });
+
   it("gives the same verdict locally and in the deployed node, case by case", async () => {
     const deployed = await deployedValidate();
     expect(CASES.length, "no cases; this would pass on an empty set").toBeGreaterThan(4);

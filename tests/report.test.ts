@@ -286,12 +286,22 @@ describe("the thread does not say more, or less, than the incident holds", () =>
     });
     const r = reportIncident(withRc, AT);
     if (r.state !== "reported") throw new Error(r.reason);
+    /*
+     * Asserted on the ROOT CAUSE agent's own message, not on the whole thread.
+     *
+     * The first version searched every message for "datadog" and required
+     * "kubernetes" somewhere — and the kubernetes agent's own line supplies
+     * both, so when asEvidence stopped falling through to datadog on
+     * 2026-09-08 the mutation guarding this survived. Two carriers of one
+     * value, and the test was reading whichever it liked. The gate said so.
+     */
     const messages = (r.conversation.messages as Array<Record<string, unknown>>);
-    const cited = messages.flatMap((m) =>
-      (m.cited_evidence as Array<{ source: string }> | undefined) ?? []);
-    expect(cited.length, "nothing was cited; this would pass on an empty set").toBeGreaterThan(0);
-    expect(cited.map((c) => c.source), "no citation may name a provider that never held the fact")
-      .not.toContain("datadog");
-    expect(cited.map((c) => c.source)).toContain("kubernetes");
+    const rcLine = messages.find((m) => String(m.text ?? "").startsWith("root_cause:"));
+    expect(rcLine, "the root cause agent has no line at all").toBeDefined();
+    const rcCited = (rcLine!.cited_evidence as Array<{ source: string }> | undefined) ?? [];
+    expect(rcCited.length, "it cited nothing; this would pass on an empty set").toBeGreaterThan(0);
+    expect(rcCited.map((c) => c.source),
+      "the fact was reported by kubernetes, so kubernetes is its source")
+      .toEqual(["kubernetes"]);
   });
 });

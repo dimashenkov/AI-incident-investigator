@@ -950,3 +950,53 @@ describe("coverage is established from this run's test report, not a leftover", 
     expect(reportIsFromThisRun(join(tmpdir(), "absent-report-8812.json"), 0)).toBe(false);
   });
 });
+
+/*
+ * Every check is CALLED by something, and the ones that are not say why.
+ *
+ * A subagent counted on 2026-09-07: of the nine checks, exactly one — `tests` —
+ * ever had its `run()` called from the suite, under describe blocks named for
+ * the others. `runGate` wraps a throw into `unknown`, so a check that threw on
+ * every input would report "could not establish" forever and the gate would
+ * exit 2 for a reason nobody would trace to a bug in the check itself.
+ *
+ * Four are run here. Five are not, and each names its reason — a check left out
+ * of both lists fails the last assertion, so a new one cannot be added to
+ * neither by accident.
+ */
+describe("every gate check is exercised, or says why not", () => {
+  const RUN_HERE = ["declared-scripts-exist", "no-secrets-near-commit",
+    "promised-checks-due", "definition-of-done"];
+
+  const NOT_RUN_HERE: Record<string, string> = {
+    tests: "it spawns vitest, and vitest running vitest is the hang this gate guards against",
+    "core-builds-clean": "it shells out to a build that takes seconds and writes into out/",
+    typecheck: "it shells out to tsc over the whole tree",
+    "mutations-still-caught": "it breaks source files on purpose and runs the suite per mutation",
+    "no-drift-from-baseline": "it compares against a recorded export and reads out/",
+  };
+
+  it("recognises the state of every check it can run", () => {
+    expect(RUN_HERE.length, "nothing is run; this would pass on an empty set").toBeGreaterThan(3);
+    for (const id of RUN_HERE) {
+      const check = (CHECKS as Array<{ id: string; run: () => { state?: string } }>).find((c) => c.id === id);
+      expect(check, `${id} is not in CHECKS any more`).toBeDefined();
+      // A throw here is the finding: runGate would turn it into `unknown` and
+      // the gate would say "could not establish" forever.
+      const r = check!.run();
+      expect(["pass", "fail", "unknown"], `${id} returned ${JSON.stringify(r?.state)}`)
+        .toContain(r?.state);
+    }
+  });
+
+  it("accounts for every check, so a new one cannot be silently unexercised", () => {
+    const ids = (CHECKS as Array<{ id: string }>).map((c) => c.id);
+    expect(ids.length, "no checks at all").toBeGreaterThan(5);
+    const accounted = new Set([...RUN_HERE, ...Object.keys(NOT_RUN_HERE)]);
+    const orphans = ids.filter((id) => !accounted.has(id));
+    expect(orphans, "these checks are neither run here nor excused; say which and why").toEqual([]);
+    // And nothing may be excused that no longer exists.
+    const stale = [...accounted].filter((id) => !ids.includes(id));
+    expect(stale, "these are named here but are not checks any more").toEqual([]);
+  });
+});

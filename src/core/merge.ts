@@ -533,7 +533,7 @@ export function concludeIncident(
   const supported = Array.isArray(h["supported_by"]) ? (h["supported_by"] as string[]) : [];
   const evidence = findings
     .filter((f) => supported.includes(String(f["source_ref"])))
-    .map((f) => ({ ...asEvidence(f), supports: "for" as const }));
+    .map((f) => ({ ...asEvidence(f, agents), supports: "for" as const }));
 
   if (evidence.length === 0) {
     // The schema demands it, and so does the point: a diagnosis whose cited
@@ -563,7 +563,7 @@ export function concludeIncident(
   const contradicted = Array.isArray(h["contradicted_by"]) ? (h["contradicted_by"] as string[]) : [];
   const against = findings
     .filter((f) => contradicted.includes(String(f["source_ref"])))
-    .map((f) => ({ ...asEvidence(f), supports: "against" as const }));
+    .map((f) => ({ ...asEvidence(f, agents), supports: "against" as const }));
 
   return finish(validate, {
     ...incident,
@@ -573,19 +573,63 @@ export function concludeIncident(
   });
 }
 
-function asEvidence(finding: Record<string, unknown>): { source: string; fact: string } {
-  // The evidence source names where the fact came from. A root cause finding
-  // cites another agent, so the source is that agent's own slot when the
-  // citation says so, and `datadog` otherwise — never invented.
+/**
+ * Which agent a fact came from — traced through the agents, not guessed from
+ * the shape of its path.
+ *
+ * This mapped by string prefix and fell through to `datadog`, and the comment
+ * above it claimed the source was "that agent's own slot when the citation says
+ * so, and datadog otherwise — never invented". Both halves were false, and a
+ * subagent measured both on 2026-09-07:
+ *
+ *   `window.from` is a field of the logs contract AND the metrics contract, so
+ *   a metrics agent citing it was recorded as logs — a fact attributed to an
+ *   agent that never reported it.
+ *
+ *   `collected_at` is in every observation and matched no prefix, so it fell to
+ *   `datadog` — the one evidenceSource value no slot can ever produce, which is
+ *   the definition of invented.
+ *
+ * The same defect was found in src/core/thread.ts the same day and fixed there.
+ * The fix landed in one carrier of two. This is the other one, and this is what
+ * "look for the second carrier" means when it is written down and then not done.
+ *
+ * A root cause finding may only cite a source_ref some agent reported — enforced
+ * since 2026-09-07 — so the reporter is FINDABLE. When it is not, the answer is
+ * the citation's own shape rather than a provider that never held the fact.
+ */
+function asEvidence(
+  finding: Record<string, unknown>,
+  agents: unknown[] = [],
+): { source: string; fact: string } {
   const ref = String(finding["source_ref"] ?? "");
-  const source = ref.startsWith("pods") || ref.startsWith("events") || ref.startsWith("deployment")
+
+  for (const a of agents) {
+    if (typeof a !== "object" || a === null) continue;
+    const who = (a as Record<string, unknown>)["agent"];
+    if (who !== "kubernetes" && who !== "logs" && who !== "metrics") continue;
+    const fs = (a as Record<string, unknown>)["findings"];
+    if (!Array.isArray(fs)) continue;
+    const reported = fs.some((f) =>
+      typeof f === "object" && f !== null && (f as Record<string, unknown>)["source_ref"] === ref);
+    if (reported) return { source: who, fact: String(finding["fact"] ?? "") };
+  }
+
+  /*
+   * Nobody reported it. Fall back to the shape, and NOT to `datadog`: an
+   * unattributable citation must not be laid at a provider's door. `window` and
+   * `collected_at` are deliberately absent from this list because they belong
+   * to more than one contract, and guessing between them is what produced the
+   * wrong attribution in the first place.
+   */
+  const shape = ref.startsWith("pods") || ref.startsWith("events") || ref.startsWith("deployment")
     ? "kubernetes"
-    : ref.startsWith("lines") || ref.startsWith("truncated") || ref.startsWith("window")
+    : ref.startsWith("lines") || ref.startsWith("truncated")
       ? "logs"
       : ref.startsWith("series")
         ? "metrics"
-        : "datadog";
-  return { source, fact: String(finding["fact"] ?? "") };
+        : null;
+  return { source: shape ?? "root_cause", fact: String(finding["fact"] ?? "") };
 }
 
 function finish(validate: Validate, next: Record<string, unknown>): { state: "concluded"; incident: Record<string, unknown> } | { state: "refused"; reason: string; errors?: string[] } {

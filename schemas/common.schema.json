@@ -5,13 +5,14 @@
   "description": "Values that more than one schema needs, in one place.\\n\\nCodex, chunk 0 round 6: these lived inside incident.schema.json and were referenced from the other files by absolute id. Every ref resolved in production, because the validator registers all schemas together — but it made two formerly independent files silently depend on the incident schema, and an absolute $ref is only a name: nothing fetches the file it points at.\\n\\nThe schemas are a package, not four separate documents. Nothing here compiles alone, and a test checks that every cross-file reference points at a schema the validator actually registers.",
   "$defs": {
     "evidenceSource": {
-      "description": "Where a fact came from. One carrier: this list also governs what a chat answer may cite, and the two drifting apart would let a message cite a source no evidence can have.",
+      "description": "Where a fact came from. One carrier: this list also governs what a chat answer may cite, and the two drifting apart would let a message cite a source no evidence can have. `root_cause` was added on 2026-09-07: the verdict's evidence is traced back to the agent that reported the citation, and when no agent did — which the citation rule makes unreachable in practice, and this does not rely on that — the claim is laid at the root cause agent's own door rather than at a provider's. `datadog` names the alerting source; it is the one value no observation slot can produce, so attributing a slot's fact to it was the definition of inventing one.",
       "type": "string",
       "enum": [
         "kubernetes",
         "logs",
         "metrics",
-        "datadog"
+        "datadog",
+        "root_cause"
       ]
     },
     "severity": {
