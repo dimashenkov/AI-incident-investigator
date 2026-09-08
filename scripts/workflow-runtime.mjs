@@ -350,9 +350,19 @@ return items.map(function (item, index) {
     return { json: { index, state: "refused", agent: NEXT,
       reason: NEXT + " reads no observation slot, so its context failing is a refusal and never a skip: " + ctx.reason } };
   }
+  /*
+   * A skip is only honest when the context failed BECAUSE the slot is empty.
+   *
+   * This asked the collection record alone and threw ctx.why away, so a
+   * context refused for CONTAMINATION — another incident's data in the payload,
+   * the one thing that check exists to catch — was printed as "the provider
+   * reported an established absence", the chain carried on, and the run scored
+   * correct. Three of the eight scenarios declare an absence for a slot, so the
+   * trigger sits in the shipped fixtures. Measured by a subagent on 2026-09-07.
+   */
   const collection = (j.incident && j.incident.collection) || {};
   const record = collection[slot] || {};
-  if (record.state === "nothing") {
+  if (record.state === "nothing" && ctx.why === "empty-slot") {
     return { json: { index, state: "skipped", agent: NEXT, scenario: j.scenario,
       incident: j.incident, normalised: j.normalised || 0,
       skipped_because: NEXT + " had nothing to read: the provider reported an established absence" } };

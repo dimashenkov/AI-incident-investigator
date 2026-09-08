@@ -36,9 +36,22 @@ function snapshot<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+/**
+ * Why a context could not be built, in a word a machine may branch on.
+ *
+ * `empty-slot` is the ONLY one a caller may turn into a skip: the provider ran
+ * and reported an absence, so there is nothing to ask about. Every other value
+ * means something went wrong, and the deployed node was branching on the
+ * collection record alone — so a context refused for CONTAMINATION, the one
+ * thing checkSourceForForeignIncidents exists to catch, was printed as "the
+ * provider reported an established absence", the chain continued, and the run
+ * scored correct. Measured by a subagent on 2026-09-07 against a real scenario.
+ */
+export type Unavailable = "empty-slot" | "no-slot" | "no-prompt" | "no-incident-id" | "no-such-slot" | "contaminated";
+
 export type ContextResult =
   | { state: "assembled"; agent: AgentName; prompt: string; payload: Record<string, unknown> }
-  | { state: "unavailable"; agent: AgentName; reason: string };
+  | { state: "unavailable"; agent: AgentName; reason: string; why: Unavailable };
 
 
 /**
@@ -57,16 +70,25 @@ export function buildObservingContext(
 ): ContextResult {
   const slot = AGENT_SLOT[agent];
   if (slot === null) {
-    return { state: "unavailable", agent, reason: `${agent} does not read an observation slot` };
+    return { state: "unavailable", agent, why: "no-slot", reason: `${agent} does not read an observation slot` };
   }
 
-  if (prompt === null) return { state: "unavailable", agent, reason: `no prompt for ${agent}` };
+  /*
+   * Not `=== null`. A prompt map built from a directory listing yields
+   * UNDEFINED for a renamed or deleted file, and this guard let that through —
+   * so the HTTP node built a request whose system prompt was `undefined` and
+   * the call was paid for before the API said 400. The file already records
+   * that failure costing money once; the guard was written for the other half.
+   */
+  if (typeof prompt !== "string" || prompt.length === 0) {
+    return { state: "unavailable", agent, why: "no-prompt", reason: `no prompt for ${agent}` };
+  }
 
   const incidentId = own(incident, "incident_id");
   if (typeof incidentId !== "string") {
     // Without an id there is nothing to stamp the context with, and nothing to
     // check a leak against afterwards. Refusing is the only honest answer.
-    return { state: "unavailable", agent, reason: "the incident carries no incident_id" };
+    return { state: "unavailable", agent, why: "no-incident-id", reason: "the incident carries no incident_id" };
   }
 
   const observations = own(incident, "observations");
@@ -75,10 +97,10 @@ export function buildObservingContext(
     : undefined;
 
   if (observation === undefined) {
-    return { state: "unavailable", agent, reason: `the incident has no ${slot} observation slot` };
+    return { state: "unavailable", agent, why: "no-such-slot", reason: `the incident has no ${slot} observation slot` };
   }
   if (observation === null) {
-    return { state: "unavailable", agent, reason: `nothing was collected for ${slot}` };
+    return { state: "unavailable", agent, why: "empty-slot", reason: `nothing was collected for ${slot}` };
   }
 
   return {
@@ -106,11 +128,13 @@ export function buildRootCauseContext(
   incident: Record<string, unknown>,
   prompt: string | null,
 ): ContextResult {
-  if (prompt === null) return { state: "unavailable", agent: "root-cause", reason: "no prompt for root-cause" };
+  if (typeof prompt !== "string" || prompt.length === 0) {
+    return { state: "unavailable", agent: "root-cause", why: "no-prompt", reason: "no prompt for root-cause" };
+  }
 
   const incidentId = own(incident, "incident_id");
   if (typeof incidentId !== "string") {
-    return { state: "unavailable", agent: "root-cause", reason: "the incident carries no incident_id" };
+    return { state: "unavailable", agent: "root-cause", why: "no-incident-id", reason: "the incident carries no incident_id" };
   }
 
   const analysis = own(incident, "analysis");
@@ -119,12 +143,12 @@ export function buildRootCauseContext(
     : undefined;
 
   if (!Array.isArray(agents)) {
-    return { state: "unavailable", agent: "root-cause", reason: "the incident carries no agent results" };
+    return { state: "unavailable", agent: "root-cause", why: "empty-slot", reason: "the incident carries no agent results" };
   }
   if (agents.length === 0) {
     // No agent ran, so there is nothing to weigh. Asking anyway would produce a
     // conclusion resting on nothing, which is the failure this system is for.
-    return { state: "unavailable", agent: "root-cause", reason: "no agent results to weigh" };
+    return { state: "unavailable", agent: "root-cause", why: "empty-slot", reason: "no agent results to weigh" };
   }
 
   return { state: "assembled", agent: "root-cause", prompt, payload: { incident_id: incidentId, agent_results: snapshot(agents) } };
@@ -315,10 +339,10 @@ export function buildCheckedContext(
 ): ContextResult {
   const source = checkSourceForForeignIncidents(incident);
   if (source.state === "contaminated") {
-    return { state: "unavailable", agent, reason: `the incident carries another incident's data: ${source.foreign.join(", ")}` };
+    return { state: "unavailable", agent, why: "contaminated", reason: `the incident carries another incident's data: ${source.foreign.join(", ")}` };
   }
   if (source.state === "unchecked") {
-    return { state: "unavailable", agent, reason: `could not check the source: ${source.reason}` };
+    return { state: "unavailable", agent, why: "contaminated", reason: `could not check the source: ${source.reason}` };
   }
 
   const built = agent === "root-cause"
@@ -328,10 +352,10 @@ export function buildCheckedContext(
 
   const slice = checkPayloadIsExactlyTheSlice(built, incident);
   if (slice.state === "foreign") {
-    return { state: "unavailable", agent, reason: `the payload holds something the slice does not: ${slice.paths.slice(0, 3).join(", ")}` };
+    return { state: "unavailable", agent, why: "contaminated", reason: `the payload holds something the slice does not: ${slice.paths.slice(0, 3).join(", ")}` };
   }
   if (slice.state === "unchecked") {
-    return { state: "unavailable", agent, reason: `could not check the payload: ${slice.reason}` };
+    return { state: "unavailable", agent, why: "contaminated", reason: `could not check the payload: ${slice.reason}` };
   }
 
   return built;

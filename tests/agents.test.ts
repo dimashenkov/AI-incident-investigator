@@ -1121,3 +1121,25 @@ describe("two separate questions: did the assembler add anything, and is the sou
     expect(AGENT_SLOT["root-cause"]).toBeNull();
   });
 });
+
+/*
+ * A prompt map built from a directory listing yields UNDEFINED for a renamed or
+ * deleted file, and the guard was written as `prompt === null` — so the HTTP
+ * node built a request whose system prompt was undefined and the call was paid
+ * for before the API said 400. This file already records that failure costing
+ * money once; the guard covered the other half only.
+ */
+describe("a context is refused when the prompt is missing, however it is missing", () => {
+  it("refuses a missing prompt however it is missing", async () => {
+    const { buildObservingContext } = await import("../src/agents/slice.js");
+    const incident = { incident_id: "INC-2026-0001", observations: { logs: { lines: [] } } };
+    for (const missing of [null, undefined, ""]) {
+      const r = buildObservingContext("logs", incident, missing as never);
+      expect(r.state, `prompt ${JSON.stringify(missing)} must not produce a context`).toBe("unavailable");
+      if (r.state === "unavailable") expect(r.why).toBe("no-prompt");
+    }
+    // And a real prompt still builds one, or this refuses everything.
+    const ok = buildObservingContext("logs", incident, "a real prompt");
+    expect(ok.state).toBe("assembled");
+  });
+});

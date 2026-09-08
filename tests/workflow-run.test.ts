@@ -104,6 +104,51 @@ describe("the generated workflow investigates, not merely validates", () => {
     expect(String(r.reason)).toContain("logs");
   });
 
+  it("refuses a contaminated slot rather than skipping it as an absence", async () => {
+    /*
+     * The other way a skip can be wrong, and the one that was live.
+     *
+     * The branch asked the collection record alone and threw the context's
+     * reason away — so a context refused for CONTAMINATION, the one thing
+     * checkSourceForForeignIncidents exists to catch, was printed as "the
+     * provider reported an established absence", the chain carried on, and the
+     * run scored correct. Three of the eight scenarios declare an absence for a
+     * slot, so the trigger is in the shipped fixtures.
+     *
+     * Exercised by running the Record node's code directly, because a whole
+     * chain cannot easily be made to contaminate itself.
+     */
+    const { workflow } = await generate();
+    const node = workflow.nodes.find((n: { name: string }) => n.name === "Record logs")!;
+    const jsCode = (node.parameters as { jsCode: string }).jsCode;
+
+    const clean = await runScenario("image-pull-failure");
+    const incident = (clean.incident ?? {}) as Record<string, unknown>;
+    // A slot that legitimately declares an absence, with another incident's id
+    // planted where the source check will find it.
+    const poisoned = {
+      ...incident,
+      analysis: { ...(incident.analysis as Record<string, unknown>),
+        agents: [{ agent: "kubernetes", status: "ok",
+          findings: [{ fact: "INC-2026-9999 was also affected", source_ref: "pods[0].phase" }],
+          hypotheses: [], confidence: 0.5 }] },
+    };
+
+    /*
+     * `skipped` on the way in, so the node walks past the reply block and
+     * reaches the decision about the NEXT agent — which is where the skip is
+     * chosen. The first version of this test sent `recorded` with no reply and
+     * was refused three lines earlier, so it passed with the defect in place
+     * and the gate said so.
+     */
+    const out = runCode(jsCode, [{ json: { index: 0, state: "skipped", scenario: "image-pull-failure",
+      incident: poisoned } }])[0]!.json as Record<string, unknown>;
+    expect(out.state, "contamination must never be reported as an established absence").not.toBe("skipped");
+    expect(String(out.skipped_because ?? "")).not.toMatch(/established absence/);
+    expect(String(out.reason ?? ""), "and the real reason must reach the report")
+      .toMatch(/another incident/);
+  });
+
   it("refuses, never skips, when the agent that reads no slot cannot be given a context", async () => {
     /*
      * Grok, 2026-09-06: the root cause agent reads no observation slot, so

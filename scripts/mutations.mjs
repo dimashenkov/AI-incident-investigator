@@ -487,9 +487,28 @@ export const MUTATIONS = [
     // way becomes a skip, and the rule breaks the day someone rewords it.
     id: "skip-decided-by-a-message-not-by-the-record",
     file: "scripts/workflow-runtime.mjs",
-    from: '  if (record.state === "nothing") {',
+    from: '  if (record.state === "nothing" && ctx.why === "empty-slot") {',
     to: '  if (String(ctx.reason || "").indexOf("nothing was collected") !== -1) {',
     mustFail: "refuses a slot that could not be read, rather than skipping it like an absence",
+  },
+  {
+    // The skip decided by the collection record alone, so a context refused for
+    // contamination is printed as an established absence and the run scores
+    // correct.
+    id: "contamination-skipped-as-an-established-absence",
+    file: "scripts/workflow-runtime.mjs",
+    from: '  if (record.state === "nothing" && ctx.why === "empty-slot") {',
+    to: '  if (record.state === "nothing") {',
+    mustFail: "refuses a contaminated slot rather than skipping it as an absence",
+  },
+  {
+    // A missing prompt is undefined, not null, so the guard written for the
+    // other half lets it through and the paid call goes out with no prompt.
+    id: "missing-prompt-passed-as-undefined",
+    file: "src/agents/slice.ts",
+    from: '  if (typeof prompt !== "string" || prompt.length === 0) {\n    return { state: "unavailable", agent, why: "no-prompt", reason: `no prompt for ${agent}` };',
+    to: '  if (prompt === null) {\n    return { state: "unavailable", agent, why: "no-prompt", reason: `no prompt for ${agent}` };',
+    mustFail: "refuses a missing prompt however it is missing",
   },
   {
     // Measured live on 2026-09-06: routing a gate's false branch past the node
