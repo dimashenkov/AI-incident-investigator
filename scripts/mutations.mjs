@@ -977,6 +977,50 @@ export const MUTATIONS = [
     mustFail: "counts a citation that is more specific than the one required",
   },
   {
+    // The generator reading the shell again: two machines, two artifacts, and
+    // drift false forever.
+    id: "generation-reads-the-shell",
+    file: "scripts/generate-workflow.mjs",
+    from: '  id: "fcCTZNZiEZhLkGHD",',
+    to: '  id: process.env.N8N_OPENAI_CREDENTIAL_ID ?? "fcCTZNZiEZhLkGHD",',
+    mustFail: "generates the same bytes whatever the shell happens to hold",
+  },
+  {
+    // An error body written over the drift baseline, and "baseline recorded"
+    // printed. Every later comparison is then measured against nothing.
+    id: "baseline-recorded-from-a-body-with-no-nodes",
+    file: "scripts/record-baseline.mjs",
+    from: "  if (!Array.isArray(out.nodes) || out.nodes.length === 0) {",
+    to: "  if (false) {",
+    mustFail: "refuses to record a baseline from a body that carries no nodes",
+  },
+  {
+    // A release judging the gate by a report from some earlier execution.
+    id: "release-reads-a-report-from-another-run",
+    file: "scripts/release.mjs",
+    from: "  if (report.finishedAt < startedAt) {",
+    to: "  if (false) {",
+    mustFail: "stops on a report written before this run started",
+  },
+  {
+    // An unreadable run record skipped in silence, so readiness answers from a
+    // record that has been superseded by one nobody can read.
+    id: "unreadable-run-record-skipped-in-silence",
+    file: "scripts/readiness.mjs",
+    from: "  const broken = dated.find((d) => d.unreadable !== undefined);",
+    to: "  const broken = undefined;",
+    mustFail: "stops at an unreadable record rather than answering from an older one",
+  },
+  {
+    // Ties between records of one day left to directory order, so the second
+    // run of the day beats the sixth.
+    id: "same-day-records-ordered-by-the-filesystem",
+    file: "scripts/readiness.mjs",
+    from: "  dated.sort((a, b) => {\n    if (a.when !== b.when) return 0;\n    return a.f < b.f ? 1 : -1;\n  });",
+    to: "",
+    mustFail: "breaks a tie between records of the same day by name, not by directory order",
+  },
+  {
     // The deployed node running the schemas and nothing else, so "valid" means
     // one thing in a unit test and another in production — which is exactly the
     // promise the top of src/schema/validate.ts makes.

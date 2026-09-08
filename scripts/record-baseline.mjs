@@ -26,9 +26,22 @@ const API = process.env.N8N_API_URL;
 const KEY = process.env.N8N_API_KEY;
 
 /** Replace each code payload with the digest of what came back from the instance. */
+/**
+ * A baseline is only a baseline if it describes a workflow.
+ *
+ * `nodes: (out.nodes ?? [])` used to accept anything, so `{message:
+ * "unauthorized"}` became a baseline with zero nodes and every later drift
+ * comparison was measured against it. The callers check before calling; this
+ * refuses anyway, because a helper that trusts its callers is a helper that is
+ * wrong the day one of them stops checking.
+ */
 export function recordFrom(exported, { note }) {
   const out = { ...exported };
   delete out.shared;
+  if (!Array.isArray(out.nodes) || out.nodes.length === 0) {
+    throw new Error("refusing to record a baseline from an export with no nodes: "
+      + JSON.stringify(exported).slice(0, 200));
+  }
   out.nodes = (out.nodes ?? []).map((n) => {
     const js = n?.parameters?.jsCode;
     if (typeof js !== "string") return n;
@@ -105,7 +118,28 @@ async function main() {
   }
 
   try {
-    const exported = await (await fetch(`${API}/workflows/${created.id}`, { headers })).json();
+    /*
+     * Checked, like the `existing` branch eight lines up.
+     *
+     * This was `await (await fetch(...)).json()` with no look at res.ok, and
+     * `recordFrom` fills in `nodes: (out.nodes ?? [])` — so an error body was
+     * written OVER the drift baseline, the artifact every later comparison is
+     * measured against, and the script printed "baseline recorded". The
+     * `finally` then deleted the upload, leaving nothing to re-export. Found by
+     * a subagent on 2026-09-07, and it is the path the FIRST release takes,
+     * before N8N_WORKFLOW_ID exists.
+     */
+    const exportRes = await fetch(`${API}/workflows/${created.id}`, { headers });
+    if (!exportRes.ok) {
+      process.stderr.write(`could not export the temporary workflow ${created.id}: HTTP ${exportRes.status}\n`);
+      process.exit(2);
+    }
+    const exported = await exportRes.json();
+    if (!Array.isArray(exported.nodes) || exported.nodes.length === 0) {
+      process.stderr.write(`the export carried no nodes; refusing to write a baseline from it: `
+        + `${JSON.stringify(exported).slice(0, 200)}\n`);
+      process.exit(2);
+    }
     const fixture = recordFrom(exported, {
       note:
         "A real export from n8n Cloud, with each large code payload replaced by the sha256 of what the " +

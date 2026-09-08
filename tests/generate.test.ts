@@ -9,6 +9,7 @@
  * Behaviour of the chain end to end lives in workflow-run.test.ts.
  */
 import { describe, it, expect } from "vitest";
+import { execFileSync } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
 // @ts-expect-error — plain .mjs, the same file node runs.
 import { buildWorkflow, serialise, generate, WEBHOOK_PATH, MODEL, OPENAI_CREDENTIAL } from "../scripts/generate-workflow.mjs";
@@ -36,11 +37,57 @@ describe("the workflow is generated, not written", () => {
     expect(readFileSync(COMMITTED, "utf8")).toBe((await generate()).text);
   });
 
-  it("is byte-identical across two generations from the same input", () => {
-    // Any instability — a timestamp, a random id, unordered keys — would make
-    // every drift comparison report a difference that means nothing.
-    expect(serialise(buildWorkflow(RUNTIME))).toBe(serialise(buildWorkflow(RUNTIME)));
+  it("is byte-identical across two REAL generations", async () => {
+    /*
+     * Two calls to `generate()`, which reads the disk, the environment, the
+     * schemas, the prompts and the TypeScript compiler.
+     *
+     * It used to be two calls to `buildWorkflow(RUNTIME)` on a literal declared
+     * at the top of this file — a pure function on a hard-coded object, which
+     * cannot observe any of the things its own comment names. A subagent proved
+     * it on 2026-09-07 by putting `// built at ${Date.now()}` into the real
+     * prelude: the real generation differed and this test stayed green.
+     *
+     * Any instability — a timestamp, a random id, unordered keys, a variable in
+     * somebody's shell — makes every drift comparison report a difference that
+     * means nothing.
+     */
+    const a = await generate();
+    const b = await generate();
+    expect(a.text).toBe(b.text);
   });
+
+  it("generates the same bytes whatever the shell happens to hold", () => {
+    /*
+     * In a CHILD PROCESS, because the constant is read at module load.
+     *
+     * The first version of this test set process.env and called generate()
+     * again in the same process — which cannot work, and the gate said so: the
+     * mutation reintroducing the environment read survived it. A test that
+     * cannot observe the thing it names is the defect it was written against.
+     *
+     * The generator read N8N_OPENAI_CREDENTIAL_ID and _NAME until 2026-09-07,
+     * so a developer with either exported committed a workflow that was green
+     * on their machine and permanently red everywhere else — and the id
+     * variable is masked by drift detection, so the failure had no diagnostic
+     * pointing anywhere near its cause.
+     */
+    const hash = (env: Record<string, string>) => execFileSync(
+      "node",
+      ["--import", "./scripts/ts-from-js.mjs", "-e",
+        'import("./scripts/generate-workflow.mjs").then(async (m) => {'
+        + " const { workflow } = await m.generate();"
+        + ' process.stdout.write(require("crypto").createHash("sha256")'
+        + ".update(m.serialise(workflow)).digest(\"hex\")); })"],
+      { encoding: "utf8", env: { ...process.env, ...env } },
+    ).trim();
+
+    const plain = hash({});
+    expect(plain, "the child produced no hash; the probe is broken").toMatch(/^[0-9a-f]{64}$/);
+    expect(hash({ N8N_OPENAI_CREDENTIAL_ID: "some-other-credential" }),
+      "a variable in the shell changed the artifact").toBe(plain);
+    expect(hash({ N8N_OPENAI_CREDENTIAL_NAME: "Someone else's account" })).toBe(plain);
+  }, 120_000);
 
   it("uses a fixed webhook path rather than a generated one", () => {
     expect(WEBHOOK_PATH).toMatch(/^[a-z0-9-]+$/);

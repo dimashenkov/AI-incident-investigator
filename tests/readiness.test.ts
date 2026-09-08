@@ -204,13 +204,49 @@ describe("a readiness figure that admits what it does not know", () => {
     } finally { rmSync(d, { recursive: true, force: true }); }
   });
 
-  it("does not let an unreadable record stop it finding an older good one", () => {
+  /*
+   * Reversed on 2026-09-07, and the reversal is the point.
+   *
+   * This used to assert that an unreadable record does not stop the search — so
+   * a truncated NEWEST record was skipped in silence and readiness answered
+   * from an older run, reporting green for a scenario the newest run had scored
+   * `wrong`. A subagent measured it. "One bad file must not blind the count"
+   * sounds right and is the flattering direction: it answers from a record that
+   * has been superseded by one nobody can read.
+   *
+   * Stopping is not blindness. It is the third state, said out loud.
+   */
+  it("stops at an unreadable record rather than answering from an older one", () => {
     const d = tmp();
     try {
       mkdirSync(join(d, "runs"), { recursive: true });
-      writeFileSync(join(d, "runs", "2026-01-01-good.json"), JSON.stringify({ scored: { a: "correct" } }));
+      writeFileSync(join(d, "runs", "2026-01-01-good.json"),
+        JSON.stringify({ when: "2026-01-01", scored: { a: "correct" } }));
       writeFileSync(join(d, "runs", "2026-03-03-broken.json"), "{ not json");
-      expect(latestScored(join(d, "runs")).file).toBe("2026-01-01-good.json");
+      const r = latestScored(join(d, "runs"));
+      expect(r.scored, "a superseded record must not answer for the newest one").toBe(null);
+      expect(r.unreadable).toBe("2026-03-03-broken.json");
+      expect(r.why).toMatch(/could not be read/);
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it("breaks a tie between records of the same day by name, not by directory order", () => {
+    /*
+     * Every real record carries a date with no time, so ties are the normal
+     * case — and the comparator returned 0, leaving the winner to readdirSync.
+     * A subagent scored two records of one day differently on 2026-09-07 and
+     * the SECOND run of the day beat the sixth.
+     */
+    const d = tmp();
+    try {
+      mkdirSync(join(d, "runs"), { recursive: true });
+      writeFileSync(join(d, "runs", "2026-06-06-second.json"),
+        JSON.stringify({ when: "2026-06-06", scored: { a: "wrong" } }));
+      writeFileSync(join(d, "runs", "2026-06-06-sixth.json"),
+        JSON.stringify({ when: "2026-06-06", scored: { a: "correct" } }));
+      const r = latestScored(join(d, "runs"));
+      expect(r.file, "the later name wins, and it wins every time").toBe("2026-06-06-sixth.json");
+      expect(r.scored).toEqual({ a: "correct" });
     } finally { rmSync(d, { recursive: true, force: true }); }
   });
 

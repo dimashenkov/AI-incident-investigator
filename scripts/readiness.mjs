@@ -136,11 +136,16 @@ export function latestScored(runsDir) {
   const names = readdirSync(runsDir).filter((f) => f.endsWith(".json"));
   const dated = names.map((f) => {
     let when = null;
+    let unreadable;
     try {
       const w = JSON.parse(readFileSync(join(runsDir, f), "utf8"))?.when;
       if (typeof w === "string" && w.length > 0) when = w;
-    } catch { /* unreadable here is decided below, not silently */ }
-    return { f, when };
+    } catch (e) {
+      // Carried, not swallowed. The comment here used to promise it was decided
+      // below and below was `catch { continue; }`.
+      unreadable = e instanceof Error ? e.message : String(e);
+    }
+    return { f, when, unreadable };
   });
   // Records with a date first, newest first; undated ones after, by name — an
   // undated record must never outrank a dated one it may well predate.
@@ -150,13 +155,58 @@ export function latestScored(runsDir) {
     if (b.when !== null) return 1;
     return a.f < b.f ? 1 : -1;
   });
+  /*
+   * The comparator above returns 0 for two records with the SAME `when`, and
+   * every real record carries a date without a time — so ties are the normal
+   * case, and a stable sort then left the winner to `readdirSync` order. A
+   * subagent scored two records of one day differently on 2026-09-07: the
+   * second run of the day beat the sixth.
+   *
+   * The tie is broken by filename, descending, which is the same rule the
+   * undated branch already uses — so one rule decides, in one direction.
+   */
+  dated.sort((a, b) => {
+    if (a.when !== b.when) return 0;
+    return a.f < b.f ? 1 : -1;
+  });
   const files = dated.map((d) => d.f);
+  /*
+   * A record that cannot be READ is not a record that says nothing.
+   *
+   * This was `catch { continue; }` — silent — three lines under a comment
+   * promising the opposite. A subagent truncated the newest record on
+   * 2026-09-07 and readiness reported two green scenarios from an OLDER run,
+   * with nothing anywhere admitting a file could not be read. The newest run
+   * had scored one of them `wrong`.
+   *
+   * An unreadable record now stops the search where it stands. Continuing past
+   * it would answer from a record that has been superseded by one nobody can
+   * read, which is the flattering direction.
+   */
+  /*
+   * Any unreadable record makes the whole answer unestablished, whatever its
+   * position in the sort.
+   *
+   * Not "stop when the walk reaches it": a record that cannot be parsed has no
+   * readable date either, so it cannot be placed in the order at all — and a
+   * newer result may be sitting inside it. Answering from the newest READABLE
+   * record would be asserting an ordering that was never established.
+   */
+  const broken = dated.find((d) => d.unreadable !== undefined);
+  if (broken !== undefined) {
+    return { scored: null, file: broken.f, unreadable: broken.f,
+      why: `${broken.f} could not be read (${broken.unreadable}), so which run is the newest, `
+        + "and what it scored, is unestablished" };
+  }
+
   for (const f of files) {
     let rec;
     try {
       rec = JSON.parse(readFileSync(join(runsDir, f), "utf8"));
-    } catch {
-      continue;
+    } catch (e) {
+      return { scored: null, file: f, unreadable: f,
+        why: `${f} could not be read (${e instanceof Error ? e.message : String(e)}), `
+          + "so what the newest run scored is unestablished" };
     }
     const scored = rec?.scored;
     if (scored !== null && typeof scored === "object" && !Array.isArray(scored) && Object.keys(scored).length > 0) {

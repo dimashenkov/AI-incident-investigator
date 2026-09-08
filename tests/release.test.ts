@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 // @ts-expect-error — plain .mjs, the same file node runs.
 import { chooseSource } from "../scripts/record-baseline.mjs";
 // @ts-expect-error - plain .mjs script, no types
-import { releaseMayProceed, gateFinished, DRIFT_CHECK_ID } from "../scripts/release.mjs";
+import { releaseMayProceed, gateFinished, reportIsFromThisRun, DRIFT_CHECK_ID } from "../scripts/release.mjs";
 
 const SOURCE = readFileSync(new URL("../scripts/release.mjs", import.meta.url).pathname, "utf8");
 const PKG = JSON.parse(readFileSync(new URL("../package.json", import.meta.url).pathname, "utf8"));
@@ -152,5 +152,41 @@ describe("a release reads a gate report only from a gate that finished", () => {
     for (const status of [0, 1, 2, 3]) {
       expect(gateFinished({ status, error: undefined }), `exit ${status} is a finished run`).toBeNull();
     }
+  });
+});
+
+/*
+ * gateFinished rejects a killed gate and one that never started. It does not
+ * reject a gate that THREW — restoreInterruptedMutation, format and the final
+ * writeFileSync all sit outside runGate's per-check try, so an exception there
+ * exits non-zero having written no report, and the release read whatever was
+ * left on disk. If that leftover showed only drift failing, the chain deployed
+ * while announcing "the gate failed on no-drift-from-baseline only". The
+ * artifact has carried finishedAt since this morning and nothing read it.
+ */
+describe("a release judges the gate by a report from the run it just waited for", () => {
+  const started = 1_000_000;
+
+  it("stops on a report written before this run started", () => {
+    const r = reportIsFromThisRun({ exitCode: 1, finishedAt: started - 1 }, started);
+    expect(r, "a report older than the run is a different run's").not.toBeNull();
+    expect(String(r)).toMatch(/before this run started/);
+  });
+
+  it("stops on a report that carries no time at all", () => {
+    expect(String(reportIsFromThisRun({ exitCode: 1 }, started))).toMatch(/carries no time/);
+  });
+
+  it("stops when the gate wrote no readable report", () => {
+    for (const bad of [null, undefined, "nope", 7]) {
+      expect(reportIsFromThisRun(bad as never, started),
+        `${JSON.stringify(bad)} is not a report`).not.toBeNull();
+    }
+  });
+
+  it("carries on for a report from this run", () => {
+    expect(reportIsFromThisRun({ exitCode: 1, finishedAt: started + 1 }, started)).toBeNull();
+    expect(reportIsFromThisRun({ exitCode: 0, finishedAt: started }, started),
+      "written in the same millisecond is still this run").toBeNull();
   });
 });

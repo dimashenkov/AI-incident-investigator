@@ -233,3 +233,26 @@ describe("comparison keeps three states", () => {
     expect(digestCode(wf).nodes[0].parameters.jsCode.__bytes).toBe(3);
   });
 });
+
+/*
+ * The baseline is the artifact every later drift comparison is measured
+ * against. An error body written over it makes every subsequent answer about
+ * the deployment meaningless, and the script printed "baseline recorded".
+ * Found by a subagent on 2026-09-07 — and it is the path the FIRST release
+ * takes, before N8N_WORKFLOW_ID exists.
+ */
+describe("a baseline is only a baseline if it describes a workflow", () => {
+  it("refuses to record a baseline from a body that carries no nodes", () => {
+    for (const body of [{ message: "unauthorized" }, { nodes: [] }, {}, { nodes: "not a list" }]) {
+      expect(() => recordFrom(body, { note: "t" }),
+        `${JSON.stringify(body)} must not become a baseline`).toThrow(/no nodes/);
+    }
+  });
+
+  it("still records a real export, or this refuses everything", () => {
+    const real = { name: "w", nodes: [{ name: "n", type: "n8n-nodes-base.code",
+      parameters: { jsCode: "return items;" } }], connections: {} };
+    const out = recordFrom(real, { note: "t" }) as { nodes: unknown[] };
+    expect(out.nodes).toHaveLength(1);
+  });
+});

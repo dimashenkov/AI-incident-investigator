@@ -30,7 +30,7 @@ const OUT = resolve(ROOT, "workflows/incident.json");
  * meaningless — every comparison would report a difference that means nothing,
  * and the real differences would drown in it.
  */
-export const WEBHOOK_PATH = "ai-sre-incident";
+export const WEBHOOK_PATH = "ai-sre-incident-changed";
 
 /**
  * The node the core runs in.
@@ -190,13 +190,30 @@ export const MODEL = "gpt-4o-mini";
  * legitimately differs per instance. The NAME is compared, so a workflow
  * pointed at a different account is drift rather than a surprise.
  *
- * Both come from the environment when it says so, and fall back to the values
- * of the instance this repository deploys to, so that regenerating without a
- * shell full of variables produces the same bytes.
+ * FIXED, not read from the environment.
+ *
+ * They were `process.env.N8N_OPENAI_CREDENTIAL_ID ?? "…"`, and the comment here
+ * claimed that produced the same bytes — true only when nobody has the variable
+ * set. A subagent measured the rest on 2026-09-07: with either variable
+ * exported, generation produces a different file, so a developer whose shell
+ * carries them (the same shell that must source the n8n env for release,
+ * verify-deployment and record-baseline) commits a workflow that is green
+ * locally and permanently red everywhere else.
+ *
+ * Worse in one direction than the other. Drift masks `credentials/*​/id` and
+ * compares `name` — so the NAME variable at least shows up as drift, while the
+ * ID variable changes the committed artifact byte for byte and the only check
+ * written to explain such a change is deliberately blind to it. A failure with
+ * no diagnostic pointing anywhere near its cause.
+ *
+ * This was the ONLY non-hermetic input in the whole generation path; every
+ * directory read in it already sorts, and nothing else touches a clock or a
+ * random source. Pointing at another instance is now an edit to this file,
+ * which is a change a diff can show.
  */
 export const OPENAI_CREDENTIAL = {
-  id: process.env.N8N_OPENAI_CREDENTIAL_ID ?? "fcCTZNZiEZhLkGHD",
-  name: process.env.N8N_OPENAI_CREDENTIAL_NAME ?? "OpenAI account",
+  id: "fcCTZNZiEZhLkGHD",
+  name: "OpenAI account",
 };
 
 export function buildWorkflow(runtime, { name = "AI SRE — incident investigation" } = {}) {

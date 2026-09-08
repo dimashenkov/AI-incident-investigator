@@ -108,6 +108,27 @@ export function releaseMayProceed(report) {
  *
  * A signal kill is not a verdict. Neither is a spawn that never started.
  */
+/**
+ * Was this report written by the gate run we just waited for? A reason to stop,
+ * or null.
+ *
+ * `startedAt` is taken before the gate is spawned, so a report stamped earlier
+ * belongs to some other execution. A report with no stamp predates the stamping
+ * and cannot be dated at all, which is not the same as being current.
+ */
+export function reportIsFromThisRun(report, startedAt) {
+  if (report === null || typeof report !== "object") {
+    return "the gate wrote no readable report, so there is nothing to judge it by";
+  }
+  if (typeof report.finishedAt !== "number") {
+    return "the gate report carries no time, so it cannot be tied to the run that just finished";
+  }
+  if (report.finishedAt < startedAt) {
+    return "the gate report on disk was written before this run started, so it is a different run's";
+  }
+  return null;
+}
+
 export function gateFinished(r) {
   if (r === null || typeof r !== "object") return "the gate result could not be read at all";
   if (r.error !== undefined && r.error !== null) {
@@ -131,12 +152,32 @@ function gateStep() {
     process.exit(2);
   }
 
+  /*
+   * And the report has to be from THIS run.
+   *
+   * `gateFinished` rejects a killed gate and a gate that never started. It does
+   * not reject a gate that THREW: `restoreInterruptedMutation`, `format` and
+   * the final `writeFileSync` all sit outside runGate's per-check try, so an
+   * exception there exits non-zero having written no report — and the read
+   * below picks up whatever was left on disk. If that leftover showed only
+   * drift failing, the chain deployed while announcing "the gate failed on
+   * no-drift-from-baseline only". The artifact has carried `finishedAt` since
+   * this morning for exactly this, and nothing read it. Found by a subagent on
+   * 2026-09-07.
+   */
+  const startedAt = Date.now();
   let report = null;
   try {
     report = JSON.parse(readFileSync(resolve(ROOT, "out/acceptance-gate.json"), "utf8"));
   } catch {
     report = null;
   }
+  const fresh = reportIsFromThisRun(report, startedAt);
+  if (fresh !== null) {
+    process.stdout.write(`\nrelease stopped at "acceptance gate": ${fresh}\n`);
+    process.exit(2);
+  }
+
   const stop = releaseMayProceed(report);
   if (stop !== null) {
     process.stdout.write(`\nrelease stopped at "acceptance gate": ${stop}\n`);
