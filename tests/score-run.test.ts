@@ -7,9 +7,11 @@
  * the two and the only thing between them was somebody reading both files.
  */
 import { describe, it, expect } from "vitest";
-import { readdirSync } from "node:fs";
+import { readdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 // @ts-expect-error - plain .mjs script, no types
-import { score, scoreAll, expectedFor, format, citationCovers } from "../scripts/score-run.mjs";
+import { score, scoreAll, expectedFor, format, citationCovers, recordInto } from "../scripts/score-run.mjs";
 
 const SCENARIOS = new URL("../scenarios/", import.meta.url).pathname;
 /**
@@ -327,5 +329,49 @@ describe("a citation counts when it is at least as specific as the one required"
     expect(citationCovers("series[0].points[3]", "series[0].points[30]"),
       "point 30 is not point 3").toBe(false);
     expect(citationCovers("events[0].message", "events[1].message")).toBe(false);
+  });
+});
+
+/*
+ * Two ways a run record could be quietly falsified, both measured by a subagent
+ * on 2026-09-07 by running the scorer twice with different inputs.
+ */
+describe("a recorded verdict is not overwritten by accident", () => {
+  const record = () => {
+    const d = mkdtempSync(join(tmpdir(), "rec-"));
+    const f = join(d, "run.json");
+    writeFileSync(f, JSON.stringify({ note: "the run that concluded container-oom correctly" }));
+    return { d, f };
+  };
+  const ok = [{ scenario: "container-oom", state: "correct" }];
+
+  it("refuses to replace scores that are already there", () => {
+    const { d, f } = record();
+    try {
+      expect(recordInto(f, ok)).toEqual({ "container-oom": "correct" });
+      expect(() => recordInto(f, [{ scenario: "container-oom", state: "wrong" }]),
+        "a second run must not silently rewrite the first's verdict").toThrow(/already carries scores/);
+      // Saying so explicitly is allowed; the point is that it must be said.
+      expect(recordInto(f, [{ scenario: "container-oom", state: "wrong" }], { replace: true }))
+        .toEqual({ "container-oom": "wrong" });
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it("refuses to record a run in which nothing was established", () => {
+    /*
+     * scoreAll enumerates every scenario directory whatever the answers hold,
+     * so an empty answers file produces a FULL map of `unestablished` rather
+     * than an obviously truncated one — and the gate's someRunWasScored accepts
+     * any non-empty scored map, so those keys would flip promised checks from
+     * waiting to due on the strength of a run that answered nothing.
+     */
+    const { d, f } = record();
+    try {
+      const nothing = ["container-oom", "cpu-throttling"].map((s) => ({ scenario: s, state: "unestablished" }));
+      expect(() => recordInto(f, nothing)).toThrow(/answered nothing/);
+      // A run where SOMETHING was established records, unestablished keys and all.
+      expect(recordInto(f, [...nothing, { scenario: "image-pull-failure", state: "correct" }]))
+        .toHaveProperty("image-pull-failure", "correct");
+    } finally { rmSync(d, { recursive: true, force: true }); }
   });
 });

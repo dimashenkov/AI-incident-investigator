@@ -522,6 +522,30 @@ describe("the mutation machinery, which is what makes 'every fix has a test' che
     // never touched, the suite stayed green, and the mutation was reported as
     // surviving a test that in fact still bites. Ambiguity produced a false alarm
     // then; with the entries in their own file it would produce a false all-clear.
+    /*
+     * The precondition the two strongest coverage claims in this repository did
+     * not have.
+     *
+     * Both of these are `for (const m of MUTATIONS)`, and this file guards
+     * exactly that shape for SECRET_SHAPED, for DEBT and for the test titles —
+     * and not for the list of 174 defects whose whole job is proving the suite
+     * bites. Empty the array and both tests go green while the gate reports
+     * nothing reintroduced. Found by a subagent on 2026-09-07.
+     */
+    expect(MUTATIONS.length, "no mutations; both tests below would pass on nothing")
+      .toBeGreaterThan(100);
+
+    /*
+     * And no two entries may share an id, or a report naming one of them names
+     * both — nor may any be a no-op, which leaves the file unchanged, lets its
+     * named test pass, and has the gate report it survived.
+     */
+    const ids = (MUTATIONS as Array<{ id: string }>).map((m) => m.id);
+    expect(new Set(ids).size, "two mutations share an id").toBe(ids.length);
+    for (const m of MUTATIONS as Array<{ id: string; from: string; to: string }>) {
+      expect(m.to, `${m.id} replaces its anchor with itself, so it changes nothing`).not.toBe(m.from);
+    }
+
     const root = new URL("../", import.meta.url).pathname;
     for (const m of MUTATIONS as Array<{ id: string; file: string; from: string }>) {
       const text = readFileSync(join(root, m.file), "utf8");

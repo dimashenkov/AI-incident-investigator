@@ -30,7 +30,7 @@ const OUT = resolve(ROOT, "workflows/incident.json");
  * meaningless — every comparison would report a difference that means nothing,
  * and the real differences would drown in it.
  */
-export const WEBHOOK_PATH = "ai-sre-incident-changed";
+export const WEBHOOK_PATH = "ai-sre-incident";
 
 /**
  * The node the core runs in.

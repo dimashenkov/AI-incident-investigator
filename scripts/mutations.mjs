@@ -1021,6 +1021,50 @@ export const MUTATIONS = [
     mustFail: "breaks a tie between records of the same day by name, not by directory order",
   },
   {
+    // A second workflow created with the same name and webhook path, which
+    // makes drift ambiguous forever and cannot be undone from here.
+    id: "release-creates-a-duplicate-workflow",
+    file: "scripts/release.mjs",
+    from: "  if (already.length > 0) {\n    return `a workflow named ${JSON.stringify(name)} already exists",
+    to: "  if (false) {\n    return `a workflow named ${JSON.stringify(name)} already exists",
+    mustFail: "refuses when one of that name already exists",
+  },
+  {
+    // An unreadable listing read as "there is none".
+    id: "unreadable-listing-read-as-no-workflow",
+    file: "scripts/release.mjs",
+    from: "  if (listing === null || typeof listing !== \"object\") {",
+    to: "  if (false) {",
+    mustFail: "refuses when it could not establish that none exists",
+  },
+  {
+    // A recorded verdict rewritten by a later run with no word about it.
+    id: "recorded-verdict-silently-replaced",
+    file: "scripts/score-run.mjs",
+    from: "  if (hasVerdict && !replace) {",
+    to: "  if (false) {",
+    mustFail: "refuses to replace scores that are already there",
+  },
+  {
+    // A full map of `unestablished` recorded as a measurement, which the gate
+    // then reads as "this project has measured itself".
+    id: "a-run-that-answered-nothing-recorded-as-a-measurement",
+    file: "scripts/score-run.mjs",
+    from: "  if (established.length === 0) {",
+    to: "  if (false) {",
+    mustFail: "refuses to record a run in which nothing was established",
+  },
+  {
+    // startedAt sampled AFTER the gate finished, so the gate's own report is
+    // always older than it, every non-zero gate exits 2, and the drift-only
+    // continuation the release exists for is unreachable.
+    id: "release-samples-the-clock-after-the-gate-ran",
+    file: "scripts/release.mjs",
+    from: "  const startedAt = Date.now();\n  const r = spawnSync",
+    to: "  const r = spawnSync",
+    mustFail: "takes the time before the gate is spawned, not after it finishes",
+  },
+  {
     // The deployed node running the schemas and nothing else, so "valid" means
     // one thing in a unit test and another in production — which is exactly the
     // promise the top of src/schema/validate.ts makes.

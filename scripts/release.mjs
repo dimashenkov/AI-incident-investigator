@@ -129,6 +129,29 @@ export function reportIsFromThisRun(report, startedAt) {
   return null;
 }
 
+/**
+ * May a release create a new workflow? A reason to stop, or null.
+ *
+ * Exported so the decision can be tested without an instance. The rule is not
+ * "no workflow of this name exists" — it is "we ESTABLISHED that none exists".
+ * A listing that could not be read, or that came back in a shape this does not
+ * recognise, is not evidence of absence, and a duplicate name plus a shared
+ * webhook path is a state nothing in this repository can undo.
+ */
+export function mayCreateWorkflow(listing, name) {
+  if (listing === null || typeof listing !== "object") {
+    return "the workflow listing could not be read, so whether one already exists is unestablished";
+  }
+  if (!Array.isArray(listing.data)) {
+    return "the workflow listing was not a list; refusing to create blindly";
+  }
+  const already = listing.data.filter((w) => w && w.name === name);
+  if (already.length > 0) {
+    return `a workflow named ${JSON.stringify(name)} already exists (${already.map((w) => w.id).join(", ")})`;
+  }
+  return null;
+}
+
 export function gateFinished(r) {
   if (r === null || typeof r !== "object") return "the gate result could not be read at all";
   if (r.error !== undefined && r.error !== null) {
@@ -143,6 +166,15 @@ export function gateFinished(r) {
 
 function gateStep() {
   process.stdout.write(`\n── acceptance gate\n`);
+  /*
+   * BEFORE the spawn. The comment on reportIsFromThisRun said so and the code
+   * did not — `startedAt` was taken after spawnSync returned, so the gate's own
+   * report was always older than it, every non-zero gate exited 2 with "written
+   * before this run started", and the drift-only continuation this whole
+   * function exists for became unreachable. A subagent found it hours after I
+   * wrote it, by reading the two lines next to each other.
+   */
+  const startedAt = Date.now();
   const r = spawnSync("node", ["scripts/acceptance-gate.mjs"], { cwd: ROOT, stdio: "inherit" });
   if (r.error === undefined && r.status === 0) return;
 
@@ -165,7 +197,6 @@ function gateStep() {
    * this morning for exactly this, and nothing read it. Found by a subagent on
    * 2026-09-07.
    */
-  const startedAt = Date.now();
   let report = null;
   try {
     report = JSON.parse(readFileSync(resolve(ROOT, "out/acceptance-gate.json"), "utf8"));
@@ -208,6 +239,44 @@ async function deploy() {
     }
     process.stdout.write(`updated ${WORKFLOW_ID}\n`);
     return;
+  }
+
+  /*
+   * Ask first, because creating is not idempotent and a duplicate cannot be
+   * undone from here.
+   *
+   * With no N8N_WORKFLOW_ID this branch used to POST unconditionally, so a
+   * second release on a machine that never set the variable — which is only
+   * SUGGESTED below, never required — created a second workflow with the same
+   * name and the same fixed webhook path. Step 5 then reports `ambiguous`
+   * forever: every later release and every drift check fails for a reason no
+   * change to this repository can clear, and the duplicate has to be deleted by
+   * hand in the n8n UI. Found by a subagent on 2026-09-07.
+   *
+   * A listing that cannot be read stops the release rather than guessing. "I
+   * could not check whether one already exists" is not "there is none".
+   */
+  /*
+   * Through mayCreateWorkflow, not beside it.
+   *
+   * The first version of this made the same three decisions inline, so the
+   * exported function was tested and called by nothing — a describe block named
+   * for the shipped behaviour, exercising an orphan, while the shipped path
+   * carried a second copy of the same messages. Found by a subagent the same
+   * hour I wrote it.
+   */
+  const existing = await fetch(`${API}/workflows`, { headers });
+  const listing = existing.ok ? await existing.json() : null;
+  const stopCreating = existing.ok
+    ? mayCreateWorkflow(listing, generated.name)
+    : `could not list workflows before creating one: HTTP ${existing.status}`;
+  if (stopCreating !== null) {
+    process.stdout.write(
+      `${stopCreating}.\n`
+        + `Set N8N_WORKFLOW_ID in ~/.config/ai-sre/n8n.env to the one you mean, and release again.\n`
+        + "Creating a second would share this one's webhook path and make drift ambiguous forever.\n",
+    );
+    process.exit(2);
   }
 
   const res = await fetch(`${API}/workflows`, { method: "POST", headers, body });

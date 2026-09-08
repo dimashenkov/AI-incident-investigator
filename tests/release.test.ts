@@ -8,10 +8,11 @@
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 // @ts-expect-error — plain .mjs, the same file node runs.
 import { chooseSource } from "../scripts/record-baseline.mjs";
 // @ts-expect-error - plain .mjs script, no types
-import { releaseMayProceed, gateFinished, reportIsFromThisRun, DRIFT_CHECK_ID } from "../scripts/release.mjs";
+import { releaseMayProceed, gateFinished, reportIsFromThisRun, mayCreateWorkflow, DRIFT_CHECK_ID } from "../scripts/release.mjs";
 
 const SOURCE = readFileSync(new URL("../scripts/release.mjs", import.meta.url).pathname, "utf8");
 const PKG = JSON.parse(readFileSync(new URL("../package.json", import.meta.url).pathname, "utf8"));
@@ -188,5 +189,76 @@ describe("a release judges the gate by a report from the run it just waited for"
     expect(reportIsFromThisRun({ exitCode: 1, finishedAt: started + 1 }, started)).toBeNull();
     expect(reportIsFromThisRun({ exitCode: 0, finishedAt: started }, started),
       "written in the same millisecond is still this run").toBeNull();
+  });
+});
+
+/*
+ * Creating is not idempotent, and a duplicate cannot be undone from here.
+ *
+ * With no N8N_WORKFLOW_ID the deploy step used to POST unconditionally, so a
+ * second release on a machine that never set the variable — only SUGGESTED, never
+ * required — created a second workflow with the same name and the same fixed
+ * webhook path. Every later release and drift check then reports ambiguity, for
+ * a reason no change to this repository can clear, and the duplicate has to be
+ * deleted by hand in the n8n UI. Found by a subagent on 2026-09-07.
+ */
+describe("a release does not create a second workflow of the same name", () => {
+  const NAME = "AI SRE — incident investigation";
+
+  it("refuses when one of that name already exists", () => {
+    const r = mayCreateWorkflow({ data: [{ id: "w1", name: NAME }, { id: "w2", name: "something else" }] }, NAME);
+    expect(r, "a duplicate name shares the webhook path and makes drift ambiguous forever").not.toBeNull();
+    expect(String(r)).toMatch(/already exists \(w1\)/);
+  });
+
+  it("refuses when it could not establish that none exists", () => {
+    /*
+     * Not "no workflow of this name exists" — "we ESTABLISHED that none does".
+     * An unreadable listing is not evidence of absence.
+     */
+    for (const bad of [null, undefined, "nope", 7]) {
+      expect(mayCreateWorkflow(bad as never, NAME),
+        `${JSON.stringify(bad)} is not a listing`).not.toBeNull();
+    }
+    expect(String(mayCreateWorkflow({ message: "unauthorized" }, NAME))).toMatch(/not a list/);
+  });
+
+  it("allows creating when the listing is readable and holds no such name", () => {
+    expect(mayCreateWorkflow({ data: [] }, NAME)).toBeNull();
+    expect(mayCreateWorkflow({ data: [{ id: "w9", name: "another workflow" }] }, NAME)).toBeNull();
+  });
+});
+
+/*
+ * A defect I wrote and a subagent found the same hour, by reading two lines
+ * next to each other.
+ *
+ * reportIsFromThisRun's own comment says startedAt is taken BEFORE the gate is
+ * spawned. It was taken after spawnSync returned — so the gate's report was
+ * always stamped earlier, every non-zero gate exited 2 with "written before
+ * this run started", and the drift-only continuation gateStep exists for became
+ * unreachable.
+ *
+ * Asserted on the SOURCE, because gateStep spawns a ten-minute gate and no test
+ * may run one. Reading the order of two statements is what the defect was.
+ */
+describe("the gate is timed from before it starts", () => {
+  const SOURCE = readFileSync(new URL("../scripts/release.mjs", import.meta.url), "utf8");
+
+  it("takes the time before the gate is spawned, not after it finishes", () => {
+    const clock = SOURCE.indexOf("const startedAt = Date.now();");
+    const spawn = SOURCE.indexOf('spawnSync("node", ["scripts/acceptance-gate.mjs"]');
+    expect(clock, "startedAt is gone; the freshness check has nothing to compare against")
+      .toBeGreaterThan(-1);
+    expect(spawn, "the gate is no longer spawned here").toBeGreaterThan(-1);
+    expect(clock, "a clock read after the gate ran makes its own report look stale")
+      .toBeLessThan(spawn);
+  });
+
+  it("decides whether to create through the function written for it", () => {
+    // The first version made the same three decisions inline, so the exported
+    // function was tested and called by nothing.
+    expect(SOURCE, "deploy() must call mayCreateWorkflow rather than repeat it")
+      .toMatch(/mayCreateWorkflow\(listing, generated\.name\)/);
   });
 });

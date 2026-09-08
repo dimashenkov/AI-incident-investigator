@@ -302,8 +302,39 @@ export function format(results) {
  * the fix at the source: the scorer writes what it decided, at the moment it
  * decides it, next to the cost of the run that produced it.
  */
-export function recordInto(recordPath, results) {
+export function recordInto(recordPath, results, { replace = false } = {}) {
   const rec = JSON.parse(readFileSync(recordPath, "utf8"));
+
+  /*
+   * Two refusals, both measured by a subagent on 2026-09-07.
+   *
+   * A verdict already written is not overwritten by accident. Running the
+   * scorer against a different answers file replaced a real result with one
+   * derived from `{}` — every scenario `unestablished`, exit 2, no warning, and
+   * the record then contradicted its own prose. `replace: true` is how a caller
+   * says it meant to.
+   *
+   * And a full map of `unestablished` is not a measurement. `scoreAll`
+   * enumerates every scenario directory whatever the answers hold, so an empty
+   * answers file produces eight keys rather than an obviously truncated map —
+   * and `someRunWasScored` in the gate accepts any non-empty `scored`, so those
+   * eight would flip promised checks from waiting to due on the strength of a
+   * run that established nothing.
+   */
+  const established = results.filter((r) => r.state !== "unestablished");
+  if (established.length === 0) {
+    throw new Error(`refusing to record scores into ${recordPath}: every scenario came back `
+      + "unestablished, which is a run that answered nothing rather than a measurement");
+  }
+
+  const before = rec.scored;
+  const hasVerdict = before !== null && typeof before === "object" && !Array.isArray(before)
+    && Object.keys(before).length > 0;
+  if (hasVerdict && !replace) {
+    throw new Error(`${recordPath} already carries scores. Pass --replace to overwrite them, `
+      + "and say in the record why the first ones were wrong");
+  }
+
   rec.scored = Object.fromEntries(results.map((r) => [r.scenario, r.state]));
   writeFileSync(recordPath, `${JSON.stringify(rec, null, 2)}\n`);
   return rec.scored;
@@ -327,7 +358,12 @@ function main() {
       process.stderr.write("--record needs the path of a run record in docs/runs/\n");
       process.exit(2);
     }
-    recordInto(target, results);
+    try {
+      recordInto(target, results, { replace: process.argv.includes("--replace") });
+    } catch (e) {
+      process.stderr.write(`${e instanceof Error ? e.message : String(e)}\n`);
+      process.exit(2);
+    }
     process.stdout.write(`  recorded ${results.length} scores into ${target}\n\n`);
   }
   // Wrong is a failure; not established is not the same failure.
