@@ -1065,6 +1065,33 @@ export const MUTATIONS = [
     mustFail: "takes the time before the gate is spawned, not after it finishes",
   },
   {
+    // An unreadable listing collapsed into "nothing is deployed", which is a
+    // positive claim about the instance rather than an admission.
+    id: "unreadable-listing-read-as-nothing-deployed",
+    file: "scripts/verify-deployment.mjs",
+    from: "  if (!Array.isArray(list)) {",
+    to: "  if (false) {",
+    mustFail: "keeps a listing it could not read apart from an instance with nothing on it",
+  },
+  {
+    // "Could not check" reported as "your reply is bad" — the defect merge.ts
+    // names in its own header as one of the four it was written to fix, and
+    // which nothing exercised until 2026-09-07.
+    id: "unrunnable-validator-blamed-on-the-reply",
+    file: "src/core/merge.ts",
+    from: '  if (before.state === "unchecked") {\n    return { state: "refused", reason: `could not validate the incident: ${before.reason}` };',
+    to: '  if (before.state === "unchecked") {\n    return { state: "refused", reason: "the incident was already invalid before the result arrived" };',
+    mustFail: "blames the validator, not the reply, when the incident cannot be checked",
+  },
+  {
+    // The same collapse on the check that runs after attaching.
+    id: "post-attach-unchecked-reported-as-invalid",
+    file: "src/core/merge.ts",
+    from: '  if (whole.state === "unchecked") {',
+    to: "  if (false) {",
+    mustFail: "says the same about the check that runs after attaching",
+  },
+  {
     // The deployed node running the schemas and nothing else, so "valid" means
     // one thing in a unit test and another in production — which is exactly the
     // promise the top of src/schema/validate.ts makes.

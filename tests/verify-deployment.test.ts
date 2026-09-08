@@ -69,11 +69,26 @@ describe("choosing which deployment to compare against", () => {
     expect(r.ids).toEqual(["a", "b"]);
   });
 
-  it("survives a listing that is missing or malformed", () => {
-    // A listing that could not be read must not resolve to "nothing deployed",
-    // which would read as a clean instance.
-    expect(pickDeployed(undefined, NAME).state).toBe("absent");
-    expect(pickDeployed(null, NAME).state).toBe("absent");
+  it("keeps a listing it could not read apart from an instance with nothing on it", () => {
+    /*
+     * This test asserted the collapse its own comment forbids.
+     *
+     * It said "a listing that could not be read must not resolve to nothing
+     * deployed, which would read as a clean instance" — and then expected
+     * exactly `absent`, the same value an empty instance produces. `list ?? []`
+     * made them one answer, and the test named for the distinction blessed it.
+     * A subagent found the pair on 2026-09-07.
+     *
+     * `absent` is a positive claim: I looked and there is nothing of this name.
+     * `unreadable` is the other answer, and they are not interchangeable.
+     */
+    for (const bad of [undefined, null, "nope", 7, { data: [] }]) {
+      const r = pickDeployed(bad as never, NAME);
+      expect(r.state, `${JSON.stringify(bad)} is not a listing`).toBe("unreadable");
+      expect(String(r.reason)).toMatch(/unestablished/);
+    }
+    // And a real empty listing still says absent, or this refuses everything.
+    expect(pickDeployed([], NAME).state).toBe("absent");
   });
 
   it("matches on the exact name, not a prefix", () => {

@@ -51,7 +51,26 @@ const KEY = process.env.N8N_API_KEY;
  * looks like the real thing is how a weaker check gets mistaken for the strong one.
  */
 export function pickDeployed(list, name, configuredId) {
-  const all = list ?? [];
+  /*
+   * A listing that could not be READ is not an empty instance.
+   *
+   * This was `list ?? []`, so `undefined` and `[]` produced the identical
+   * `absent` — and `absent` is a positive claim about the instance: nothing of
+   * this name is deployed. The test written for the distinction asserted the
+   * collapse, in its own words: "A listing that could not be read must not
+   * resolve to 'nothing deployed'" — and then expected exactly that. A subagent
+   * found the pair on 2026-09-07.
+   *
+   * `unreadable` is its own state, so a caller can tell "I looked and there is
+   * nothing" from "I could not look". The three-states rule this project
+   * applies everywhere else, applied here.
+   */
+  if (!Array.isArray(list)) {
+    return { state: "unreadable", by: configuredId ? "id" : "name",
+      reason: `the workflow listing was ${list === undefined ? "not returned" : JSON.stringify(list)}, `
+        + "so whether anything is deployed is unestablished" };
+  }
+  const all = list;
 
   if (configuredId !== undefined && configuredId !== null && configuredId !== "") {
     const byId = all.find((w) => w.id === configuredId);
@@ -116,6 +135,13 @@ async function main() {
       process.exit(2);
     }
     picked = pickDeployed(list, workflow.name);
+  }
+  if (picked.state === "unreadable") {
+    // Exit 2, and the sentence says what it is: I could not look. The `absent`
+    // branch below makes a positive claim about the instance, and this is not
+    // that claim.
+    process.stdout.write(`unchecked: ${picked.reason}\n`);
+    process.exit(2);
   }
   if (picked.state === "absent") {
     const how = picked.by === "id" ? picked.reason : `no workflow named ${JSON.stringify(workflow.name)} is deployed`;
