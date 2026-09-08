@@ -257,6 +257,32 @@ describe("a readiness figure that admits what it does not know", () => {
    * that a scenario went unanswered turned it from unknown into failed, which
    * is the exact collapse this file exists to refuse.
    */
+  it("lets the worst attempt decide, so two of three is not a fix", () => {
+    /*
+     * The point of repeating a measurement is to separate a fix from luck. Two
+     * correct and one wrong is not a fix, and a figure that reported it as one
+     * would be the flattery this file exists to refuse. This reader saw only
+     * the bare scenario key, so attempts were invisible to it — the same defect
+     * Codex found in the scorer on 2026-09-08, one reader over.
+     */
+    const d = tmp();
+    try {
+      for (const n of ["alpha", "beta"]) mkdirSync(join(d, "scenarios", n), { recursive: true });
+      mkdirSync(join(d, "docs", "runs"), { recursive: true });
+      writeFileSync(join(d, "docs", "runs", "2026-09-08-a.json"), JSON.stringify({
+        when: "2026-09-08",
+        scored: { alpha: "correct", "alpha#2": "correct", "alpha#3": "wrong",
+                  beta: "correct", "beta#2": "correct" },
+      }));
+      const byId = new Map<string, { state: string; why: string }>(
+        scenariosMeasured(d).map((c: any) => [c.id as string, c as { state: string; why: string }]));
+      expect(byId.get("scenario-alpha")!.state, "one wrong attempt is not a passing scenario").toBe("red");
+      expect(byId.get("scenario-alpha")!.why, "and the report must say how many there were")
+        .toMatch(/3 attempts, worst kept/);
+      expect(byId.get("scenario-beta")!.state, "every attempt correct is correct").toBe("green");
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
   it("keeps the scorer's own unestablished state instead of calling it a failure", () => {
     const d = tmp();
     try {

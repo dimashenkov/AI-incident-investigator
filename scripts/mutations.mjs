@@ -572,7 +572,7 @@ export const MUTATIONS = [
     // scenario recorded as unestablished became FAILED.
     id: "recorded-unestablished-read-as-failure",
     file: "scripts/readiness.mjs",
-    from: '    if (state === "unestablished") {\n      return unknown(`scenario-${n}`, `not established in ${latest.file}`, PAID);\n    }',
+    from: '    if (state === "unestablished") {\n      return unknown(`scenario-${n}`, `not established in ${latest.file}${many}`, PAID);\n    }',
     to: "    if (false) {\n      return unknown(`scenario-${n}`, `x`, PAID);\n    }",
     mustFail: "keeps the scorer's own unestablished state instead of calling it a failure",
   },
@@ -1160,6 +1160,49 @@ export const MUTATIONS = [
     from: "| `events` | every event that shows something wrong **or something CHANGING**, quoting its message |",
     to: "| `events` | every event that shows something wrong, quoting its message |",
     mustFail: "asks for a change even when nothing looks wrong",
+  },
+  {
+    // Attempt keys ignored again: three attempts collapse to one, and the
+    // discarded one is as likely as any to be the interesting one.
+    id: "attempt-keys-dropped-from-the-score",
+    file: "scripts/score-run.mjs",
+    from: "    .filter((k) => attemptOf(k) !== null)",
+    to: "    .filter(() => false)",
+    mustFail: "keeps every attempt as its own row rather than the last one winning",
+  },
+  {
+    // A key with an attempt marker failing to find its scenario's expectation.
+    id: "an-attempt-key-finds-no-expectation",
+    file: "scripts/score-run.mjs",
+    from: '  const path = join(root, scenarioOf(scenario), "expected.json");',
+    to: '  const path = join(root, scenario, "expected.json");',
+    mustFail: "scores an attempt key against its scenario's expectation",
+  },
+  {
+    // The best attempt deciding instead of the worst, so two of three reads as
+    // a fix — which is the thing repeating a measurement exists to refuse.
+    id: "the-best-attempt-decides",
+    file: "scripts/readiness.mjs",
+    from: '    const worst = states.includes("wrong") ? "wrong"',
+    to: '    const worst = states.includes("correct") ? "correct"',
+    mustFail: "lets the worst attempt decide, so two of three is not a fix",
+  },
+  {
+    // A citation invented one level below a real path, counted as evidence.
+    id: "an-invented-path-counted-as-a-citation",
+    file: "scripts/score-run.mjs",
+    from: "  const canResolve = hasObservations(answer);",
+    to: "  const canResolve = false;",
+    mustFail: "refuses a path invented one level below a real one",
+  },
+  {
+    // A refusal whose confidence is a string or Infinity, slipping past the
+    // ceiling in silence — the null > 0.6 shape, written a second time.
+    id: "a-refusal-whose-confidence-is-not-a-number",
+    file: "scripts/score-run.mjs",
+    from: "    if (c !== undefined && c !== null && (typeof c !== \"number\" || !Number.isFinite(c))) {",
+    to: "    if (false) {",
+    mustFail: "refuses a refusal whose confidence is not a number",
   },
   {
     // The deployed node running the schemas and nothing else, so "valid" means

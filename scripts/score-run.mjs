@@ -22,13 +22,39 @@ import { fileURLToPath } from "node:url";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SCENARIOS = resolve(ROOT, "scenarios");
 
+/**
+ * The scenario a key names, with any attempt marker removed.
+ *
+ * A repeated measurement needs each attempt recorded separately — three
+ * attempts written under one scenario name keep only the last, and the one
+ * discarded is as likely as any to be the interesting one. The protocol said to
+ * write `image-pull-failure#1`, `#2`, `#3` and I wrote that in the document and
+ * not in the code: `scoreAll` enumerated directories and read `answers[s]`, so
+ * every attempt key was silently ignored, and `score()` called with one
+ * answered "has no expected.json". Codex found it on 2026-09-08, before the run
+ * it would have wasted.
+ *
+ * `#` because no scenario directory can contain it, so the split cannot be
+ * ambiguous.
+ */
+export function scenarioOf(key) {
+  const at = String(key).indexOf("#");
+  return at === -1 ? String(key) : String(key).slice(0, at);
+}
+
+/** The attempt a key names, or null when it names the scenario itself. */
+export function attemptOf(key) {
+  const at = String(key).indexOf("#");
+  return at === -1 ? null : String(key).slice(at + 1);
+}
+
 export function expectedFor(scenario, root = SCENARIOS) {
-  const path = join(root, scenario, "expected.json");
-  if (!existsSync(path)) return { state: "unknown", why: `${scenario} has no expected.json` };
+  const path = join(root, scenarioOf(scenario), "expected.json");
+  if (!existsSync(path)) return { state: "unknown", why: `${scenarioOf(scenario)} has no expected.json` };
   try {
     const e = JSON.parse(readFileSync(path, "utf8"));
     if (typeof e.root_cause_code !== "string") {
-      return { state: "unknown", why: `${scenario}/expected.json names no root_cause_code` };
+      return { state: "unknown", why: `${scenarioOf(scenario)}/expected.json names no root_cause_code` };
     }
     /*
      * Three optional qualifications, added 2026-09-07 for the conflicting
@@ -135,7 +161,21 @@ export function score(scenario, answer, root = SCENARIOS) {
    */
   if (want.maxConfidence !== null && refused) {
     const c = answer.incident?.analysis?.confidence;
-    if (typeof c === "number" && Number.isFinite(c) && c > want.maxConfidence) {
+    /*
+     * A number that is not a number does not slip past the ceiling.
+     *
+     * The first version asked `typeof c === "number" && isFinite && c > max`,
+     * so `"0.95"` as a string and Infinity walked through in silence — the same
+     * `null > 0.6` shape this file already refuses on the other branch, written
+     * again on the branch added a day later. Grok found it on 2026-09-08.
+     *
+     * Absent is still fine: a refusal that states no confidence is honest, and
+     * that is the whole reason this branch is separate from the other one.
+     */
+    if (c !== undefined && c !== null && (typeof c !== "number" || !Number.isFinite(c))) {
+      unqualified.push(`it refused and stated a confidence of ${JSON.stringify(c)}, `
+        + "which is not a number, so whether it is under the ceiling cannot be established");
+    } else if (typeof c === "number" && Number.isFinite(c) && c > want.maxConfidence) {
       unqualified.push(`it refused and then stated confidence ${c}, above the ceiling of `
         + `${want.maxConfidence} — a refusal held that firmly is not a refusal`);
     }
@@ -231,7 +271,35 @@ export function score(scenario, answer, root = SCENARIOS) {
     return { scenario, state: "correct-but-unqualified", code: got, why: unqualified };
   }
 
-  const cited = citedPaths(answer);
+  /*
+   * A citation only counts if it RESOLVES in the observation.
+   *
+   * `citationCovers` accepts a path at least as specific as the required one,
+   * which is right for `series[0].points[3].value` covering
+   * `series[0].points[3]` — and wrong for `series[0].points[3].value.nope`,
+   * which is more specific and points at nothing. Grok scored exactly that
+   * `correct` on 2026-09-08. The chain refuses an unresolvable ref from a
+   * specialist, so this is unreachable through the deployed path today; the
+   * scorer is also read by hand-built answer files, and this does not rely on a
+   * guarantee made somewhere else.
+   *
+   * The bound is the DEPTH the required path names plus what the scenario asked
+   * for: nothing deeper is needed to satisfy it, so nothing deeper is accepted.
+   */
+  /*
+   * Checked only when there is something to check against.
+   *
+   * An answer that carries no observations cannot have its citations resolved,
+   * and "I could not look" is not "you cited nothing" — dropping every citation
+   * there would report a run as resting on other ground for a reason that has
+   * nothing to do with the run. Three states, in the smallest place they turn
+   * up: resolvable and resolved, resolvable and not, and nothing to resolve
+   * against.
+   */
+  const canResolve = hasObservations(answer);
+  const cited = canResolve
+    ? citedPaths(answer).filter((got) => resolvesInSomeSlot(answer, got))
+    : citedPaths(answer);
   const missing = want.mustCite.filter((c) => !cited.some((got) => citationCovers(c, got)));
   if (missing.length > 0) {
     return { scenario, state: "correct-without-its-evidence", code: got, missingCitations: missing };
@@ -264,8 +332,55 @@ export function score(scenario, answer, root = SCENARIOS) {
  * `series[0].points[30]` starts with `series[0].points[3]` and is a different
  * point entirely.
  */
+/**
+ * Does a citation point at something the incident actually holds?
+ *
+ * `citationCovers` accepts a path at least as specific as the required one —
+ * right for `series[0].points[3].value` covering `series[0].points[3]`, and
+ * wrong for `series[0].points[3].value.nope`, which is more specific and points
+ * at nothing. Grok scored exactly that `correct` on 2026-09-08.
+ *
+ * Depth cannot separate the two: one leaf deeper than the requirement is
+ * legitimate in the first case and invented in the second. What separates them
+ * is whether the path RESOLVES, and the answer carries the incident, so the
+ * scorer can look rather than reason about it.
+ *
+ * A citation is checked against every slot, because the scorer is not told
+ * which agent reported it. An incident with no observations at all resolves
+ * nothing, which is correct: there was nothing to cite.
+ */
+/** Is there any observation at all to resolve a citation against? */
+export function hasObservations(answer) {
+  const obs = answer?.incident?.observations;
+  if (typeof obs !== "object" || obs === null) return false;
+  return Object.values(obs).some((slot) => typeof slot === "object" && slot !== null);
+}
+
+export function resolvesInSomeSlot(answer, path) {
+  const obs = answer?.incident?.observations;
+  if (typeof obs !== "object" || obs === null) return false;
+  const segs = segments(path);
+  for (const slot of Object.values(obs)) {
+    if (typeof slot !== "object" || slot === null) continue;
+    let cur = slot;
+    let ok = true;
+    for (const seg of segs) {
+      if (cur === null || typeof cur !== "object"
+        || !Object.prototype.hasOwnProperty.call(cur, seg)) { ok = false; break; }
+      cur = cur[seg];
+    }
+    if (ok) return true;
+  }
+  return false;
+}
+
+/** A path as segments, with `[0]` folded into the path so indexes compare. */
+export function segments(p) {
+  return String(p).replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean);
+}
+
 export function citationCovers(required, got) {
-  const split = (p) => String(p).replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean);
+  const split = segments;
   const want = split(required);
   const have = split(got);
   if (have.length < want.length) return false;
@@ -279,11 +394,23 @@ export function citedPaths(answer) {
     .filter((r) => typeof r === "string");
 }
 
+/**
+ * Every answer scored, including attempts.
+ *
+ * The scenarios on disk decide what MUST be answered — an absent one is
+ * unestablished, which is the whole reason this enumerates directories rather
+ * than keys. Attempt keys are then scored on top, so `image-pull-failure#2`
+ * appears beside `image-pull-failure` instead of vanishing.
+ */
 export function scoreAll(answers, root = SCENARIOS) {
+  const extra = Object.keys(answers ?? {})
+    .filter((k) => attemptOf(k) !== null)
+    .sort()
+    .map((k) => score(k, answers[k], root));
   const scenarios = existsSync(root)
     ? readdirSync(root, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort()
     : [];
-  return scenarios.map((s) => score(s, answers[s] ?? null, root));
+  return [...scenarios.map((s) => score(s, answers[s] ?? null, root)), ...extra];
 }
 
 export function format(results) {

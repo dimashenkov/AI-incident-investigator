@@ -93,11 +93,33 @@ export function scenariosMeasured(root = ROOT) {
 
   const latest = latestScored(join(root, "docs", "runs"));
   return names.map((n) => {
-    const state = latest.scored?.[n];
-    if (state === undefined) {
+    /*
+     * Attempts count, and the WORST of them decides.
+     *
+     * A repeated measurement writes `image-pull-failure#1`, `#2`, `#3`, and
+     * this read only the bare name — so three attempts of which one was wrong
+     * could be reported green off a fourth, bare key, or ignored entirely.
+     * Codex found the scoring half on 2026-09-08; this is the same defect one
+     * reader over.
+     *
+     * The worst decides because the point of repeating is to separate a fix
+     * from luck. Two correct and one wrong is not a fix, and a figure that
+     * reported it as one would be exactly the flattery this file exists to
+     * refuse.
+     */
+    const scored = latest.scored ?? {};
+    const states = Object.keys(scored)
+      .filter((k) => k === n || k.startsWith(`${n}#`))
+      .map((k) => scored[k]);
+    if (states.length === 0) {
       return unknown(`scenario-${n}`, latest.why ?? "no run record scores this scenario", PAID);
     }
-    if (state === "correct") return green(`scenario-${n}`, `answered correctly in ${latest.file}`);
+    const worst = states.includes("wrong") ? "wrong"
+      : states.find((x) => x !== "correct" && x !== "unestablished")
+        ?? (states.includes("unestablished") ? "unestablished" : "correct");
+    const state = worst;
+    const many = states.length > 1 ? ` (${states.length} attempts, worst kept)` : "";
+    if (state === "correct") return green(`scenario-${n}`, `answered correctly in ${latest.file}${many}`);
     /*
      * The scorer has its own third state and it must survive the journey here.
      *
@@ -108,9 +130,9 @@ export function scenariosMeasured(root = ROOT) {
      * file that refuses it.
      */
     if (state === "unestablished") {
-      return unknown(`scenario-${n}`, `not established in ${latest.file}`, PAID);
+      return unknown(`scenario-${n}`, `not established in ${latest.file}${many}`, PAID);
     }
-    return red(`scenario-${n}`, `${state} in ${latest.file}`);
+    return red(`scenario-${n}`, `${state} in ${latest.file}${many}`);
   });
 }
 

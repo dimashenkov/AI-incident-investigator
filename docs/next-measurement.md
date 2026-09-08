@@ -49,6 +49,51 @@ token counts, the cost and `normalised` are hand-entered afterwards — which th
 document's last section says must not happen. That is a gap, and it is stated
 here rather than discovered after paying.
 
+## Corrected again on 2026-09-08, after all three reviewers said no
+
+The rule is that the three must AGREE before money is asked for. They did not.
+
+| Who | What they refused |
+|---|---|
+| **Codex** | the per-attempt key was written in THIS document and not in the code — `scoreAll` enumerated directories and read the bare name, so every `#1` key was ignored in silence |
+| **Grok · 1** | item 3 closes under two different outcomes, so whatever the model returns reads as success. And the table says ≤60% closes it while the paragraph below says it must be LOWER than container-oom — a run at 55% on both satisfies one and fails the other |
+| **Grok · 2** | `correct` is recorded for an answer the scenario is built to refuse: the dissent requirement is met by two well-shaped objects whose FACTS are never read |
+
+Two of the three are fixed in code. The third is not fixable in code, and is
+handled below by saying which question this run answers and which it does not.
+
+## Bought in three parts, not one
+
+Grok's objection, and it is right: the protocol says a wrong readiness attempt
+stops everything else, so paying for everything up front buys runs that a bad
+first result makes meaningless.
+
+| Part | Calls | Bought only if |
+|---|---|---|
+| 1 · one `readiness-probe-failure` | 3 | — |
+| 2 · three `image-pull-failure` | 9 | part 1 came back fully correct |
+| 3 · the three never-asked scenarios, one each | ~10 | part 2 settled the rewrite either way |
+
+Part 1 is the cheap question with the largest consequence: it was correct three
+times out of three on 2026-09-07, so a wrong answer now is a REGRESSION, and
+nothing else should be measured until its cause is known.
+
+## What item 3 needs, said once
+
+The table below closed item 3 on two different outcomes. It closes on ONE:
+
+> `conflicting-evidence` comes back with a confidence **strictly lower** than
+> `container-oom` in the same run, with dissent recorded from a different source.
+
+A refusal is an acceptable ANSWER and does not close item 3, because a refusal
+states no confidence to compare. If the run refuses, the item stays open and
+the reason is that the comparison was not available — not that it failed.
+
+**Nothing here moves Definition-of-Done items 2, 3 or 10 by itself.** They are
+`covered: false` and readiness reads that flag and the test report; closing them
+needs a hand edit and named tests that pass. This run moves **eight** of the
+nineteen readiness checks — the scenarios — and no more.
+
 ## What is asked
 
 Eight scenarios, one attempt each, on one deployment.

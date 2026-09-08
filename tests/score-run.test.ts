@@ -11,7 +11,7 @@ import { readdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 // @ts-expect-error - plain .mjs script, no types
-import { score, scoreAll, expectedFor, format, citationCovers, recordInto } from "../scripts/score-run.mjs";
+import { score, scoreAll, expectedFor, format, citationCovers, recordInto, scenarioOf, attemptOf, resolvesInSomeSlot } from "../scripts/score-run.mjs";
 
 const SCENARIOS = new URL("../scenarios/", import.meta.url).pathname;
 /**
@@ -400,5 +400,130 @@ describe("a recorded verdict is not overwritten by accident", () => {
       expect(recordInto(f, [...nothing, { scenario: "image-pull-failure", state: "correct" }]))
         .toHaveProperty("image-pull-failure", "correct");
     } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+});
+
+/*
+ * A repeated measurement needs each attempt recorded separately: three attempts
+ * written under one scenario name keep only the last, and the discarded one is
+ * as likely as any to be the interesting one — on 2026-09-07 it was exactly the
+ * attempt that cited the path the whole re-measurement was about.
+ *
+ * The protocol said to write `image-pull-failure#1`. I wrote that in the
+ * document and not in the code: scoreAll enumerated directories and read
+ * answers[s], so every attempt key was silently ignored, and score() called
+ * with one answered "has no expected.json". Codex found it on 2026-09-08,
+ * before the run it would have wasted.
+ */
+describe("an attempt is scored as itself, not lost under its scenario", () => {
+  const cite = mustCiteOf("image-pull-failure");
+  const answer = (code: string) => concluded(code, cite);
+
+  it("splits a key into the scenario and the attempt", () => {
+    expect(scenarioOf("image-pull-failure#2")).toBe("image-pull-failure");
+    expect(attemptOf("image-pull-failure#2")).toBe("2");
+    // A bare name is the scenario itself, not attempt "".
+    expect(scenarioOf("image-pull-failure")).toBe("image-pull-failure");
+    expect(attemptOf("image-pull-failure")).toBeNull();
+  });
+
+  it("scores an attempt key against its scenario's expectation", () => {
+    const r = score("image-pull-failure#1", answer("IMAGE_PULL_FAILURE"), SCENARIOS);
+    expect(r.state, "an attempt must be scorable at all").toBe("correct");
+    expect(r.scenario, "and it must keep its own name in the result").toBe("image-pull-failure#1");
+  });
+
+  it("keeps every attempt as its own row rather than the last one winning", () => {
+    const rows = scoreAll({
+      "image-pull-failure": answer("IMAGE_PULL_FAILURE"),
+      "image-pull-failure#2": answer("IMAGE_PULL_FAILURE"),
+      "image-pull-failure#3": answer("CONTAINER_OOM"),
+    }, SCENARIOS).filter((r: { scenario: string }) => r.scenario.startsWith("image-pull-failure"));
+
+    expect(rows.map((r: { scenario: string }) => r.scenario))
+      .toEqual(["image-pull-failure", "image-pull-failure#2", "image-pull-failure#3"]);
+    expect(rows.map((r: { state: string }) => r.state), "the wrong attempt must survive into the record")
+      .toEqual(["correct", "correct", "wrong"]);
+  });
+
+  it("still reports a scenario nobody answered, attempts or not", () => {
+    // The directories decide what MUST be answered. That is why scoreAll walks
+    // them rather than the keys it was handed.
+    const rows = scoreAll({ "image-pull-failure#1": answer("IMAGE_PULL_FAILURE") }, SCENARIOS);
+    const bare = rows.find((r: { scenario: string }) => r.scenario === "container-oom");
+    expect(bare!.state, "an unanswered scenario is unestablished, not absent").toBe("unestablished");
+  });
+});
+
+/*
+ * Two ways a run could be recorded BETTER than it was, both measured by Grok on
+ * 2026-09-08, before the run they would have flattered.
+ */
+describe("a citation counts only when it points at something the incident holds", () => {
+  const withObservations = (refs: string[]) => ({
+    state: "concluded", root_cause_code: "CONTAINER_OOM",
+    incident: {
+      observations: { kubernetes: { pods: [{ containers: [{ last_state: { terminated: { reason: "OOMKilled" } } }] }] },
+        logs: null, metrics: { series: [{ points: [{}, {}, {}, { value: 155 }] }] } },
+      analysis: { confidence: 0.5,
+        evidence: [{ source: "kubernetes", fact: "a", supports: "for" },
+                   { source: "metrics", fact: "b", supports: "against" }],
+        agents: [{ agent: "kubernetes", findings: refs.map((r) => ({ fact: "f", source_ref: r })) }] },
+    },
+  });
+
+  it("refuses a path invented one level below a real one", () => {
+    /*
+     * citationCovers accepts a path at least as specific as the requirement —
+     * right for the leaf of a point, wrong for a leaf invented under the leaf.
+     * Depth cannot separate them: one deeper is legitimate in the first case
+     * and invented in the second. Resolution can, and the answer carries the
+     * incident, so the scorer looks instead of reasoning.
+     */
+    const real = score("conflicting-evidence", withObservations([
+      "pods[0].containers[0].last_state.terminated.reason", "series[0].points[3].value"]), SCENARIOS);
+    expect(real.state, "the honest answer must still be correct").toBe("correct");
+
+    const invented = score("conflicting-evidence", withObservations([
+      "pods[0].containers[0].last_state.terminated.reason.nope", "series[0].points[3].value.nope"]), SCENARIOS);
+    expect(invented.state, "a path pointing at nothing is not a citation")
+      .toBe("correct-without-its-evidence");
+  });
+
+  it("resolves a path against every slot, since it is not told which agent cited it", () => {
+    const a = withObservations([]);
+    expect(resolvesInSomeSlot(a, "pods[0].containers[0].last_state.terminated.reason")).toBe(true);
+    expect(resolvesInSomeSlot(a, "series[0].points[3].value")).toBe(true);
+    expect(resolvesInSomeSlot(a, "series[0].points[9].value"), "point 9 is not there").toBe(false);
+    expect(resolvesInSomeSlot({ incident: {} }, "anything"),
+      "an incident with no observations resolves nothing").toBe(false);
+    expect(resolvesInSomeSlot(a, "toString"), "a property every object has is not a citation").toBe(false);
+  });
+
+  it("refuses a refusal whose confidence is not a number", () => {
+    const S = "conflicting-evidence";
+    const cite = mustCiteOf(S);
+    const withEvidence = (code: string, cited: string[], confidence: unknown, evidence: unknown[]) => {
+      const a = concluded(code, cited) as Record<string, any>;
+      a.incident.analysis.confidence = confidence;
+      a.incident.analysis.evidence = evidence;
+      return a;
+    };
+    /*
+     * The ceiling branch asked `typeof c === "number" && isFinite && c > max`,
+     * so "0.95" as a string and Infinity walked through in silence — the same
+     * `null > 0.6` shape this file already refuses on the other branch, written
+     * again on the branch added a day later.
+     */
+    const refusal = (confidence: unknown) =>
+      withEvidence("INSUFFICIENT_EVIDENCE", cite, confidence, []);
+    for (const bad of ["0.95", Number.POSITIVE_INFINITY, Number.NaN, "low"]) {
+      const r = score(S, refusal(bad), SCENARIOS);
+      expect(r.state, `${JSON.stringify(bad)} must not pass as under the ceiling`)
+        .toBe("correct-but-unqualified");
+      expect(r.why.join(" ")).toMatch(/not a number|above the ceiling/);
+    }
+    // Absent is still honest — that is why this branch is separate from the other.
+    expect(score(S, refusal(undefined), SCENARIOS).state).toBe("correct");
   });
 });
