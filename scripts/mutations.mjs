@@ -1128,6 +1128,22 @@ export const MUTATIONS = [
     mustFail: "refuses a wrong verdict that names the cause it already gave",
   },
   {
+    // Two slots of one incident gathered under different requests, accepted.
+    id: "slots-gathered-under-different-requests",
+    file: "src/schema/invariants.ts",
+    from: "          else if (already[1] !== v) {",
+    to: "          else if (false) {",
+    mustFail: "22 two slots gathered under different requests",
+  },
+  {
+    // A slot gathered in another tenant's namespace, accepted.
+    id: "slot-gathered-in-another-namespace",
+    file: "src/schema/invariants.ts",
+    from: "          if (typeof got === \"string\" && typeof want === \"string\" && got !== want) {",
+    to: "          if (false) {",
+    mustFail: "23 a slot gathered in another namespace",
+  },
+  {
     // The deployed node running the schemas and nothing else, so "valid" means
     // one thing in a unit test and another in production — which is exactly the
     // promise the top of src/schema/validate.ts makes.

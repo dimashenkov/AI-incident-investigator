@@ -127,6 +127,30 @@ describe("absence is not consent — cases that used to pass", () => {
             replicas: { desired: 1, ready: 0, available: 0 } } } },
       collection: { kubernetes: { state: "collected" }, logs: { state: "nothing" }, metrics: { state: "nothing" } } },
     "must have required property 'terminated'");
+  /*
+   * The two arms of the one-collection rule that nothing reached. Both cases
+   * that appeared to test it built a SINGLE collected slot, so only the
+   * requested_for comparison ever ran — and the sentence the rule is written
+   * for is about slots disagreeing with EACH OTHER.
+   */
+  probe("22 two slots gathered under different requests", "incident",
+    { ...INC,
+      observations: { metrics: null,
+        kubernetes: { provenance: { collection_id: "11111111-0000-4000-8000-000000000000", requested_for: "INC-2026-0001", cluster: "prod-eu", namespace: "production", provider: "fake-kubernetes" }, collected_at: "2026-09-04T10:31:00Z", pods: [], events: [], deployment: { name: "d", namespace: "production", image: "i", replicas: { desired: 1, ready: 1, available: 1 } } },
+        logs: { provenance: { collection_id: "22222222-0000-4000-8000-000000000000",
+            requested_for: "INC-2026-0001", cluster: "prod-eu", namespace: "production", provider: "fake-logs" },
+          collected_at: "2026-09-04T10:31:00Z",
+          window: { from: "2026-09-04T10:20:00Z", to: "2026-09-04T10:30:00Z" },
+          truncated: false, lines: [] } },
+      collection: { kubernetes: { state: "collected" }, logs: { state: "collected" },
+        metrics: { state: "nothing" } } },
+    "was gathered with");
+  probe("23 a slot gathered in another namespace", "incident",
+    { ...INC,
+      observations: { logs: null, metrics: null,
+        kubernetes: { provenance: { collection_id: "11111111-0000-4000-8000-000000000000", requested_for: "INC-2026-0001", cluster: "prod-eu", namespace: "another-tenant", provider: "fake-kubernetes" }, collected_at: "2026-09-04T10:31:00Z", pods: [], events: [], deployment: { name: "d", namespace: "another-tenant", image: "i", replicas: { desired: 1, ready: 1, available: 1 } } } },
+      collection: { kubernetes: { state: "collected" }, logs: { state: "nothing" }, metrics: { state: "nothing" } } },
+    "but this incident is about production");
   probe("14 investigating while carrying a cause", "incident",
     { ...INC, analysis: { agents: [], root_cause_code: "CONTAINER_OOM", root_cause: "r",
       confidence: 0.8, evidence: [{ source: "kubernetes", fact: "f", supports: "for" }] } },

@@ -87,6 +87,49 @@ const CASES: Array<[string, string, () => unknown]> = [
     i.collection.kubernetes = { state: "collected" } as never;
     return i;
   }],
+  ["two slots gathered under different collection ids", "incident", () => {
+    /*
+     * The arm the rule was written for, and the one nothing reached.
+     *
+     * "Every slot of one incident must have been gathered under ONE request" —
+     * and both cases that appeared to test it built a SINGLE collected slot, so
+     * only the requested_for arm ever ran. The cross-slot comparison, which is
+     * what the sentence is about, was dead. A subagent counted it on 2026-09-07.
+     */
+    const i = base();
+    const slot = (cid: string) => ({
+      provenance: { collection_id: cid, requested_for: "INC-2026-0001", cluster: "prod-eu",
+        namespace: "production", provider: "fake-kubernetes" },
+      collected_at: "2026-09-04T10:31:00Z", pods: [], events: [],
+      deployment: { name: "d", namespace: "production", image: "i",
+        replicas: { desired: 1, ready: 1, available: 1 } },
+    });
+    (i.observations as Record<string, unknown>).kubernetes = slot("11111111-0000-4000-8000-000000000000");
+    (i.observations as Record<string, unknown>).logs = {
+      provenance: { collection_id: "22222222-0000-4000-8000-000000000000", requested_for: "INC-2026-0001",
+        cluster: "prod-eu", namespace: "production", provider: "fake-logs" },
+      collected_at: "2026-09-04T10:31:00Z",
+      window: { from: "2026-09-04T10:20:00Z", to: "2026-09-04T10:30:00Z" },
+      truncated: false, lines: [],
+    };
+    i.collection.kubernetes = { state: "collected" } as never;
+    i.collection.logs = { state: "collected" } as never;
+    return i;
+  }],
+  ["a slot gathered in another namespace", "incident", () => {
+    // The incident's own cluster and namespace are what was asked for. This arm
+    // was dead too: every case built one slot whose stamp matched.
+    const i = base();
+    (i.observations as Record<string, unknown>).kubernetes = {
+      provenance: { collection_id: "11111111-0000-4000-8000-000000000000", requested_for: "INC-2026-0001",
+        cluster: "prod-eu", namespace: "another-tenant", provider: "fake-kubernetes" },
+      collected_at: "2026-09-04T10:31:00Z", pods: [], events: [],
+      deployment: { name: "d", namespace: "another-tenant", image: "i",
+        replicas: { desired: 1, ready: 1, available: 1 } },
+    };
+    i.collection.kubernetes = { state: "collected" } as never;
+    return i;
+  }],
   ["a clean agent result", "agent-result", () => ({
     agent: "kubernetes", status: "ok",
     findings: [{ fact: "f", source_ref: "pods[0].phase" }],
