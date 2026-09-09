@@ -1133,7 +1133,8 @@ export function runGate(checks = CHECKS) {
    * It is `unknown`, not `fail`: nothing was established, and nothing failed.
    */
   const nothingChecked = results.length === 0;
-  const exitCode = failed.length > 0 ? 1 : 0;
+  const exitCode = (failed.length > 0 ? 1 : 0)
+    + (unresolved.length > 0 || nothingChecked ? 2 : 0);
 
   /*
    * And an interrupted mutation that could not be put back travels into the
