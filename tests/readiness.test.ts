@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from "vitest";
 // @ts-expect-error - plain .mjs script, no types
-import { definitionOfDone, latestScored, summarise, oneLine, bar, gateResult, scenariosMeasured, sourceNewerThan } from "../scripts/readiness.mjs";
+import { definitionOfDone, latestScored, summarise, oneLine, bar, gateResult, scenariosMeasured, sourceNewerThan, latestScoredPerScenario, orderedRecords } from "../scripts/readiness.mjs";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -323,6 +323,139 @@ describe("a readiness figure that admits what it does not know", () => {
     } finally { rmSync(d, { recursive: true, force: true }); }
   });
 
+  it("does not let a record whose date is not a date outrank a dated one", () => {
+    /*
+     * `when` was any non-empty string, and records are ordered by comparing it
+     * as TEXT — so "unknown" sorted ahead of every real date, claimed the
+     * scenario, and a wrong attempt from the newest run was replaced by an
+     * older correct one. Readiness went green. Codex, 2026-09-09.
+     */
+    const d = tmp();
+    try {
+      mkdirSync(join(d, "runs"), { recursive: true });
+      writeFileSync(join(d, "runs", "new.json"),
+        JSON.stringify({ when: "2026-09-09", scored: { "alpha#1": "wrong" } }));
+      writeFileSync(join(d, "runs", "old.json"),
+        JSON.stringify({ when: "unknown", scored: { "alpha#2": "correct" } }));
+      expect(latestScoredPerScenario(join(d, "runs")).scored,
+        "a record that gives no usable date is undated, and undated never wins")
+        .toEqual({ "alpha#1": "wrong" });
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it("does not count a placeholder from one file as an attempt made in another", () => {
+    /*
+     * A newer record said `alpha: unasked`; an older one had actually tried
+     * twice and established nothing. Merged key by key, the reader said "not
+     * established in new.json (3 attempts)" — counting the placeholder, and
+     * naming the file that holds only it. Codex, 2026-09-09.
+     */
+    const d = tmp();
+    try {
+      mkdirSync(join(d, "scenarios", "alpha"), { recursive: true });
+      mkdirSync(join(d, "docs", "runs"), { recursive: true });
+      writeFileSync(join(d, "docs", "runs", "2026-09-09-new.json"),
+        JSON.stringify({ when: "2026-09-09", scored: { alpha: "unasked" } }));
+      writeFileSync(join(d, "docs", "runs", "2026-01-01-old.json"), JSON.stringify({
+        when: "2026-01-01",
+        scored: { "alpha#1": "unestablished", "alpha#2": "unestablished" } }));
+      const c = scenariosMeasured(d).find((x: any) => x.id === "scenario-alpha");
+      expect(c!.state).toBe("unestablished");
+      expect(c!.why, "one file's placeholder is not three attempts").not.toMatch(/3 attempts/);
+      expect(c!.why, "and the file named is the one the row came from").toContain("2026-09-09-new.json");
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it("names the file of a winning record whose only verdict is a later attempt", () => {
+    const d = tmp();
+    try {
+      mkdirSync(join(d, "scenarios", "alpha"), { recursive: true });
+      mkdirSync(join(d, "docs", "runs"), { recursive: true });
+      writeFileSync(join(d, "docs", "runs", "2026-09-09-new.json"),
+        JSON.stringify({ when: "2026-09-09", scored: { "alpha#2": "correct" } }));
+      const c = scenariosMeasured(d).find((x: any) => x.id === "scenario-alpha");
+      expect(c!.why, "any attempt of the scenario names the file, not only the bare key or #1")
+        .toContain("2026-09-09-new.json");
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it("lets a newer measurement replace the whole scenario, not one attempt key", () => {
+    /*
+     * An older record scored `alpha#1` correct and `alpha#2` wrong. The newer
+     * one repeated only `alpha#1`. Merging key by key kept the older `#2`, so
+     * the worst-of rule reported the scenario WRONG from an attempt the newest
+     * measurement never made — and named the newer file as its source.
+     * Codex reproduced it on 2026-09-09.
+     */
+    const d = tmp();
+    try {
+      mkdirSync(join(d, "runs"), { recursive: true });
+      writeFileSync(join(d, "runs", "2026-01-01-a.json"),
+        JSON.stringify({ when: "2026-01-01", scored: { "alpha#1": "correct", "alpha#2": "wrong" } }));
+      writeFileSync(join(d, "runs", "2026-06-01-b.json"),
+        JSON.stringify({ when: "2026-06-01", scored: { "alpha#1": "correct" } }));
+      const r = latestScoredPerScenario(join(d, "runs"));
+      expect(r.scored, "the newest record that established anything takes the scenario whole")
+        .toEqual({ "alpha#1": "correct" });
+      expect(r.from!["alpha#1"], "and the verdict is attributed to the file it came from")
+        .toBe("2026-06-01-b.json");
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it("keeps every attempt of the record that claims the scenario", () => {
+    const d = tmp();
+    try {
+      mkdirSync(join(d, "runs"), { recursive: true });
+      writeFileSync(join(d, "runs", "2026-01-01-a.json"),
+        JSON.stringify({ when: "2026-01-01", scored: { "alpha#1": "correct" } }));
+      writeFileSync(join(d, "runs", "2026-06-01-b.json"),
+        JSON.stringify({ when: "2026-06-01", scored: { "alpha#1": "correct", "alpha#2": "wrong" } }));
+      expect(latestScoredPerScenario(join(d, "runs")).scored,
+        "a repeat that answered twice is two attempts, and the worst of them still counts")
+        .toEqual({ "alpha#1": "correct", "alpha#2": "wrong" });
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it("does not let a bare unestablished row outvote answered attempts of the same scenario", () => {
+    /*
+     * A run bought in parts writes the bare key `alpha` from the part that did
+     * not ask, and `alpha#1` from the part that did. The fallback merge matched
+     * on the EXACT key, so the bare `unestablished` row survived beside the
+     * answered attempt and the scenario reported unestablished, citing the
+     * older file. Codex reproduced it on 2026-09-09.
+     */
+    const d = tmp();
+    try {
+      mkdirSync(join(d, "runs"), { recursive: true });
+      writeFileSync(join(d, "runs", "2026-01-01-a.json"),
+        JSON.stringify({ when: "2026-01-01", scored: { alpha: "unestablished" } }));
+      writeFileSync(join(d, "runs", "2026-06-01-b.json"),
+        JSON.stringify({ when: "2026-06-01", scored: { "alpha#1": "correct" } }));
+      const scored = latestScoredPerScenario(join(d, "runs")).scored;
+      expect(scored, "an attempt that answered is not unanswered by a part that did not ask")
+        .toEqual({ "alpha#1": "correct" });
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it("carries the record parsed while unreadability was decided, not a second read", () => {
+    /*
+     * The records were read and parsed TWICE: once to find the date and catch
+     * an unreadable file, once again — outside any catch — to hand them back.
+     * A record that changed between the two made readiness throw instead of
+     * answering unestablished.
+     */
+    const d = tmp();
+    try {
+      mkdirSync(join(d, "runs"), { recursive: true });
+      writeFileSync(join(d, "runs", "2026-02-02-a.json"),
+        JSON.stringify({ when: "2026-02-02", scored: { alpha: "correct" }, note: "kept" }));
+      const r = orderedRecords(join(d, "runs"));
+      expect(r.records.length).toBe(1);
+      expect(r.records[0].rec, "the parsed object travels with the file it came from")
+        .toEqual({ when: "2026-02-02", scored: { alpha: "correct" }, note: "kept" });
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
   it("does not let a row saying nobody asked outvote the attempts that answered", () => {
     /*
      * A run bought in parts writes one record, so a scenario answered under
@@ -486,6 +619,76 @@ describe("a readiness figure that admits what it does not know", () => {
       expect(gateResult(d)[0].state, "a real failure beside an unknown is still red").toBe("red");
       writeFileSync(join(d, "out", "acceptance-gate.json"), JSON.stringify({ nothing: true, finishedAt: fresh }));
       expect(gateResult(d)[0].state, "a result with no exit code establishes nothing").toBe("unestablished");
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+});
+
+/*
+ * The run is bought in PARTS, so no single record holds every scenario.
+ *
+ * Measured on 2026-09-07 minutes after it happened: part 1 established
+ * readiness-probe-failure correct three times, readiness went 31% to 36%, part
+ * 2 was bought next, and the figure fell straight back to 31% — because part
+ * 2's record says nothing about readiness-probe-failure and the counter read
+ * only the newest record. A later run that did not ASK a question does not
+ * unanswer it.
+ */
+describe("a verdict survives a later run that did not ask the question", () => {
+  const twoParts = () => {
+    const d = tmp();
+    mkdirSync(join(d, "runs"), { recursive: true });
+    writeFileSync(join(d, "runs", "2026-09-07-part1.json"), JSON.stringify({
+      when: "2026-09-07", scored: { "readiness-probe-failure#1": "correct", "image-pull-failure": "unasked" },
+    }));
+    writeFileSync(join(d, "runs", "2026-09-07-part2.json"), JSON.stringify({
+      when: "2026-09-07", scored: { "image-pull-failure#1": "wrong", "readiness-probe-failure": "unasked" },
+    }));
+    return d;
+  };
+
+  it("keeps what an earlier part established", () => {
+    const d = twoParts();
+    try {
+      const r = latestScoredPerScenario(join(d, "runs"));
+      expect(r.scored, "the earlier part's verdict was lost").toHaveProperty(
+        "readiness-probe-failure#1", "correct");
+      expect(r.scored).toHaveProperty("image-pull-failure#1", "wrong");
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it("does not let unasked or unestablished overwrite a real verdict", () => {
+    const d = tmp();
+    try {
+      mkdirSync(join(d, "runs"), { recursive: true });
+      writeFileSync(join(d, "runs", "2026-01-01-a.json"),
+        JSON.stringify({ when: "2026-01-01", scored: { alpha: "correct" } }));
+      writeFileSync(join(d, "runs", "2026-06-06-b.json"),
+        JSON.stringify({ when: "2026-06-06", scored: { alpha: "unasked" } }));
+      expect(latestScoredPerScenario(join(d, "runs")).scored,
+        "a question nobody asked says nothing about the answer").toHaveProperty("alpha", "correct");
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it("lets a newer REAL verdict replace an older one, because that is a re-measurement", () => {
+    const d = tmp();
+    try {
+      mkdirSync(join(d, "runs"), { recursive: true });
+      writeFileSync(join(d, "runs", "2026-01-01-a.json"),
+        JSON.stringify({ when: "2026-01-01", scored: { alpha: "correct" } }));
+      writeFileSync(join(d, "runs", "2026-06-06-b.json"),
+        JSON.stringify({ when: "2026-06-06", scored: { alpha: "wrong" } }));
+      expect(latestScoredPerScenario(join(d, "runs")).scored).toHaveProperty("alpha", "wrong");
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it("names the record each verdict came from, not one file for all of them", () => {
+    const d = twoParts();
+    try {
+      const checks = scenariosMeasured(d);
+      void checks;
+      const r = latestScoredPerScenario(join(d, "runs"));
+      expect(r.from!["readiness-probe-failure#1"]).toBe("2026-09-07-part1.json");
+      expect(r.from!["image-pull-failure#1"]).toBe("2026-09-07-part2.json");
     } finally { rmSync(d, { recursive: true, force: true }); }
   });
 });

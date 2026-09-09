@@ -1,0 +1,850 @@
+{
+  "image-pull-failure#1": {
+    "index": 0,
+    "state": "concluded",
+    "scenario": "image-pull-failure",
+    "normalised": 0,
+    "raw_answers": {
+      "kubernetes": "{\n  \"agent\": \"kubernetes\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"the event says: Failed to pull image \\\"registry.internal/checkout-api:2.9.1\\\": not found\",\n      \"source_ref\": \"events[0].message\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"the pod is in phase Pending\",\n      \"source_ref\": \"pods[0].phase\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"the container is not ready\",\n      \"source_ref\": \"pods[0].containers[0].ready\",\n      \"severity\": \"warning\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "logs": "{\n  \"agent\": \"logs\",\n  \"status\": \"no_data\",\n  \"findings\": [],\n  \"hypotheses\": [],\n  \"confidence\": 0\n}",
+      "root-cause": "{\n  \"agent\": \"root_cause\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"the event says: Failed to pull image \\\"registry.internal/checkout-api:2.9.1\\\": not found\",\n      \"source_ref\": \"events[0].message\"\n    },\n    {\n      \"fact\": \"the pod is in phase Pending\",\n      \"source_ref\": \"pods[0].phase\"\n    },\n    {\n      \"fact\": \"the container is not ready\",\n      \"source_ref\": \"pods[0].containers[0].ready\"\n    }\n  ],\n  \"hypotheses\": [\n    {\n      \"code\": \"IMAGE_PULL_FAILURE\",\n      \"statement\": \"The failure to pull the specified image caused the pod to remain in a Pending state and the container to not be ready.\",\n      \"supported_by\": [\n        \"events[0].message\"\n      ]\n    }\n  ],\n  \"confidence\": 0.8\n}"
+    },
+    "root_cause_code": "IMAGE_PULL_FAILURE",
+    "root_cause": "The failure to pull the specified image caused the pod to remain in a Pending state and the container to not be ready.",
+    "confidence": 0.8,
+    "evidence": [
+      {
+        "source": "kubernetes",
+        "fact": "the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found",
+        "supports": "for"
+      }
+    ],
+    "incident": {
+      "incident_id": "INC-2026-0201",
+      "status": "diagnosed",
+      "service": "checkout-api",
+      "namespace": "production",
+      "cluster": "prod-eu",
+      "started_at": "2026-09-04T14:02:00Z",
+      "scenario": "image-pull-failure",
+      "source": {
+        "provider": "fake-datadog",
+        "alert": {
+          "id": "alert-3d81",
+          "title": "checkout-api pods not starting after deploy",
+          "triggered_at": "2026-09-04T14:02:00Z",
+          "severity": "critical",
+          "monitor_id": "mon-4471",
+          "tags": [
+            "service:checkout-api",
+            "env:production"
+          ]
+        }
+      },
+      "observations": {
+        "kubernetes": {
+          "collected_at": "2026-09-04T14:03:20Z",
+          "pods": [
+            {
+              "name": "checkout-api-6c9f77b4d-lp8kz",
+              "namespace": "production",
+              "phase": "Pending",
+              "restart_count": 0,
+              "containers": [
+                {
+                  "name": "checkout-api",
+                  "ready": false,
+                  "restart_count": 0,
+                  "limits": {
+                    "memory": "1Gi",
+                    "cpu": "1000m"
+                  },
+                  "requests": {
+                    "memory": "512Mi",
+                    "cpu": "500m"
+                  }
+                }
+              ]
+            }
+          ],
+          "events": [
+            {
+              "type": "Warning",
+              "reason": "Failed",
+              "message": "Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found",
+              "count": 4,
+              "last_seen": "2026-09-04T14:02:51Z",
+              "involved_object": "pod/checkout-api-6c9f77b4d-lp8kz"
+            },
+            {
+              "type": "Warning",
+              "reason": "ImagePullBackOff",
+              "message": "Back-off pulling image",
+              "count": 3,
+              "last_seen": "2026-09-04T14:03:10Z",
+              "involved_object": "pod/checkout-api-6c9f77b4d-lp8kz"
+            }
+          ],
+          "deployment": {
+            "name": "checkout-api",
+            "namespace": "production",
+            "replicas": {
+              "desired": 3,
+              "ready": 0,
+              "available": 0
+            },
+            "image": "registry.internal/checkout-api:2.9.1"
+          },
+          "provenance": {
+            "collection_id": "5f7edf45-7ab5-48b6-8d85-a09f6d14e2f8",
+            "requested_for": "INC-2026-0201",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-kubernetes"
+          }
+        },
+        "logs": {
+          "collected_at": "2026-09-04T14:03:22Z",
+          "window": {
+            "from": "2026-09-04T13:55:00Z",
+            "to": "2026-09-04T14:03:00Z"
+          },
+          "truncated": false,
+          "lines": [],
+          "provenance": {
+            "collection_id": "5f7edf45-7ab5-48b6-8d85-a09f6d14e2f8",
+            "requested_for": "INC-2026-0201",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-logs"
+          }
+        },
+        "metrics": null
+      },
+      "collection": {
+        "kubernetes": {
+          "state": "collected"
+        },
+        "logs": {
+          "state": "collected"
+        },
+        "metrics": {
+          "state": "nothing"
+        }
+      },
+      "analysis": {
+        "agents": [
+          {
+            "agent": "kubernetes",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found",
+                "source_ref": "events[0].message",
+                "severity": "warning"
+              },
+              {
+                "fact": "the pod is in phase Pending",
+                "source_ref": "pods[0].phase",
+                "severity": "warning"
+              },
+              {
+                "fact": "the container is not ready",
+                "source_ref": "pods[0].containers[0].ready",
+                "severity": "warning"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "logs",
+            "status": "no_data",
+            "findings": [],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "root_cause",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found",
+                "source_ref": "events[0].message"
+              },
+              {
+                "fact": "the pod is in phase Pending",
+                "source_ref": "pods[0].phase"
+              },
+              {
+                "fact": "the container is not ready",
+                "source_ref": "pods[0].containers[0].ready"
+              }
+            ],
+            "hypotheses": [
+              {
+                "code": "IMAGE_PULL_FAILURE",
+                "statement": "The failure to pull the specified image caused the pod to remain in a Pending state and the container to not be ready.",
+                "supported_by": [
+                  "events[0].message"
+                ]
+              }
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "root_cause_code": "IMAGE_PULL_FAILURE",
+        "root_cause": "The failure to pull the specified image caused the pod to remain in a Pending state and the container to not be ready.",
+        "confidence": 0.8,
+        "evidence": [
+          {
+            "source": "kubernetes",
+            "fact": "the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found",
+            "supports": "for"
+          }
+        ]
+      },
+      "remediation": {
+        "recommended_actions": []
+      },
+      "conversation": {
+        "provider": "fake-slack",
+        "channel_id": "fake-prod-incidents",
+        "thread_id": "thread-INC-2026-0201",
+        "incident_id": "INC-2026-0201",
+        "messages": [
+          {
+            "role": "system",
+            "text": "INC-2026-0201: checkout-api in production — investigating.",
+            "ts": "2026-09-04T14:02:00Z",
+            "incident_id": "INC-2026-0201"
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0201",
+            "ts": "2026-09-04T14:02:00Z",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the pod is in phase Pending"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container is not ready"
+              }
+            ],
+            "text": "kubernetes: the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found; the pod is in phase Pending; the container is not ready."
+          },
+          {
+            "role": "system",
+            "incident_id": "INC-2026-0201",
+            "ts": "2026-09-04T14:02:00Z",
+            "text": "logs: read its source and found nothing to report."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0201",
+            "ts": "2026-09-04T14:02:00Z",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the pod is in phase Pending"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container is not ready"
+              }
+            ],
+            "text": "root_cause: the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found; the pod is in phase Pending; the container is not ready."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0201",
+            "ts": "2026-09-04T14:02:00Z",
+            "text": "Root cause: IMAGE_PULL_FAILURE. The failure to pull the specified image caused the pod to remain in a Pending state and the container to not be ready. The agent puts its confidence at 80%, which is its own estimate and nothing here checks it.",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "thread": [
+      "INC-2026-0201: checkout-api in production — investigating.",
+      "kubernetes: the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found; the pod is in phase Pending; the container is not ready.",
+      "logs: read its source and found nothing to report.",
+      "root_cause: the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found; the pod is in phase Pending; the container is not ready.",
+      "Root cause: IMAGE_PULL_FAILURE. The failure to pull the specified image caused the pod to remain in a Pending state and the container to not be ready. The agent puts its confidence at 80%, which is its own estimate and nothing here checks it."
+    ]
+  },
+  "image-pull-failure#2": {
+    "index": 0,
+    "state": "concluded",
+    "scenario": "image-pull-failure",
+    "normalised": 0,
+    "raw_answers": {
+      "kubernetes": "{\n  \"agent\": \"kubernetes\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"the event says: Failed to pull image \\\"registry.internal/checkout-api:2.9.1\\\": not found\",\n      \"source_ref\": \"events[0].message\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"the pod is in phase Pending and not ready\",\n      \"source_ref\": \"pods[0].phase\",\n      \"severity\": \"warning\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "logs": "{\n  \"agent\": \"logs\",\n  \"status\": \"no_data\",\n  \"findings\": [],\n  \"hypotheses\": [],\n  \"confidence\": 0\n}",
+      "root-cause": "{\n  \"agent\": \"root_cause\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"the event says: Failed to pull image \\\"registry.internal/checkout-api:2.9.1\\\": not found\",\n      \"source_ref\": \"events[0].message\"\n    },\n    {\n      \"fact\": \"the pod is in phase Pending and not ready\",\n      \"source_ref\": \"pods[0].phase\"\n    }\n  ],\n  \"hypotheses\": [\n    {\n      \"code\": \"IMAGE_PULL_FAILURE\",\n      \"statement\": \"The failure to pull the specified image caused the pod to remain in a Pending state.\",\n      \"supported_by\": [\n        \"events[0].message\"\n      ]\n    }\n  ],\n  \"confidence\": 0.8\n}"
+    },
+    "root_cause_code": "IMAGE_PULL_FAILURE",
+    "root_cause": "The failure to pull the specified image caused the pod to remain in a Pending state.",
+    "confidence": 0.8,
+    "evidence": [
+      {
+        "source": "kubernetes",
+        "fact": "the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found",
+        "supports": "for"
+      }
+    ],
+    "incident": {
+      "incident_id": "INC-2026-0201",
+      "status": "diagnosed",
+      "service": "checkout-api",
+      "namespace": "production",
+      "cluster": "prod-eu",
+      "started_at": "2026-09-04T14:02:00Z",
+      "scenario": "image-pull-failure",
+      "source": {
+        "provider": "fake-datadog",
+        "alert": {
+          "id": "alert-3d81",
+          "title": "checkout-api pods not starting after deploy",
+          "triggered_at": "2026-09-04T14:02:00Z",
+          "severity": "critical",
+          "monitor_id": "mon-4471",
+          "tags": [
+            "service:checkout-api",
+            "env:production"
+          ]
+        }
+      },
+      "observations": {
+        "kubernetes": {
+          "collected_at": "2026-09-04T14:03:20Z",
+          "pods": [
+            {
+              "name": "checkout-api-6c9f77b4d-lp8kz",
+              "namespace": "production",
+              "phase": "Pending",
+              "restart_count": 0,
+              "containers": [
+                {
+                  "name": "checkout-api",
+                  "ready": false,
+                  "restart_count": 0,
+                  "limits": {
+                    "memory": "1Gi",
+                    "cpu": "1000m"
+                  },
+                  "requests": {
+                    "memory": "512Mi",
+                    "cpu": "500m"
+                  }
+                }
+              ]
+            }
+          ],
+          "events": [
+            {
+              "type": "Warning",
+              "reason": "Failed",
+              "message": "Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found",
+              "count": 4,
+              "last_seen": "2026-09-04T14:02:51Z",
+              "involved_object": "pod/checkout-api-6c9f77b4d-lp8kz"
+            },
+            {
+              "type": "Warning",
+              "reason": "ImagePullBackOff",
+              "message": "Back-off pulling image",
+              "count": 3,
+              "last_seen": "2026-09-04T14:03:10Z",
+              "involved_object": "pod/checkout-api-6c9f77b4d-lp8kz"
+            }
+          ],
+          "deployment": {
+            "name": "checkout-api",
+            "namespace": "production",
+            "replicas": {
+              "desired": 3,
+              "ready": 0,
+              "available": 0
+            },
+            "image": "registry.internal/checkout-api:2.9.1"
+          },
+          "provenance": {
+            "collection_id": "5f7edf45-7ab5-48b6-8d85-a09f6d14e2f8",
+            "requested_for": "INC-2026-0201",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-kubernetes"
+          }
+        },
+        "logs": {
+          "collected_at": "2026-09-04T14:03:22Z",
+          "window": {
+            "from": "2026-09-04T13:55:00Z",
+            "to": "2026-09-04T14:03:00Z"
+          },
+          "truncated": false,
+          "lines": [],
+          "provenance": {
+            "collection_id": "5f7edf45-7ab5-48b6-8d85-a09f6d14e2f8",
+            "requested_for": "INC-2026-0201",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-logs"
+          }
+        },
+        "metrics": null
+      },
+      "collection": {
+        "kubernetes": {
+          "state": "collected"
+        },
+        "logs": {
+          "state": "collected"
+        },
+        "metrics": {
+          "state": "nothing"
+        }
+      },
+      "analysis": {
+        "agents": [
+          {
+            "agent": "kubernetes",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found",
+                "source_ref": "events[0].message",
+                "severity": "warning"
+              },
+              {
+                "fact": "the pod is in phase Pending and not ready",
+                "source_ref": "pods[0].phase",
+                "severity": "warning"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "logs",
+            "status": "no_data",
+            "findings": [],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "root_cause",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found",
+                "source_ref": "events[0].message"
+              },
+              {
+                "fact": "the pod is in phase Pending and not ready",
+                "source_ref": "pods[0].phase"
+              }
+            ],
+            "hypotheses": [
+              {
+                "code": "IMAGE_PULL_FAILURE",
+                "statement": "The failure to pull the specified image caused the pod to remain in a Pending state.",
+                "supported_by": [
+                  "events[0].message"
+                ]
+              }
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "root_cause_code": "IMAGE_PULL_FAILURE",
+        "root_cause": "The failure to pull the specified image caused the pod to remain in a Pending state.",
+        "confidence": 0.8,
+        "evidence": [
+          {
+            "source": "kubernetes",
+            "fact": "the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found",
+            "supports": "for"
+          }
+        ]
+      },
+      "remediation": {
+        "recommended_actions": []
+      },
+      "conversation": {
+        "provider": "fake-slack",
+        "channel_id": "fake-prod-incidents",
+        "thread_id": "thread-INC-2026-0201",
+        "incident_id": "INC-2026-0201",
+        "messages": [
+          {
+            "role": "system",
+            "text": "INC-2026-0201: checkout-api in production — investigating.",
+            "ts": "2026-09-04T14:02:00Z",
+            "incident_id": "INC-2026-0201"
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0201",
+            "ts": "2026-09-04T14:02:00Z",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the pod is in phase Pending and not ready"
+              }
+            ],
+            "text": "kubernetes: the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found; the pod is in phase Pending and not ready."
+          },
+          {
+            "role": "system",
+            "incident_id": "INC-2026-0201",
+            "ts": "2026-09-04T14:02:00Z",
+            "text": "logs: read its source and found nothing to report."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0201",
+            "ts": "2026-09-04T14:02:00Z",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the pod is in phase Pending and not ready"
+              }
+            ],
+            "text": "root_cause: the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found; the pod is in phase Pending and not ready."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0201",
+            "ts": "2026-09-04T14:02:00Z",
+            "text": "Root cause: IMAGE_PULL_FAILURE. The failure to pull the specified image caused the pod to remain in a Pending state. The agent puts its confidence at 80%, which is its own estimate and nothing here checks it.",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "thread": [
+      "INC-2026-0201: checkout-api in production — investigating.",
+      "kubernetes: the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found; the pod is in phase Pending and not ready.",
+      "logs: read its source and found nothing to report.",
+      "root_cause: the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found; the pod is in phase Pending and not ready.",
+      "Root cause: IMAGE_PULL_FAILURE. The failure to pull the specified image caused the pod to remain in a Pending state. The agent puts its confidence at 80%, which is its own estimate and nothing here checks it."
+    ]
+  },
+  "image-pull-failure#3": {
+    "index": 0,
+    "state": "concluded",
+    "scenario": "image-pull-failure",
+    "normalised": 0,
+    "raw_answers": {
+      "kubernetes": "{\n  \"agent\": \"kubernetes\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"the event says: Failed to pull image \\\"registry.internal/checkout-api:2.9.1\\\": not found\",\n      \"source_ref\": \"events[0].message\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"the pod is in phase Pending and not ready\",\n      \"source_ref\": \"pods[0].phase\",\n      \"severity\": \"warning\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "logs": "{\n  \"agent\": \"logs\",\n  \"status\": \"no_data\",\n  \"findings\": [],\n  \"hypotheses\": [],\n  \"confidence\": 0\n}",
+      "root-cause": "{\n  \"agent\": \"root_cause\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"the event says: Failed to pull image \\\"registry.internal/checkout-api:2.9.1\\\": not found\",\n      \"source_ref\": \"events[0].message\"\n    },\n    {\n      \"fact\": \"the pod is in phase Pending and not ready\",\n      \"source_ref\": \"pods[0].phase\"\n    }\n  ],\n  \"hypotheses\": [\n    {\n      \"code\": \"IMAGE_PULL_FAILURE\",\n      \"statement\": \"The failure to pull the specified image caused the pod to remain in a Pending state.\",\n      \"supported_by\": [\n        \"events[0].message\",\n        \"pods[0].phase\"\n      ]\n    }\n  ],\n  \"confidence\": 0.8\n}"
+    },
+    "root_cause_code": "IMAGE_PULL_FAILURE",
+    "root_cause": "The failure to pull the specified image caused the pod to remain in a Pending state.",
+    "confidence": 0.8,
+    "evidence": [
+      {
+        "source": "kubernetes",
+        "fact": "the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found",
+        "supports": "for"
+      },
+      {
+        "source": "kubernetes",
+        "fact": "the pod is in phase Pending and not ready",
+        "supports": "for"
+      }
+    ],
+    "incident": {
+      "incident_id": "INC-2026-0201",
+      "status": "diagnosed",
+      "service": "checkout-api",
+      "namespace": "production",
+      "cluster": "prod-eu",
+      "started_at": "2026-09-04T14:02:00Z",
+      "scenario": "image-pull-failure",
+      "source": {
+        "provider": "fake-datadog",
+        "alert": {
+          "id": "alert-3d81",
+          "title": "checkout-api pods not starting after deploy",
+          "triggered_at": "2026-09-04T14:02:00Z",
+          "severity": "critical",
+          "monitor_id": "mon-4471",
+          "tags": [
+            "service:checkout-api",
+            "env:production"
+          ]
+        }
+      },
+      "observations": {
+        "kubernetes": {
+          "collected_at": "2026-09-04T14:03:20Z",
+          "pods": [
+            {
+              "name": "checkout-api-6c9f77b4d-lp8kz",
+              "namespace": "production",
+              "phase": "Pending",
+              "restart_count": 0,
+              "containers": [
+                {
+                  "name": "checkout-api",
+                  "ready": false,
+                  "restart_count": 0,
+                  "limits": {
+                    "memory": "1Gi",
+                    "cpu": "1000m"
+                  },
+                  "requests": {
+                    "memory": "512Mi",
+                    "cpu": "500m"
+                  }
+                }
+              ]
+            }
+          ],
+          "events": [
+            {
+              "type": "Warning",
+              "reason": "Failed",
+              "message": "Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found",
+              "count": 4,
+              "last_seen": "2026-09-04T14:02:51Z",
+              "involved_object": "pod/checkout-api-6c9f77b4d-lp8kz"
+            },
+            {
+              "type": "Warning",
+              "reason": "ImagePullBackOff",
+              "message": "Back-off pulling image",
+              "count": 3,
+              "last_seen": "2026-09-04T14:03:10Z",
+              "involved_object": "pod/checkout-api-6c9f77b4d-lp8kz"
+            }
+          ],
+          "deployment": {
+            "name": "checkout-api",
+            "namespace": "production",
+            "replicas": {
+              "desired": 3,
+              "ready": 0,
+              "available": 0
+            },
+            "image": "registry.internal/checkout-api:2.9.1"
+          },
+          "provenance": {
+            "collection_id": "5f7edf45-7ab5-48b6-8d85-a09f6d14e2f8",
+            "requested_for": "INC-2026-0201",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-kubernetes"
+          }
+        },
+        "logs": {
+          "collected_at": "2026-09-04T14:03:22Z",
+          "window": {
+            "from": "2026-09-04T13:55:00Z",
+            "to": "2026-09-04T14:03:00Z"
+          },
+          "truncated": false,
+          "lines": [],
+          "provenance": {
+            "collection_id": "5f7edf45-7ab5-48b6-8d85-a09f6d14e2f8",
+            "requested_for": "INC-2026-0201",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-logs"
+          }
+        },
+        "metrics": null
+      },
+      "collection": {
+        "kubernetes": {
+          "state": "collected"
+        },
+        "logs": {
+          "state": "collected"
+        },
+        "metrics": {
+          "state": "nothing"
+        }
+      },
+      "analysis": {
+        "agents": [
+          {
+            "agent": "kubernetes",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found",
+                "source_ref": "events[0].message",
+                "severity": "warning"
+              },
+              {
+                "fact": "the pod is in phase Pending and not ready",
+                "source_ref": "pods[0].phase",
+                "severity": "warning"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "logs",
+            "status": "no_data",
+            "findings": [],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "root_cause",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found",
+                "source_ref": "events[0].message"
+              },
+              {
+                "fact": "the pod is in phase Pending and not ready",
+                "source_ref": "pods[0].phase"
+              }
+            ],
+            "hypotheses": [
+              {
+                "code": "IMAGE_PULL_FAILURE",
+                "statement": "The failure to pull the specified image caused the pod to remain in a Pending state.",
+                "supported_by": [
+                  "events[0].message",
+                  "pods[0].phase"
+                ]
+              }
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "root_cause_code": "IMAGE_PULL_FAILURE",
+        "root_cause": "The failure to pull the specified image caused the pod to remain in a Pending state.",
+        "confidence": 0.8,
+        "evidence": [
+          {
+            "source": "kubernetes",
+            "fact": "the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found",
+            "supports": "for"
+          },
+          {
+            "source": "kubernetes",
+            "fact": "the pod is in phase Pending and not ready",
+            "supports": "for"
+          }
+        ]
+      },
+      "remediation": {
+        "recommended_actions": []
+      },
+      "conversation": {
+        "provider": "fake-slack",
+        "channel_id": "fake-prod-incidents",
+        "thread_id": "thread-INC-2026-0201",
+        "incident_id": "INC-2026-0201",
+        "messages": [
+          {
+            "role": "system",
+            "text": "INC-2026-0201: checkout-api in production — investigating.",
+            "ts": "2026-09-04T14:02:00Z",
+            "incident_id": "INC-2026-0201"
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0201",
+            "ts": "2026-09-04T14:02:00Z",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the pod is in phase Pending and not ready"
+              }
+            ],
+            "text": "kubernetes: the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found; the pod is in phase Pending and not ready."
+          },
+          {
+            "role": "system",
+            "incident_id": "INC-2026-0201",
+            "ts": "2026-09-04T14:02:00Z",
+            "text": "logs: read its source and found nothing to report."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0201",
+            "ts": "2026-09-04T14:02:00Z",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the pod is in phase Pending and not ready"
+              }
+            ],
+            "text": "root_cause: the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found; the pod is in phase Pending and not ready."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0201",
+            "ts": "2026-09-04T14:02:00Z",
+            "text": "Root cause: IMAGE_PULL_FAILURE. The failure to pull the specified image caused the pod to remain in a Pending state. The agent puts its confidence at 80%, which is its own estimate and nothing here checks it.",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the pod is in phase Pending and not ready"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "thread": [
+      "INC-2026-0201: checkout-api in production — investigating.",
+      "kubernetes: the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found; the pod is in phase Pending and not ready.",
+      "logs: read its source and found nothing to report.",
+      "root_cause: the event says: Failed to pull image \"registry.internal/checkout-api:2.9.1\": not found; the pod is in phase Pending and not ready.",
+      "Root cause: IMAGE_PULL_FAILURE. The failure to pull the specified image caused the pod to remain in a Pending state. The agent puts its confidence at 80%, which is its own estimate and nothing here checks it."
+    ]
+  }
+}

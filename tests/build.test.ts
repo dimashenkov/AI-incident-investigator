@@ -11,7 +11,8 @@
 import { describe, it, expect } from "vitest";
 import { validate } from "../src/schema/validate.js";
 // @ts-expect-error — plain .mjs, the same file node runs in the build.
-import { buildCore, exportName, wrapCjs, countOccurrences, remainingRequires, stripCodeMetadata, INLINED, VALIDATABLE } from "../scripts/build-core.mjs";
+import { buildCore, exportName, wrapCjs, countOccurrences, remainingRequires, stripCodeMetadata, INLINED, VALIDATABLE, SCHEMA_FILES } from "../scripts/build-core.mjs";
+import { REGISTERED_IDS } from "../src/schema/validate.js";
 
 /** Evaluate the CommonJS artifact in memory — no file, no module system. */
 function loadArtifact(code: string): Record<string, (data: unknown) => boolean> {
@@ -202,5 +203,34 @@ describe("the artifact agrees with the local validator", () => {
     // ...and does not fire on the English word, which a schema description uses.
     expect(remainingRequires("and then require neither approval nor a target")).toEqual([]);
     expect(remainingRequires('"required": ["a"]')).toEqual([]);
+  });
+});
+
+describe("the schema list exists twice, and nothing used to compare the copies", () => {
+  /*
+   * `SCHEMA_FILES` and `VALIDATABLE` in scripts/build-core.mjs decide what the
+   * transpiled artifact carries; `REGISTERED_IDS` in src/schema/validate.ts
+   * decides what the local validator knows. Register a schema in one only and
+   * `validate(...)` answers `valid` locally while the deployed Code node has no
+   * validator for it and answers `unchecked` — which is the exact promise at
+   * the top of validate.ts, that `valid` means one thing in both places.
+   * A subagent found the gap on 2026-09-09; nothing compared the two.
+   */
+  it("names the same schemas as the validator registers", () => {
+    const fromIds = REGISTERED_IDS.map((id) => String(id).replace(/^.*\//, "").replace(/\.schema\.json$/, ""));
+    expect([...fromIds].sort(), "one list gained a schema the other did not")
+      .toEqual([...SCHEMA_FILES].sort());
+  });
+
+  it("validates against every schema except the two that only exist to be referenced", () => {
+    /*
+     * `common` holds shared definitions and `observations` is reached through
+     * `incident`; nothing calls `validate` with either name. Naming the pair
+     * here means adding a schema to SCHEMA_FILES and forgetting VALIDATABLE
+     * fails a test rather than shipping an artifact with no validator for it.
+     */
+    const referencedOnly = ["common", "observations"];
+    expect([...VALIDATABLE].sort(), "every other schema is validated against directly")
+      .toEqual([...SCHEMA_FILES].filter((n) => !referencedOnly.includes(n)).sort());
   });
 });

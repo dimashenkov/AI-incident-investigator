@@ -14,7 +14,7 @@ import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { join } from "node:path";
 // @ts-expect-error - plain .mjs script, no types
-import { splitKey, alertFor, callOnce, mergeAnswers, recordShape, hostOf, loadEnvFile, parseArgv, refuseToStart, recordPathFor, refuseAliasedPaths, writeAtomic, tempNameFor, writeOrderFor, addressIsWrong, mayHaveBeenCharged, inFlightFromRecords } from "../scripts/run-scenarios.mjs";
+import { CHARGED_PREFIX, CHARGED_SENTENCE, splitKey, alertFor, callOnce, mergeAnswers, recordShape, hostOf, loadEnvFile, parseArgv, refuseToStart, recordPathFor, refuseAliasedPaths, writeAtomic, tempNameFor, writeOrderFor, addressIsWrong, mayHaveBeenCharged, inFlightFromRecords } from "../scripts/run-scenarios.mjs";
 
 const SCENARIOS = new URL("../scenarios/", import.meta.url).pathname;
 
@@ -309,7 +309,7 @@ describe("what survives a kill, a wrong address, and two names for one file", ()
     try {
       writeFileSync(join(d, "a.json"), JSON.stringify({ outcomes: {
         "container-oom#1": "answered",
-        "cpu-throttling#1": "called, no reply recorded — this key may have been charged",
+        "cpu-throttling#1": CHARGED_SENTENCE,
       } }));
       writeFileSync(join(d, "b.json"), JSON.stringify({ outcomes: { "other#1": "unreachable: HTTP 500" } }));
       writeFileSync(join(d, "c.json"), "not json at all");
@@ -555,7 +555,7 @@ describe("running the script for real, against a server that is not n8n", () => 
       // A record from an earlier run, in a directory of the caller's choosing.
       writeFileSync(join(d, "rec.json"), JSON.stringify({
         when: "2026-09-09",
-        outcomes: { "container-oom#1": "called, no reply recorded — this key may have been charged" },
+        outcomes: { "container-oom#1": CHARGED_SENTENCE },
       }));
       const r = await run(s.url, ["container-oom#1", "--answers", join(d, "answers.json"),
         "--record", join(d, "rec.json")], d);
@@ -570,5 +570,44 @@ describe("running the script for real, against a server that is not n8n", () => 
     const b = tempNameFor("/x/a.json", 111);
     expect(a).not.toBe(b);
     expect(a).toMatch(/\/x\/a\.json\.111\.\d+\.tmp$/);
+  });
+});
+
+describe("the marker that says a key may have been charged", () => {
+  /*
+   * The marker was spelled out inside four prose sentences, and the tests
+   * carried their own copy — so rewording the sentence left every test green
+   * while `inFlightFromRecords` matched nothing, and a key that was CHARGED
+   * read as unbought. A subagent found it on 2026-09-09.
+   */
+  it("is one string that the writers and the readers share", () => {
+    expect(CHARGED_SENTENCE.startsWith(CHARGED_PREFIX),
+      "the sentence a run writes must begin with the prefix its readers match on").toBe(true);
+  });
+
+  it("is found by the reader when the writer's sentence is reworded", () => {
+    const runs = new Map([["r.json", JSON.stringify({
+      outcomes: { "cpu-throttling#1": `${CHARGED_PREFIX} whatever wording comes later` } })]]);
+    const found = inFlightFromRecords("/runs",
+      (p: string) => runs.get(String(p).split("/").pop() as string) as string,
+      () => [...runs.keys()]);
+    expect(found.get("cpu-throttling#1"),
+      "the prefix decides, so the prose around it can change").toBe("r.json");
+  });
+});
+
+describe("the replies that mean the door refused us", () => {
+  /*
+   * The list of codes was written twice, three lines apart, in opposite senses.
+   * Adding one to a single copy makes the two answers disagree, and together
+   * they decide whether a key is recorded as possibly billed.
+   */
+  const codes = [401, 403, 404, 405, 429, 500, 502];
+  it("gives exactly opposite answers for every code, from one list", () => {
+    for (const c of codes) {
+      const r = { state: "unreachable", why: `HTTP ${c}` };
+      expect(addressIsWrong(r as any), `HTTP ${c}: the two readers must not disagree`)
+        .toBe(!mayHaveBeenCharged(r as any));
+    }
   });
 });

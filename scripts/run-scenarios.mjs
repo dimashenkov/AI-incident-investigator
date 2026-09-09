@@ -249,8 +249,32 @@ export function addressIsWrong(r) {
   const m = /^HTTP (\d+)$/.exec(String(r.why ?? ""));
   if (m === null) return true;                 // no reply at all: DNS, refused, redirect, timeout
   const code = Number(m[1]);
-  return code === 401 || code === 403 || code === 404 || code === 405;
+  return REFUSED_AT_THE_DOOR.includes(code);
 }
+
+/*
+ * The marker that says a key was called and no reply came back.
+ *
+ * It was spelled out inside four prose sentences: two writers, two readers
+ * matching with `startsWith("called,")`, and two tests carrying their own copy
+ * of the sentence. Reword the sentence and the tests still pass while
+ * `inFlightFromRecords` returns nothing — a key that was CHARGED then reads as
+ * unbought, and `refuseToStart` lets the next run pay for it again. That is the
+ * exact failure the marker was written to prevent. A subagent found it on
+ * 2026-09-09. One carrier now, and the tests import it.
+ */
+export const CHARGED_PREFIX = "called,";
+export const CHARGED_SENTENCE = `${CHARGED_PREFIX} no reply recorded — this key may have been charged`;
+
+/*
+ * The replies that mean the door refused us before any model was asked.
+ *
+ * The list was written twice, three lines apart, in opposite senses: once as
+ * "the address is wrong", once negated as "this may have been charged". Adding
+ * a code to one only flips one of the two answers, and the two answers decide
+ * whether a key is recorded as possibly billed. One list decides both.
+ */
+const REFUSED_AT_THE_DOOR = [401, 403, 404, 405];
 
 /**
  * Did this call possibly leave a charge with no answer to show for it?
@@ -277,7 +301,7 @@ export function mayHaveBeenCharged(r) {
   const m = /^HTTP (\d+)$/.exec(String(r.why ?? ""));
   if (m === null) return true;
   const code = Number(m[1]);
-  return !(code === 401 || code === 403 || code === 404 || code === 405);
+  return !REFUSED_AT_THE_DOOR.includes(code);
 }
 
 /**
@@ -298,7 +322,7 @@ export function inFlightFromRecords(runsDir, read = readFileSync, list = readdir
     const outcomes = rec?.outcomes;
     if (outcomes === null || typeof outcomes !== "object") continue;
     for (const [k, v] of Object.entries(outcomes)) {
-      if (typeof v === "string" && v.startsWith("called,")) out.set(k, f);
+      if (typeof v === "string" && v.startsWith(CHARGED_PREFIX)) out.set(k, f);
     }
   }
   return out;
@@ -590,7 +614,7 @@ async function main() {
      * charge may exist with no answer to show for it, and it survives a kill
      * because it is written first.
      */
-    outcomes[key] = "called, no reply recorded — this key may have been charged";
+    outcomes[key] = CHARGED_SENTENCE;
     /*
      * If the intent could not be written, nothing is called.
      *
@@ -615,7 +639,7 @@ async function main() {
      * an ordinary failure and dropped out of the warning at the end.
      */
     outcomes[key] = r.state === "answered" ? "answered"
-      : mayHaveBeenCharged(r) ? `called, no reply recorded — this key may have been charged (${detail})`
+      : mayHaveBeenCharged(r) ? `${CHARGED_SENTENCE} (${detail})`
         : detail;
     if (r.state === "answered") {
       const merged = mergeAnswers(answers, { [key]: r.answer });
@@ -673,7 +697,7 @@ async function main() {
    * success. That path is now refused before it starts; the exit code no longer
    * relies on that being true.
    */
-  const maybeCharged = Object.entries(outcomes).filter(([, v]) => String(v).startsWith("called,"));
+  const maybeCharged = Object.entries(outcomes).filter(([, v]) => String(v).startsWith(CHARGED_PREFIX));
   for (const [k] of maybeCharged) {
     process.stdout.write(`  ${k} was called and no reply was recorded; it may have been charged. `
       + "Read the n8n execution before asking for it again\n");

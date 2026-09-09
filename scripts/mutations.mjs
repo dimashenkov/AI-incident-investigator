@@ -15,6 +15,68 @@
  */
 export const MUTATIONS = [
   {
+    // Any non-empty string is taken as a date again: "unknown" sorts ahead of
+    // every real date and its record claims the scenario.
+    id: "any-string-taken-as-a-date",
+    file: "scripts/readiness.mjs",
+    from: '      if (typeof w === "string" && /^\\d{4}-\\d{2}-\\d{2}$/.test(w)) when = w;',
+    to: '      if (typeof w === "string" && w.length > 0) when = w;',
+    mustFail: "does not let a record whose date is not a date outrank a dated one",
+  },
+  {
+    // A placeholder row from one file joins attempts recorded in another.
+    id: "a-placeholder-counted-among-another-files-attempts",
+    file: "scripts/readiness.mjs",
+    from: "        if (!fallbackClaimed.has(base(key))) {",
+    to: "        if (true) {",
+    mustFail: "does not count a placeholder from one file as an attempt made in another",
+  },
+  {
+    // Only the bare key and #1 name the file again.
+    id: "a-later-attempt-losing-its-filename",
+    file: "scripts/readiness.mjs",
+    from: "  const key = Object.keys(from).find((k) => base(k) === scenario);",
+    to: "  const key = [scenario, `${scenario}#1`].find((k) => from[k] !== undefined);",
+    mustFail: "names the file of a winning record whose only verdict is a later attempt",
+  },
+  {
+    // Older attempts survive a newer measurement of the same scenario, and the
+    // worst-of rule then reports a failure the newest run never produced.
+    id: "an-older-attempt-surviving-a-newer-measurement",
+    file: "scripts/readiness.mjs",
+    from: "      if (claimed.has(base(key))) continue;",
+    to: "      if (false) continue;",
+    mustFail: "lets a newer measurement replace the whole scenario, not one attempt key",
+  },
+  {
+    // The sentence a run writes stops beginning with the prefix its readers
+    // match on: every writer and reader still compiles, and a charged key reads
+    // as unbought. Found by a subagent on 2026-09-09.
+    id: "the-charged-sentence-losing-the-prefix-its-readers-match",
+    file: "scripts/run-scenarios.mjs",
+    from: "export const CHARGED_SENTENCE = `${CHARGED_PREFIX} no reply recorded — this key may have been charged`;",
+    to: "export const CHARGED_SENTENCE = \"no reply recorded — this key may have been charged\";",
+    mustFail: "is one string that the writers and the readers share",
+  },
+  {
+    // One reader of the door-code list learns a code the other does not: the
+    // address stops being wrong while the key is still recorded as maybe billed.
+    id: "one-reader-of-the-door-codes-learning-a-code-the-other-does-not",
+    file: "scripts/run-scenarios.mjs",
+    from: "  return REFUSED_AT_THE_DOOR.includes(code);",
+    to: "  return REFUSED_AT_THE_DOOR.includes(code) || code === 429;",
+    mustFail: "gives exactly opposite answers for every code, from one list",
+  },
+  {
+    // The default for a missing dueFromChunk stops being a number, and the
+    // report prints what it finds.
+    id: "a-debt-with-no-chunk-printed-as-undefined",
+    file: "scripts/acceptance-gate.mjs",
+    from: '  return typeof d?.dueFromChunk === "number" ? d.dueFromChunk : 0;',
+    to: "  return d?.dueFromChunk;",
+    mustFail: "is zero when the entry does not say, so the report never prints undefined",
+  },
+  {
     id: "empty-suite-reads-as-pass",
     file: "scripts/acceptance-gate.mjs",
     from: 'if (total === 0) return fail("the suite collected 0 tests',
@@ -572,7 +634,7 @@ export const MUTATIONS = [
     // scenario recorded as unestablished became FAILED.
     id: "recorded-unestablished-read-as-failure",
     file: "scripts/readiness.mjs",
-    from: '    if (state === "unestablished" || state === "unasked") {\n      return unknown(`scenario-${n}`, `not established in ${latest.file}${many}`, PAID);\n    }',
+    from: '    if (state === "unestablished" || state === "unasked") {\n      return unknown(`scenario-${n}`, `not established in ${recordFor(latest, n)}${many}`, PAID);\n    }',
     to: "    if (false) {\n      return unknown(`scenario-${n}`, `x`, PAID);\n    }",
     mustFail: "keeps the scorer's own unestablished state instead of calling it a failure",
   },
@@ -1007,8 +1069,8 @@ export const MUTATIONS = [
     // record that has been superseded by one nobody can read.
     id: "unreadable-run-record-skipped-in-silence",
     file: "scripts/readiness.mjs",
-    from: "  const broken = dated.find((d) => d.unreadable !== undefined);",
-    to: "  const broken = undefined;",
+    from: "  const broken0 = dated.find((d) => d.unreadable !== undefined);",
+    to: "  const broken0 = undefined;",
     mustFail: "stops at an unreadable record rather than answering from an older one",
   },
   {
@@ -1242,7 +1304,7 @@ export const MUTATIONS = [
     // A timeout overwriting the one state that says a charge may exist.
     id: "a-timeout-overwriting-may-have-been-charged",
     file: "scripts/run-scenarios.mjs",
-    from: "  if (m === null) return true;\n  const code = Number(m[1]);\n  return !(code === 401 || code === 403 || code === 404 || code === 405);",
+    from: "  if (m === null) return true;\n  const code = Number(m[1]);\n  return !REFUSED_AT_THE_DOOR.includes(code);",
     to: "  if (m === null) return true;\n  const code = Number(m[1]);\n  return false;",
     mustFail: "keeps a timeout saying the call may have been charged",
   },
@@ -1291,7 +1353,7 @@ export const MUTATIONS = [
     // Evidence that a charge may exist, which nothing reads.
     id: "in-flight-evidence-nobody-reads",
     file: "scripts/run-scenarios.mjs",
-    from: '      if (typeof v === "string" && v.startsWith("called,")) out.set(k, f);',
+    from: '      if (typeof v === "string" && v.startsWith(CHARGED_PREFIX)) out.set(k, f);',
     to: "      if (false) out.set(k, f);",
     mustFail: "finds keys an earlier record says were called with no reply",
   },
@@ -1418,14 +1480,19 @@ export const MUTATIONS = [
     to: '    return { scenario, state: "unestablished", why: "no answer was recorded", expected: want.code };',
     mustFail: "carries six correct attempts through three parts without losing one",
   },
-  {
-    // A row saying nobody asked, counted against the attempts that answered.
-    id: "an-unasked-row-outvoting-the-attempts",
-    file: "scripts/readiness.mjs",
-    from: '    const answered = states.filter((x) => x !== "unasked");',
-    to: "    const answered = states;",
-    mustFail: "does not let a row saying nobody asked outvote the attempts that answered",
-  },
+  /*
+   * REMOVED on 2026-09-09: `an-unasked-row-outvoting-the-attempts`.
+   *
+   * It broke `const answered = states.filter(x => x !== "unasked")` inside
+   * `scenariosMeasured` — a SECOND carrier of the rule that a row nobody asked
+   * does not outvote the attempts that answered. The carrier is gone: the rule
+   * lives once, upstream in `latestScoredPerScenario`, and covers
+   * `unestablished` as well, which this one never did.
+   *
+   * The rule is still guarded. `a-bare-row-outvoting-the-attempts-of-its-own-
+   * scenario` breaks the surviving carrier, and it fails the removed mutation's
+   * named test too — checked before removing this, not assumed.
+   */
   {
     // A later part writing less than the record already says.
     id: "a-later-part-lowering-what-a-key-says",
@@ -1684,6 +1751,15 @@ export const MUTATIONS = [
     mustFail: "stops on either of them in the OTHER state",
   },
   {
+    // A later part of a run that did not ASK a question, unanswering it: the
+    // figure fell 36% to 31% between buying part 1 and part 2.
+    id: "a-later-part-unanswers-what-an-earlier-one-established",
+    file: "scripts/readiness.mjs",
+    from: '      if (state === "unasked" || state === "unestablished") {',
+    to: "      if (false) {",
+    mustFail: "does not let unasked or unestablished overwrite a real verdict",
+  },
+  {
     // The deployed node running the schemas and nothing else, so "valid" means
     // one thing in a unit test and another in production — which is exactly the
     // promise the top of src/schema/validate.ts makes.
@@ -1718,6 +1794,16 @@ export const MUTATIONS = [
     from: "    if (a.when !== null) return -1;\n    if (b.when !== null) return 1;",
     to: "    if (a.when !== null) return 1;\n    if (b.when !== null) return -1;",
     mustFail: "never lets an undated record outrank a dated one",
+  },
+  {
+    // A part that did not ask the question, outvoting the part that answered it.
+    // The fallback merge matched on the exact key, so the bare row survived
+    // beside `alpha#1` and the scenario reported unestablished. Codex, 2026-09-09.
+    id: "a-bare-row-outvoting-the-attempts-of-its-own-scenario",
+    file: "scripts/readiness.mjs",
+    from: "    if (answered.has(base(key))) continue;",
+    to: "    if (false) continue;",
+    mustFail: "does not let a bare unestablished row outvote answered attempts of the same scenario",
   },
   {
     // Prose in a run record read as a score: the readiness figure would then

@@ -7,11 +7,15 @@
  * the two and the only thing between them was somebody reading both files.
  */
 import { describe, it, expect } from "vitest";
+import { SLOTS } from "../src/providers/fixtures.js";
+import { MERGE_SLOTS } from "../src/core/merge.js";
+// @ts-expect-error — plain .mjs, the same file node runs.
+import { AGENT_ORDER } from "../scripts/workflow-runtime.mjs";
 import { readdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 // @ts-expect-error - plain .mjs script, no types
-import { score, scoreAll, expectedFor, format, citationCovers, recordInto, scenarioOf, attemptOf, compareConfidences, resolvesInSomeSlot, refusalCeiling, exitCodeFor } from "../scripts/score-run.mjs";
+import { SCORE_SLOTS, score, scoreAll, expectedFor, format, citationCovers, recordInto, scenarioOf, attemptOf, compareConfidences, resolvesInSomeSlot, refusalCeiling, exitCodeFor } from "../scripts/score-run.mjs";
 
 const SCENARIOS = new URL("../scenarios/", import.meta.url).pathname;
 /**
@@ -872,5 +876,30 @@ describe("a scenario whose honesty is a comparison is scored against its pair", 
       SCENARIOS,
     )[0]!;
     expect(r.state).toBe("correct");
+  });
+});
+
+describe("the list of slots exists four times", () => {
+  /*
+   * `SLOTS` (src/providers/fixtures.ts), `MERGE_SLOTS` (src/core/merge.ts),
+   * `SCORE_SLOTS` (scripts/score-run.mjs) and `AGENT_ORDER`
+   * (scripts/workflow-runtime.mjs) all name the same collection agents, and the
+   * files cannot import from each other: two of them are transpiled into the
+   * n8n Code node, where imports do not exist. TypeScript catches a wrong NAME
+   * in the two typed copies and nothing catches a MISSING one, and SCORE_SLOTS
+   * is plain JavaScript with no protection at all — so a fourth collection
+   * agent added everywhere but there falls through `resolvesInSomeSlot`, and a
+   * citation attributed to it that happens to resolve in another agent's slot
+   * scores `correct`. That is the defect `resolvesForAgent` says it closed.
+   * A subagent found it on 2026-09-09. The copies stay; this notices divergence.
+   */
+  it("names the same collection agents in all four places", () => {
+    expect([...SCORE_SLOTS], "score-run against the fixtures").toEqual([...SLOTS]);
+    expect([...MERGE_SLOTS], "merge against the fixtures").toEqual([...SLOTS]);
+  });
+
+  it("orders the agents as the collectors plus the one that reads them all", () => {
+    expect([...AGENT_ORDER], "the runtime asks every collector, then root-cause")
+      .toEqual([...SLOTS, "root-cause"]);
   });
 });

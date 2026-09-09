@@ -21,6 +21,7 @@
 import { spawnSync } from "node:child_process";
 
 import { MUTATIONS } from "./mutations.mjs";
+import { remainingRequires } from "./requires.mjs";
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -535,8 +536,23 @@ function checkCoreBuild() {
     return unknown(`manifest unreadable: ${e instanceof Error ? e.message : String(e)}`, r.line);
   }
   if (m.requiresRemaining !== 0) return fail(`${m.requiresRemaining} require call(s) remain in the artifact`, r.line);
+  /*
+   * The manifest is the builder's word about its own output. This recounts from
+   * the ARTIFACT, so weakening the builder's detector no longer buys a passing
+   * gate line: the two must agree, and this one reads the bytes that ship.
+   */
+  let left;
+  try {
+    left = remainingRequires(readFileSync(resolve(ROOT, "out/core.js"), "utf8"));
+  } catch (e) {
+    return unknown(`artifact unreadable: ${e instanceof Error ? e.message : String(e)}`, r.line);
+  }
+  if (left.length > 0) {
+    return fail(`the artifact still calls require: ${[...new Set(left)].join(", ")} `
+      + `(the manifest claims ${m.requiresRemaining})`, r.line);
+  }
   if (!Array.isArray(m.exports) || m.exports.length === 0) return fail("artifact exports no validators", r.line);
-  return pass(`${m.bytes} bytes, ${m.exports.length} validators, 0 requires`, r.line);
+  return pass(`${m.bytes} bytes, ${m.exports.length} validators, ${left.length} requires counted in the artifact`, r.line);
 }
 
 /**
@@ -951,6 +967,18 @@ export function someRunWasScored(runsDir) {
  * `chunk >= undefined` is false, so the only required field was the one nothing
  * required — absence reading as "not yet", which is this project's oldest bug.
  */
+/*
+ * The chunk a debt falls due from, and the ONE place that decides it.
+ *
+ * A missing field means "due now", deliberately. The default lived inside the
+ * filter, and two printers read `d.dueFromChunk` raw — so an entry without the
+ * field was enforced as due and reported as "chunk undefined". A subagent found
+ * it on 2026-09-09.
+ */
+export function dueFrom(d) {
+  return typeof d?.dueFromChunk === "number" ? d.dueFromChunk : 0;
+}
+
 export function splitDebt(debts, chunk, { artifactExists, scored }) {
   const list = Array.isArray(debts) ? debts : [];
   const waiting = list.filter((d) =>
@@ -958,8 +986,7 @@ export function splitDebt(debts, chunk, { artifactExists, scored }) {
     || (d.unlessScoredRun === true && !scored));
   const due = list.filter((d) => {
     if (waiting.includes(d)) return false;
-    const from = typeof d.dueFromChunk === "number" ? d.dueFromChunk : 0;
-    return chunk >= from;
+    return chunk >= dueFrom(d);
   });
   return { due, waiting };
 }
@@ -1007,7 +1034,7 @@ function checkDebt() {
       "read PROGRESS.md",
     );
   }
-  const soon = DEBT.map((d) => `chunk ${d.dueFromChunk}`).join(", ");
+  const soon = DEBT.map((d) => `chunk ${dueFrom(d)}`).join(", ");
   return pass(`chunk ${chunk}: no promised check is due yet (next: ${soon})`, "read PROGRESS.md");
 }
 
@@ -1193,7 +1220,7 @@ export function format(gate) {
   lines.push("", "  THIS GATE CANNOT DECIDE THESE — they rest on discipline, and no exit code covers them:");
   for (const n of gate.limitations) lines.push(`    · ${n}`);
   lines.push("", "  PROMISED CHECKS NOT YET WRITTEN — each holds exit 2 from the chunk named:");
-  for (const d of gate.debt) lines.push(`    · from chunk ${d.dueFromChunk}: ${d.claim}`);
+  for (const d of gate.debt) lines.push(`    · from chunk ${dueFrom(d)}: ${d.claim}`);
   lines.push("", `  ${VERDICT[gate.exitCode]}  (exit ${gate.exitCode})`, "");
   return lines.join("\n");
 }

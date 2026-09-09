@@ -252,3 +252,30 @@ agent, so a run is 3 or 4 calls, not always 4 — between 30 and 40 calls.
 | **all three** | **10** | **30–40** | **$0.012 – $0.016** |
 
 Each part is asked for on its own, with its own word. One `харчи` is one part.
+
+## The result, and the decision it forced · 2026-09-09
+
+Part 2 was bought and measured: `image-pull-failure` returned the right code
+**3 of 3**, and cited `deployment.image` **0 of 3**.
+
+By the criterion written above — before the run, not after — that is the third
+row: *the seventh rule failed like the six before it; the answer is a different
+mechanism, not a seventh rewording.*
+
+**The decision is LIMITATIONS, not an eighth rewrite of the prompt.** It is
+already carried, word for word, by an entry that predates this measurement:
+
+> that an agent cites what a scenario was built around — the prompt asks,
+> nothing enforces, and the scorer reports the miss rather than refusing the
+> answer
+
+Nothing new is added to that list, because nothing new was learnt about what the
+system can decide. What is new is the **number**, and it is written here so the
+same rewrite is not attempted an eighth time on the strength of having
+forgotten: seven consecutive attempts, the last three measured live, and the
+citation was never produced.
+
+**What would reopen it:** a mechanism, not a wording — the scorer refusing an
+answer that omits a `must_cite` field, which is a rule nobody has agreed to and
+which would turn a note into a gate. That is a decision for the owner, and it is
+not taken here.

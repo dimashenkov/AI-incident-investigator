@@ -39,7 +39,7 @@ function collectTests(dir: string): string[] {
 }
 // Plain .mjs — the same file node runs in production, so there are no types.
 // @ts-expect-error
-import { runGate, format, restoreInterruptedMutation, CHECKS, CHILD_MARKER, LIMITATIONS, DEBT, SECRET_SHAPED, readFreshReport, interpretVitestReport, interpretScripts, findSecretShaped, parsePorcelainZ, readCurrentChunk, namedTestFailed, coverageGaps, someRunWasScored, withRepair, reportIsFromThisRun, splitDebt} from "../scripts/acceptance-gate.mjs";
+import { dueFrom, runGate, format, restoreInterruptedMutation, CHECKS, CHILD_MARKER, LIMITATIONS, DEBT, SECRET_SHAPED, readFreshReport, interpretVitestReport, interpretScripts, findSecretShaped, parsePorcelainZ, readCurrentChunk, namedTestFailed, coverageGaps, someRunWasScored, withRepair, reportIsFromThisRun, splitDebt} from "../scripts/acceptance-gate.mjs";
 // @ts-expect-error
 import { MUTATIONS } from "../scripts/mutations.mjs";
 
@@ -1121,5 +1121,28 @@ describe("every gate check is exercised, or says why not", () => {
     // And nothing may be excused that no longer exists.
     const stale = [...accounted].filter((id) => !ids.includes(id));
     expect(stale, "these are named here but are not checks any more").toEqual([]);
+  });
+});
+
+describe("the chunk a promised check falls due from", () => {
+  /*
+   * The default for a missing `dueFromChunk` lived inside the filter that
+   * enforces it, and two printers read the raw field — so an entry without the
+   * field was enforced as due now and reported as "from chunk undefined".
+   * A subagent found it on 2026-09-09. One carrier decides, and it is the one
+   * the report prints.
+   */
+  it("is zero when the entry does not say, so the report never prints undefined", () => {
+    expect(dueFrom({ claim: "x" } as any), "a debt that does not say is due now").toBe(0);
+    expect(`chunk ${dueFrom({ claim: "x" } as any)}`).toBe("chunk 0");
+  });
+
+  it("is the number the entry gives, when it gives one", () => {
+    expect(dueFrom({ claim: "x", dueFromChunk: 6 } as any)).toBe(6);
+  });
+
+  it("refuses a non-number rather than printing it", () => {
+    expect(dueFrom({ claim: "x", dueFromChunk: "6" } as any),
+      "a string is not a chunk number, and printing it raw is how undefined got out").toBe(0);
   });
 });

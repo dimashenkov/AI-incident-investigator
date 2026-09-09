@@ -89,28 +89,8 @@ export function countOccurrences(haystack, needle) {
   return haystack.split(needle).length - 1;
 }
 
-/**
- * Every `require` CALL left in a body of code.
- *
- * Codex, chunk 1 part 1: matching only `require("x")` claimed more than it
- * checked. A call with a space before the paren, one with a comment between
- * them, and one with a template-literal argument are all valid calls it missed,
- * and the artifact would have shipped carrying one.
- *
- * Widening it to any mention of the word went too far the other way, and the
- * build said so on the first run: a schema description in this repository
- * contains the English word "require" in a sentence, and the check refused a
- * perfectly good artifact. The honest middle is the call syntax — the word
- * followed by an open paren, whatever spacing or comments sit between.
- *
- * What this does NOT establish: that no dynamic construction could reach a
- * module at runtime. Nothing here parses the artifact, and the claim is exactly
- * as wide as the pattern.
- */
-export function remainingRequires(code) {
-  const calls = [...code.matchAll(/\brequire\b\s*(?:\/\*[\s\S]*?\*\/\s*)*\(\s*(["'`])?(.*?)\1?\s*\)/g)];
-  return calls.map((m) => (m[2] === undefined || m[2] === "" ? "(dynamic or unparsed argument)" : m[2]));
-}
+export { remainingRequires } from "./requires.mjs";
+import { remainingRequires } from "./requires.mjs";
 
 export function buildCore({ read = (p) => readFileSync(resolve(ROOT, "node_modules", p), "utf8") } = {}) {
   const load = (n) => JSON.parse(readFileSync(resolve(ROOT, "schemas", `${n}.schema.json`), "utf8"));
@@ -180,12 +160,22 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === resolve(fileUR
     schemas: SCHEMA_FILES,
     exports: VALIDATABLE.map(exportName),
     substitutions,
-    requiresRemaining: 0,
+    /*
+     * COUNTED from the artifact, not written as the literal `0`.
+     *
+     * The constant was true only because buildCore throws first — so the gate
+     * line that read it back and printed "0 requires" was reporting a number
+     * the builder had asserted about itself. Weaken the builder's detector and
+     * the artifact ships a live require while every reader still says zero.
+     * A subagent found it on 2026-09-09 under the mandate "the same rule in
+     * two places".
+     */
+    requiresRemaining: remainingRequires(code).length,
   };
   writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2) + "\n");
   process.stdout.write(
     `core.js ${manifest.bytes} bytes, sha256 ${manifest.sha256.slice(0, 12)}…\n` +
       substitutions.map((s) => `  inlined ${s.id} (${s.replaced}×)\n`).join("") +
-      `  0 require calls remain\n`,
+      `  ${manifest.requiresRemaining} require calls remain\n`,
   );
 }

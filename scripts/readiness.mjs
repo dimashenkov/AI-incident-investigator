@@ -91,7 +91,22 @@ export function scenariosMeasured(root = ROOT) {
   const names = readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort();
   if (names.length === 0) return [unknown("scenarios", "no scenarios exist")];
 
-  const latest = latestScored(join(root, "docs", "runs"));
+  /*
+   * The newest ESTABLISHED verdict per scenario, across every record.
+   *
+   * This read one record — the newest that carried any scores — and the run is
+   * bought in PARTS, so no single record holds every scenario. Measured on
+   * 2026-09-07 minutes after it happened: part 1 established
+   * readiness-probe-failure three times correct, part 2 was bought next, and
+   * the figure fell from 36% back to 31% because part 2's record says nothing
+   * about readiness-probe-failure. A later record that did not ASK a question
+   * does not unanswer it.
+   *
+   * `unasked` and `unestablished` never overwrite a real verdict; a real
+   * verdict from a newer record does overwrite an older one, because that is a
+   * re-measurement.
+   */
+  const latest = latestScoredPerScenario(join(root, "docs", "runs"));
   return names.map((n) => {
     /*
      * Attempts count, and the WORST of them decides.
@@ -133,8 +148,18 @@ export function scenariosMeasured(root = ROOT) {
      * scenarios, which Codex reproduced on 2026-09-08. If `unasked` is ALL
      * there is, it stands, because then nobody really did ask.
      */
-    const answered = states.filter((x) => x !== "unasked");
-    const kept = answered.length > 0 ? answered : states;
+    /*
+     * The dropping of rows nobody asked happens ONCE, upstream, in
+     * `latestScoredPerScenario` — and it drops `unestablished` too.
+     *
+     * It used to happen here as well, and only for `unasked`. Two carriers of
+     * one rule, covering different sets: the upstream one made this one
+     * redundant for `unasked` and this one never covered `unestablished`, so a
+     * bare `unestablished` row outvoted three answered attempts while the
+     * mutation guarding the rule survived — the gate said so on 2026-09-09.
+     * Whatever arrives here has already been decided; the worst of it is taken.
+     */
+    const kept = states;
     const RANK = ["wrong", "correct-without-its-evidence", "correct-but-unqualified",
       "unestablished", "unasked", "correct"];
     const worst = RANK.find((r) => kept.includes(r))
@@ -143,7 +168,7 @@ export function scenariosMeasured(root = ROOT) {
     const others = [...new Set(kept.filter((x) => x !== worst))].sort();
     const alsoSaid = state !== "correct" && others.length > 0 ? `; also ${others.join(", ")}` : "";
     const many = kept.length > 1 ? ` (${kept.length} attempts, worst kept${alsoSaid})` : "";
-    if (state === "correct") return green(`scenario-${n}`, `answered correctly in ${latest.file}${many}`);
+    if (state === "correct") return green(`scenario-${n}`, `answered correctly in ${recordFor(latest, n)}${many}`);
     /*
      * The scorer has its own third state and it must survive the journey here.
      *
@@ -154,9 +179,9 @@ export function scenariosMeasured(root = ROOT) {
      * file that refuses it.
      */
     if (state === "unestablished" || state === "unasked") {
-      return unknown(`scenario-${n}`, `not established in ${latest.file}${many}`, PAID);
+      return unknown(`scenario-${n}`, `not established in ${recordFor(latest, n)}${many}`, PAID);
     }
-    return red(`scenario-${n}`, `${state} in ${latest.file}${many}`);
+    return red(`scenario-${n}`, `${state} in ${recordFor(latest, n)}${many}`);
   });
 }
 
@@ -177,21 +202,171 @@ export function scenariosMeasured(root = ROOT) {
  * A record without `scored` is skipped rather than treated as an empty result:
  * absent is not the same as nothing was answered.
  */
-export function latestScored(runsDir) {
-  if (!existsSync(runsDir)) return { scored: null, why: "docs/runs does not exist" };
+/**
+ * For each scenario, the newest record that ESTABLISHED something about it.
+ *
+ * Built on latestScored's ordering — newest first by the date inside the record
+ * — and stops at the same unreadable record, for the same reason: a record that
+ * cannot be parsed has no date either, so nothing after it can be ordered.
+ */
+/** The scenario a scored key belongs to: `image-pull-failure#2` is one attempt at it. */
+function base(key) {
+  const i = key.indexOf("#");
+  return i === -1 ? key : key.slice(0, i);
+}
+
+export function latestScoredPerScenario(runsDir) {
+  const ordered = orderedRecords(runsDir);
+  if (ordered.unreadable !== undefined) {
+    return { scored: null, file: ordered.file, unreadable: ordered.unreadable, why: ordered.why };
+  }
+  const scored = {};
+  const from = {};
+  /*
+   * Two passes, because "asked and could not establish" and "never asked" are
+   * different answers and this project keeps them apart everywhere else.
+   *
+   * The first pass takes only ESTABLISHED verdicts, oldest first, so a newer
+   * real verdict overwrites an older one — that is a re-measurement. The second
+   * fills in `unasked` and `unestablished` ONLY where nothing established
+   * anything, so the record still says which of the two it was.
+   *
+   * The first version dropped them outright, and the branch downstream that
+   * tells a recorded `unestablished` from a scenario no record mentions became
+   * unreachable — the mutation guarding it survived, and the gate said so.
+   */
+  const fallback = {};
+  const fallbackFrom = {};
+  /*
+   * The unit a re-measurement replaces is the SCENARIO, not the attempt key.
+   *
+   * Written oldest-first, key by key, an older `alpha#2: wrong` survived beside
+   * a newer record that answered only `alpha#1` — so the worst-of rule reported
+   * the scenario wrong from an attempt the newest measurement never made, and
+   * attributed it to the newer file. Codex reproduced it on 2026-09-09.
+   *
+   * Newest first now: the first record that establishes ANYTHING for a scenario
+   * claims it whole, and older records say nothing more about it.
+   */
+  const claimed = new Set();
+  const fallbackClaimed = new Set();
+  for (const { f, rec } of ordered.records) {
+    const s = rec?.scored;
+    if (s === null || typeof s !== "object" || Array.isArray(s)) continue;
+    const here = new Set();
+    const hereFallback = new Set();
+    for (const [key, state] of Object.entries(s)) {
+      if (state === "unasked" || state === "unestablished") {
+        /*
+         * Claimed by SCENARIO, exactly as an established verdict is.
+         *
+         * Merged key by key, a newer record saying `alpha: unasked` sat beside
+         * an older record's `alpha#1` and `alpha#2`, and the reader reported
+         * "not established in new.json (3 attempts)" — three, counting the
+         * placeholder, and naming a file that holds only the placeholder while
+         * the attempts came from another. Codex, 2026-09-09.
+         */
+        if (!fallbackClaimed.has(base(key))) {
+          fallback[key] = state;
+          fallbackFrom[key] = f;
+          hereFallback.add(base(key));
+        }
+        continue;
+      }
+      if (claimed.has(base(key))) continue;
+      scored[key] = state;
+      from[key] = f;
+      here.add(base(key));
+    }
+    for (const scenario of here) claimed.add(scenario);
+    for (const scenario of hereFallback) fallbackClaimed.add(scenario);
+  }
+  /*
+   * A fallback row is dropped when ANY established verdict exists for the SAME
+   * SCENARIO — not merely under the same key.
+   *
+   * A repeated measurement writes `image-pull-failure#1`, `#2`, `#3`, while a
+   * part that did not ask writes the bare `image-pull-failure`. Matching on the
+   * exact key let the bare `unestablished` row survive beside three answered
+   * attempts, and the scenario then reported `unestablished`, citing the older
+   * file. Codex reproduced it on 2026-09-09. The rule this breaks is the one
+   * the mutation `an-unasked-row-outvoting-the-attempts` already names.
+   */
+  const answered = new Set(Object.keys(scored).map(base));
+  for (const [key, state] of Object.entries(fallback)) {
+    if (Object.prototype.hasOwnProperty.call(scored, key)) continue;
+    if (answered.has(base(key))) continue;
+    scored[key] = state;
+    from[key] = fallbackFrom[key];
+  }
+  if (Object.keys(scored).length === 0) {
+    return { scored: null, file: null, why: ordered.why ?? "no run record establishes any scenario" };
+  }
+  return { scored, file: null, from, why: null };
+}
+
+/**
+ * Every run record, newest first, or the one that could not be read.
+ *
+ * Factored out on 2026-09-07 so the ordering has ONE carrier: two readers with
+ * their own copy of "which record is newest" is the second-carrier defect, and
+ * this project has fixed it four times elsewhere today.
+ */
+/**
+ * Which record a scenario's verdict came from.
+ *
+ * Per-scenario now, because the run is bought in parts and no single record
+ * holds every scenario — so one filename for the whole answer would name the
+ * wrong file for most of it.
+ */
+function recordFor(latest, scenario) {
+  /*
+   * ANY attempt of the scenario names the file, not just the bare key or `#1`.
+   *
+   * A record whose only verdict was `alpha#2` won the scenario and then lost
+   * its filename, and the reader fell back to whatever `latest.file` held.
+   * Codex noticed it on 2026-09-09 while checking the whole-scenario rule.
+   */
+  const from = latest.from ?? {};
+  const key = Object.keys(from).find((k) => base(k) === scenario);
+  return (key === undefined ? undefined : from[key]) ?? latest.file ?? "a run record";
+}
+
+export function orderedRecords(runsDir) {
+  if (!existsSync(runsDir)) return { records: [], why: "docs/runs does not exist" };
   const names = readdirSync(runsDir).filter((f) => f.endsWith(".json"));
   const dated = names.map((f) => {
     let when = null;
     let unreadable;
+    let rec;
     try {
-      const w = JSON.parse(readFileSync(join(runsDir, f), "utf8"))?.when;
-      if (typeof w === "string" && w.length > 0) when = w;
+      rec = JSON.parse(readFileSync(join(runsDir, f), "utf8"));
+      /*
+       * A date, not any non-empty string.
+       *
+       * Records are ordered by comparing `when` as TEXT, so `"unknown"` sorted
+       * ahead of every real date and the record carrying it claimed a scenario
+       * from the newest measurement — a wrong attempt was replaced by an older
+       * correct one and readiness went green. Codex reproduced it on
+       * 2026-09-09. Anything that is not YYYY-MM-DD is treated as undated, and
+       * an undated record never outranks a dated one.
+       */
+      const w = rec?.when;
+      if (typeof w === "string" && /^\d{4}-\d{2}-\d{2}$/.test(w)) when = w;
     } catch (e) {
       // Carried, not swallowed. The comment here used to promise it was decided
       // below and below was `catch { continue; }`.
       unreadable = e instanceof Error ? e.message : String(e);
     }
-    return { f, when, unreadable };
+    /*
+     * The parsed record is KEPT. It used to be thrown away and every file read
+     * and parsed a second time below, outside any `catch` — so a record that
+     * changed or vanished between the two reads made readiness THROW instead of
+     * answering `unestablished`, and the mutation guarding the unreadable check
+     * killed its named test with a SyntaxError rather than with the assertion
+     * it names. Codex found both on 2026-09-09. One read, one parse, one answer.
+     */
+    return { f, when, unreadable, rec };
   });
   // Records with a date first, newest first; undated ones after, by name — an
   // undated record must never outrank a dated one it may well predate.
@@ -215,7 +390,25 @@ export function latestScored(runsDir) {
     if (a.when !== b.when) return 0;
     return a.f < b.f ? 1 : -1;
   });
-  const files = dated.map((d) => d.f);
+  const broken0 = dated.find((d) => d.unreadable !== undefined);
+  if (broken0 !== undefined) {
+    // `unreadable` names the FILE, and `why` says what went wrong. They were one
+    // field carrying the parse error, so a caller asking which file could not be
+    // read got a message instead of a name.
+    return { records: [], file: broken0.f, unreadable: broken0.f, detail: broken0.unreadable,
+      why: `${broken0.f} could not be read (${broken0.unreadable}), so which run is the newest, `
+        + "and what it scored, is unestablished" };
+  }
+  const records = dated.map((d) => ({ f: d.f, rec: d.rec }));
+  return { records, why: null };
+}
+
+/** The newest record that carries any machine-readable scores. */
+export function latestScored(runsDir) {
+  const ordered = orderedRecords(runsDir);
+  if (ordered.unreadable !== undefined) {
+    return { scored: null, file: ordered.file, unreadable: ordered.unreadable, why: ordered.why };
+  }
   /*
    * A record that cannot be READ is not a record that says nothing.
    *
@@ -225,35 +418,13 @@ export function latestScored(runsDir) {
    * with nothing anywhere admitting a file could not be read. The newest run
    * had scored one of them `wrong`.
    *
-   * An unreadable record now stops the search where it stands. Continuing past
-   * it would answer from a record that has been superseded by one nobody can
-   * read, which is the flattering direction.
+   * The check itself now lives ONCE, in `orderedRecords`, and the guard above
+   * carries its answer here. A second copy stood in this function until
+   * 2026-09-09: it read a list that no longer carried the field, so it could
+   * never fire, and the mutation that guards this rule was breaking DEAD CODE
+   * while the test kept passing. The gate said the mutation survived.
    */
-  /*
-   * Any unreadable record makes the whole answer unestablished, whatever its
-   * position in the sort.
-   *
-   * Not "stop when the walk reaches it": a record that cannot be parsed has no
-   * readable date either, so it cannot be placed in the order at all — and a
-   * newer result may be sitting inside it. Answering from the newest READABLE
-   * record would be asserting an ordering that was never established.
-   */
-  const broken = dated.find((d) => d.unreadable !== undefined);
-  if (broken !== undefined) {
-    return { scored: null, file: broken.f, unreadable: broken.f,
-      why: `${broken.f} could not be read (${broken.unreadable}), so which run is the newest, `
-        + "and what it scored, is unestablished" };
-  }
-
-  for (const f of files) {
-    let rec;
-    try {
-      rec = JSON.parse(readFileSync(join(runsDir, f), "utf8"));
-    } catch (e) {
-      return { scored: null, file: f, unreadable: f,
-        why: `${f} could not be read (${e instanceof Error ? e.message : String(e)}), `
-          + "so what the newest run scored is unestablished" };
-    }
+  for (const { f, rec } of ordered.records) {
     const scored = rec?.scored;
     /*
      * A record ANSWERS only if something in it was established.
@@ -272,7 +443,7 @@ export function latestScored(runsDir) {
     }
   }
   return { scored: null, file: null,
-    why: `no run record carries machine-readable scores (${files.length} record${files.length === 1 ? "" : "s"} read)` };
+    why: `no run record carries machine-readable scores (${ordered.records.length} record${ordered.records.length === 1 ? "" : "s"} read)` };
 }
 
 /**
