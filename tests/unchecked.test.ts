@@ -91,7 +91,20 @@ describe("a validator that could not run is not a validator that said no", () =>
       role: "system", text: "x", ts: "2026-09-04T10:40:00Z", incident_id: "INC-2026-0001",
     });
     expect(r.state).toBe("refused");
-    if (r.state === "refused") expect(String(r.reason)).toMatch(/invalid|check/i);
+    /*
+     * The REASON the validator gave, not the sentence this file writes.
+     *
+     * `reason` is a constant for both branches, so /invalid|check/ matched
+     * whether the validator said "invalid" or "unchecked" — and the whole point
+     * of this file is that "I could not run the check" is not "the check said
+     * no". Asserting on the errors is what tells them apart. A subagent found
+     * it on 2026-09-09.
+     */
+    if (r.state === "refused") {
+      expect(String(r.reason)).toMatch(/invalid|check/i);
+      expect(r.errors, "the reason the validator gave has to reach the caller")
+        .toEqual(["schema compilation failed: boom"]);
+    }
   });
 
   it("still works when the validator answers, or these prove nothing", () => {

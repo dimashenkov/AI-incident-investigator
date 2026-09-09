@@ -11,29 +11,67 @@ import { readFileSync } from "node:fs";
 // @ts-expect-error — plain .mjs, the same file node runs.
 import { chooseSource } from "../scripts/record-baseline.mjs";
 // @ts-expect-error - plain .mjs script, no types
-import { releaseMayProceed, gateFinished, reportIsFromThisRun, mayCreateWorkflow, DRIFT_CHECK_ID } from "../scripts/release.mjs";
+import { releaseMayProceed, gateFinished, reportIsFromThisRun, mayCreateWorkflow, DRIFT_CHECK_ID, stepFailed, exitCodeFor, RELEASE_ORDER, RELEASE_RUNNERS } from "../scripts/release.mjs";
 
 const SOURCE = readFileSync(new URL("../scripts/release.mjs", import.meta.url).pathname, "utf8");
 const PKG = JSON.parse(readFileSync(new URL("../package.json", import.meta.url).pathname, "utf8"));
 
 describe("releasing cannot skip the live check", () => {
   it("runs verify-deployment as part of the chain", () => {
-    expect(SOURCE).toContain("scripts/verify-deployment.mjs");
+    // From the order, not from the text: the string appears in the runner table
+    // whether or not the order ever reaches it.
+    expect(RELEASE_ORDER as string[]).toContain("verify-the-deployment");
+    expect(RELEASE_RUNNERS as string[]).toContain("verify-the-deployment");
   });
 
   it("verifies AFTER deploying, not before", () => {
-    // Verifying before deploying would check the previous deployment and call
-    // the new one released — the check would run and establish nothing.
-    expect(SOURCE.indexOf("await deploy()")).toBeLessThan(SOURCE.indexOf("scripts/verify-deployment.mjs"));
+    /*
+     * Verifying before deploying would check the previous deployment and call
+     * the new one released.
+     *
+     * This compared `indexOf("await deploy()")` with another index — and when
+     * the sequence became data, that literal stopped existing, so `indexOf`
+     * returned -1 and the comparison passed for a reason that had nothing to do
+     * with order. A text search decays the moment the text moves.
+     */
+    const order = RELEASE_ORDER as string[];
+    expect(order.indexOf("deploy")).toBeGreaterThanOrEqual(0);
+    expect(order.indexOf("deploy")).toBeLessThan(order.indexOf("verify-the-deployment"));
   });
 
   it("stops the chain on any non-zero step rather than carrying on", () => {
-    expect(SOURCE).toContain("release stopped at");
-    expect(SOURCE).toMatch(/process\.exit\(r\.status/);
+    /*
+     * This used to assert that two STRINGS appeared in the file. Both sit
+     * inside the branch they describe, so deleting the branch left them there
+     * and the test green — a subagent measured it on 2026-09-09. A predicate
+     * can be called; a substring cannot.
+     */
+    expect(stepFailed({ status: 0 }), "a step that exited clean did not fail").toBeNull();
+    expect(stepFailed({ status: 1 })).toBe("exit 1");
+    expect(stepFailed({ status: null, signal: "SIGKILL" }), "a killed step is a failed step").toBe("exit null");
+    expect(stepFailed({ error: new Error("ENOENT") })).toBe("ENOENT");
+    expect(stepFailed(undefined), "no result at all is not success").toMatch(/no result/);
+    // And a killed step leaves with 2 rather than with a status it does not have.
+    expect(exitCodeFor({ status: null })).toBe(2);
+    expect(exitCodeFor({ status: 3 })).toBe(3);
   });
 
   it("runs the gate before deploying anything", () => {
-    expect(SOURCE.indexOf("acceptance-gate.mjs")).toBeLessThan(SOURCE.indexOf("await deploy()"));
+    /*
+     * This used to compare where two strings appeared in the file, and
+     * `acceptance-gate.mjs` appears inside gateStep's own body — so the call
+     * could be deleted from the sequence and the test stayed green. The order
+     * is now data the test reads.
+     */
+    const order = RELEASE_ORDER as string[];
+    expect(order.indexOf("acceptance-gate"), "the gate is in the sequence at all")
+      .toBeGreaterThanOrEqual(0);
+    expect(order.indexOf("acceptance-gate")).toBeLessThan(order.indexOf("deploy"));
+    expect(order.indexOf("deploy")).toBeLessThan(order.indexOf("verify-the-deployment"));
+    expect(order.indexOf("verify-the-deployment")).toBeLessThan(order.indexOf("re-record-the-baseline"));
+    // Every step named in the order has something to run, and nothing is registered
+    // that the order never reaches.
+    expect([...(RELEASE_RUNNERS as string[])].sort()).toEqual([...order].sort());
   });
 
   it("is reachable as a declared script", () => {

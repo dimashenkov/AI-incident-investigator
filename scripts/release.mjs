@@ -42,12 +42,34 @@ const API = process.env.N8N_API_URL;
 const KEY = process.env.N8N_API_KEY;
 const WORKFLOW_ID = process.env.N8N_WORKFLOW_ID;
 
+/**
+ * Did this step fail? A reason to stop, or null.
+ *
+ * Split out because the test that claimed to check it asserted on STRINGS in
+ * this file — `release stopped at` and a regex — and both strings sit inside
+ * the branch, so deleting the branch left them there and the test green. A
+ * subagent measured it on 2026-09-09. A predicate can be called; a substring
+ * cannot.
+ */
+export function stepFailed(r) {
+  if (r === null || typeof r !== "object") return "the step produced no result at all";
+  if (r.error !== undefined && r.error !== null) return r.error.message ?? String(r.error);
+  if (r.status !== 0) return `exit ${r.status}`;
+  return null;
+}
+
+/** The exit code to leave with when a step failed; a killed step has none. */
+export function exitCodeFor(r) {
+  return r?.status === null || r?.status === undefined ? 2 : r.status;
+}
+
 function step(name, cmd, args) {
   process.stdout.write(`\n── ${name}\n`);
   const r = spawnSync(cmd, args, { cwd: ROOT, stdio: "inherit" });
-  if (r.error !== undefined || r.status !== 0) {
-    process.stdout.write(`\nrelease stopped at "${name}" (${r.error ? r.error.message : `exit ${r.status}`})\n`);
-    process.exit(r.status === null || r.status === undefined ? 2 : r.status);
+  const failed = stepFailed(r);
+  if (failed !== null) {
+    process.stdout.write(`\nrelease stopped at "${name}" (${failed})\n`);
+    process.exit(exitCodeFor(r));
   }
 }
 
@@ -292,18 +314,56 @@ async function deploy() {
   );
 }
 
+/**
+ * Every step of a release, in the order they must happen.
+ *
+ * Read by the tests, so an order this file no longer performs is an order the
+ * tests can see change.
+ */
+export const RELEASE_ORDER = [
+  "assemble-the-core",
+  "generate-the-workflow",
+  "acceptance-gate",
+  "deploy",
+  "verify-the-deployment",
+  "re-record-the-baseline",
+];
+
+const RUNNERS = {
+  "assemble-the-core": () => step("assemble the core", "node", ["scripts/build-core.mjs"]),
+  "generate-the-workflow": () => step("generate the workflow", "node", ["scripts/generate-workflow.mjs"]),
+  "acceptance-gate": () => gateStep(),
+  "deploy": () => deploy(),
+  "verify-the-deployment": () => step("verify the deployment", "node", ["scripts/verify-deployment.mjs"]),
+  "re-record-the-baseline": () => step("re-record the baseline", "node", ["scripts/record-baseline.mjs"]),
+};
+
+/** Which steps are registered, so a name in the order with no runner is visible. */
+export const RELEASE_RUNNERS = Object.keys(RUNNERS);
+
 async function main() {
   if (!API || !KEY) {
     process.stdout.write("N8N_API_URL and N8N_API_KEY must be set. Source ~/.config/ai-sre/n8n.env first.\n");
     process.exit(2);
   }
 
-  step("assemble the core", "node", ["scripts/build-core.mjs"]);
-  step("generate the workflow", "node", ["scripts/generate-workflow.mjs"]);
-  gateStep();
-  await deploy();
-  step("verify the deployment", "node", ["scripts/verify-deployment.mjs"]);
-  step("re-record the baseline", "node", ["scripts/record-baseline.mjs"]);
+  /*
+   * The order is DATA, so a test can read it.
+   *
+   * It used to be five calls in a row, and the tests asserted on where certain
+   * strings appeared in this file — so `gateStep()` could be deleted from the
+   * sequence while `acceptance-gate.mjs` still appeared earlier, inside the
+   * function's own body, and "runs the gate before deploying anything" stayed
+   * green. A subagent measured it on 2026-09-09.
+   */
+  for (const id of RELEASE_ORDER) {
+    const run = RUNNERS[id];
+    if (run === undefined) {
+      process.stdout.write(`\nrelease stopped: no step is registered for ${id}\n`);
+      process.exit(2);
+    }
+    await run();
+  }
   process.stdout.write(`\nreleased: the instance runs what this repository generates, and it was checked after deploying, not before.\n`);
 }
 

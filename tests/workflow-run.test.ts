@@ -11,6 +11,7 @@
  * "passes" because the answer was planted cannot happen.
  */
 import { describe, it, expect } from "vitest";
+import { readdirSync } from "node:fs";
 import type { Stub } from "./helpers/run-workflow.js";
 import { runCode, runScenario, STUB_AGENTS, envelope, runSetExpression, newHistory, NOT_AN_ENVELOPE } from "./helpers/run-workflow.js";
 // @ts-expect-error - plain .mjs script, no types
@@ -260,6 +261,102 @@ describe("the Set node that joins the answer back to the incident", () => {
     expect(runSetExpression(node, { choices: [{ message: { content: "\"just a string\"" } }] }, {}, "Record logs").reply).toBeNull();
   });
 
+  it("keeps an answer whose own text contains a fenced block", async () => {
+    /*
+     * The fence was searched for BEFORE the answer was parsed, so a fence
+     * appearing inside a JSON string value — a quoted log line, which is
+     * exactly what these agents are asked to cite — matched, the expression
+     * took the quoted fragment as the whole answer, and parsing it failed. A
+     * valid reply became null and the chain refused AFTER that agent was paid.
+     * Codex reproduced it against the committed expression on 2026-09-09.
+     */
+    const node = await collectNode("kubernetes");
+    const answer = {
+      agent: "kubernetes", status: "ok",
+      findings: [{
+        fact: "the event says: ```Readiness probe failed: HTTP probe failed with statuscode: 503```",
+        source_ref: "events[0].message",
+      }],
+      hypotheses: [], confidence: 0.4,
+    };
+    const out = runSetExpression(node, envelope(answer as unknown as Record<string, unknown>), {}, "Assemble");
+    expect(out.reply, "a fence inside the text is not the wrapper around it").toEqual(answer);
+  });
+
+  it("reads an answer that is fenced AND encoded as a string", async () => {
+    /*
+     * The string unwrap ran before the fence, so a fence whose contents are a
+     * JSON-encoded object parsed to a string, failed the plain-object test, and
+     * a paid answer became null. Codex reproduced it on 2026-09-09 against the
+     * expression as it stood after the previous fix — the fix that was written
+     * to close this class.
+     */
+    const node = await collectNode("kubernetes");
+    const answer = { agent: "kubernetes", status: "ok", findings: [], hypotheses: [], confidence: 0 };
+    const content = "```json\n" + JSON.stringify(JSON.stringify(answer)) + "\n```";
+    const out = runSetExpression(node, { choices: [{ message: { content } }] }, {}, "Assemble");
+    expect(out.reply, "one layer of encoding is unwrapped on both paths").toEqual(answer);
+  });
+
+  it("reads the first fenced block that is an answer, when the reply carries two", async () => {
+    /*
+     * Three versions of this expression, each wrong in a different direction,
+     * and each cost a paid answer:
+     *
+     *   lazy fence   -> closed on the first pair of backticks INSIDE a string
+     *                   value, truncating a reply that quoted a log line
+     *   greedy fence -> ran from the first opening fence to the last closing
+     *                   one, so a reply with TWO blocks captured the markers
+     *                   between them and parsed as nothing
+     *
+     * Codex found each in turn on 2026-09-09, one after the other fix. The
+     * answer is not a third regex: the blocks are walked, and the greedy span
+     * is only the last resort.
+     */
+    const node = await collectNode("logs");
+    const answer = { agent: "logs", status: "no_data", findings: [], hypotheses: [], confidence: 0 };
+    const fence = (body: string) => "```json\n" + body + "\n```";
+    /*
+     * Both orders, and the block that is NOT the answer is not an object.
+     *
+     * Answer first kills a greedy span that swallows the markers between the
+     * two. Answer SECOND kills a reader that tries only one block. The other
+     * block is prose rather than `{}` on purpose: `{}` IS a plain object, and
+     * asking the expression to pass over it would be asking it to judge which
+     * object is the answer — that is validation, and it belongs to the node
+     * after this one.
+     */
+    for (const content of [
+      fence(JSON.stringify(answer)) + "\n\nand here is the shape I used:\n\n" + fence("agent, status, findings"),
+      "here is the shape I used:\n\n" + fence("agent, status, findings") + "\n\n" + fence(JSON.stringify(answer)),
+    ]) {
+      const out = runSetExpression(node, { choices: [{ message: { content } }] }, {}, "Record kubernetes");
+      expect(out.reply, `two blocks must not swallow each other: ${content.slice(0, 40)}`).toEqual(answer);
+    }
+  });
+
+  it("still recovers an answer whose own strings contain backticks, even when fenced", async () => {
+    // The case the greedy span exists for, kept working beside the walk above.
+    const node = await collectNode("kubernetes");
+    const answer = {
+      agent: "kubernetes", status: "ok",
+      findings: [{ fact: "the event says ```probe failed```", source_ref: "events[0].message" }],
+      hypotheses: [], confidence: 0.3,
+    };
+    const content = "```json\n" + JSON.stringify(answer) + "\n```";
+    const out = runSetExpression(node, { choices: [{ message: { content } }] }, {}, "Assemble");
+    expect(out.reply, "an inner pair of backticks does not close the fence").toEqual(answer);
+  });
+
+  it("still unwraps a fence that really does wrap the whole answer", async () => {
+    // The other half: a model that fences its reply must still be read.
+    const node = await collectNode("kubernetes");
+    const answer = { agent: "kubernetes", status: "ok", findings: [], hypotheses: [], confidence: 0 };
+    const fenced = "```json\n" + JSON.stringify(answer) + "\n```";
+    const out = runSetExpression(node, { choices: [{ message: { content: fenced } }] }, {}, "Assemble");
+    expect(out.reply).toEqual(answer);
+  });
+
   it("turns an unparseable answer into null rather than throwing inside n8n", async () => {
     // A throwing expression stops the workflow with an n8n error, which is a
     // different and much worse report than "the agent returned nothing".
@@ -465,4 +562,71 @@ describe("the harness refuses rather than assuming", () => {
       throw new Error(`the expression reaches for ${name}, which has not run in this execution`);
     })).toThrow(/has not run in this execution/);
   });
+});
+
+/*
+ * Every scenario, through the GENERATED nodes.
+ *
+ * Three of the eight had ever travelled the deployed code; the other five were
+ * exercised only by tests/full-run.test.ts, which imports the local modules. So
+ * a paid run on five of eight scenarios would have been the first time that
+ * node code ran on them — measured by a subagent on 2026-09-09, and the exact
+ * shape this project keeps finding: a harness standing in for the thing.
+ */
+describe("the Assemble node decides a skip the same way the Record node does", () => {
+  it("asks both conditions in both carriers, so one cannot be taught and the other left behind", async () => {
+    /*
+     * One rule, two carriers. The Record node was taught on 2026-09-07 to ask
+     * BOTH whether the collection record declares an absence and whether the
+     * context was refused for an empty slot; the Assemble node was left asking
+     * only the first, so a kubernetes slot carrying somebody else's incident id
+     * would have printed "the provider reported an established absence" and the
+     * chain would have carried on. A subagent found the second carrier on
+     * 2026-09-09.
+     *
+     * Asserted against the generated code rather than through a run, and that
+     * is a limitation stated rather than hidden: the Assemble node builds the
+     * incident itself from the scenario name, so nothing can hand it a
+     * contaminated one. The branch is unreachable today because kubernetes is
+     * collected in all eight shipped scenarios — a fixture, not a guarantee.
+     * What IS checkable is that the two carriers ask the same question.
+     */
+    const { workflow } = await generate();
+    const codeOf = (name: string) => {
+      const n = workflow.nodes.find((x: { name: string }) => x.name === name);
+      expect(n, `${name} is not in the generated workflow`).toBeDefined();
+      return (n!.parameters as { jsCode: string }).jsCode;
+    };
+    for (const name of ["Assemble", "Record kubernetes", "Record logs", "Record metrics"]) {
+      const code = codeOf(name);
+      const skips = code.includes("established absence");
+      if (!skips) continue;
+      expect(code, `${name} decides a skip from the record alone, without asking why the context was refused`)
+        .toMatch(/state === "nothing" && [\w.]*why === "empty-slot"/);
+    }
+  });
+});
+
+describe("every scenario travels the generated workflow at least once", () => {
+  const ALL = readdirSync(new URL("../scenarios/", import.meta.url).pathname, { withFileTypes: true })
+    .filter((e) => e.isDirectory()).map((e) => e.name).sort();
+
+  it("has scenarios to run at all", () => {
+    expect(ALL.length, "no scenarios; every test below would pass on nothing").toBeGreaterThan(3);
+  });
+
+  for (const scenario of ALL) {
+    it(`assembles, asks and concludes ${scenario} through the deployed nodes`, async () => {
+      const r = await runScenario(scenario);
+      /*
+       * The STUB answers are fixed, so this says nothing about whether a model
+       * would answer well. What it establishes is that the node code — assemble,
+       * the four gates, the four Collect expressions, the four Record nodes,
+       * Conclude and Report — runs end to end on this incident without throwing
+       * and without refusing for a structural reason.
+       */
+      expect(r.state, r.state === "refused" ? String(r.reason) : "").toBe("concluded");
+      expect(typeof r.incident, "the concluded incident comes back").toBe("object");
+    });
+  }
 });

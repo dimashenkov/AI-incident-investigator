@@ -158,10 +158,21 @@ function collectNode(agent, from, position) {
         + ` var m = Array.isArray(c) && c.length > 0 && c[0] ? c[0].message : null;`
         + ` var t = m ? m.content : null;`
         + ` if (typeof t !== 'string') return null;`
-        + ` var f = t.match(/\`\`\`(?:json)?\\s*([\\s\\S]*?)\`\`\`/);`
-        + ` if (f) t = f[1];`
-        + ` var o; try { o = JSON.parse(t); } catch (e) { return null; }`
-        + ` if (o === null || typeof o !== 'object' || Array.isArray(o)) return null;`
+        + ` var plain = function (v) { return v !== null && typeof v === 'object' && !Array.isArray(v); };`
+        + ` var read = function (x) { try { return JSON.parse(x); } catch (e) { return undefined; } };`
+        + ` var o = read(t);`
+        + ` if (typeof o === 'string') { var inner = read(o); if (plain(inner)) o = inner; else t = o; }`
+        + ` var asObject = function (x) {`
+        + `   var v = read(x);`
+        + `   if (typeof v === 'string') { var i2 = read(v); return plain(i2) ? i2 : undefined; }`
+        + `   return plain(v) ? v : undefined;`
+        + ` };`
+        + ` if (!plain(o)) {`
+        + `   var re = /\`\`\`(?:json)?\\s*([\\s\\S]*?)\`\`\`/g, m1, got;`
+        + `   while ((m1 = re.exec(t)) !== null) { got = asObject(m1[1]); if (got) { o = got; break; } }`
+        + `   if (!plain(o)) { var g = t.match(/\`\`\`(?:json)?\\s*([\\s\\S]*)\`\`\`/); if (g) { got = asObject(g[1]); if (got) o = got; } }`
+        + ` }`
+        + ` if (!plain(o)) return null;`
         // One key whose value is an object is never an agent result — a valid
         // one carries five. So the wrapper can be unwrapped without asking
         // whether the thing inside looks like a result: that question was a

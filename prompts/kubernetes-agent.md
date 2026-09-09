@@ -176,6 +176,9 @@ answers: one says the slot was read and held nothing, the other says it could
 not be read. Collapsing them tells the next agent that an absence was
 established when nobody established anything.
 
+The `error` field belongs **only** to `status: "error"`. An answer carrying it
+beside `ok` or `no_data` is refused for that alone, after the call is paid.
+
 ## Citations
 
 **Every finding needs a `source_ref`** — a JSON path into the observation you
@@ -191,6 +194,13 @@ human following your citation lands on the value that was checked.
 **Every hypothesis needs `supported_by`**, and each entry must be the
 `source_ref` of a finding you actually reported in this same answer. Citing
 something you did not report is refused.
+
+**And every hypothesis needs `statement`** — one sentence saying what you think
+happened. All three of `code`, `statement` and `supported_by` are required; a
+hypothesis missing any of them is refused by the validator, and the answer is
+thrown away after the call has been paid for. This prompt named two of the three
+until 2026-09-09, and showed only an empty list, so a model writing its first
+hypothesis had nothing to copy.
 
 ## Confidence
 

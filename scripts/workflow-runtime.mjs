@@ -252,8 +252,21 @@ return items.map(function (item, index) {
     return { json: { index, state: "asking", agent: "kubernetes", scenario: scenario,
       incident: incident, prompt: ctx.prompt, payload: ctx.payload } };
   }
+  /*
+   * The same two conditions the Record node asks, because it is the same rule.
+   *
+   * This half was left asking only whether the RECORD declares an absence, so a
+   * context refused for CONTAMINATION — a slot carrying somebody else's
+   * incident — would have printed "the provider reported an established
+   * absence" and let the chain carry on. The Record node was fixed on
+   * 2026-09-07 and this one was not: one rule, two carriers, and the second
+   * found by a subagent on 2026-09-09.
+   *
+   * Unreachable today only because kubernetes is collected in all eight
+   * shipped scenarios — which is a fixture, not a guarantee.
+   */
   const kubeRecord = (incident.collection || {})["kubernetes"] || {};
-  if (kubeRecord.state === "nothing") {
+  if (kubeRecord.state === "nothing" && ctx.why === "empty-slot") {
     return { json: { index, state: "skipped", agent: "kubernetes", scenario: scenario,
       incident: incident, skipped_because: "kubernetes had nothing to read: the provider reported an established absence" } };
   }

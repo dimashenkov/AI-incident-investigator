@@ -73,7 +73,7 @@ export const MUTATIONS = [
     id: "common-schema-grows-an-assertion",
     file: "schemas/common.schema.json",
     from: '"title": "Shared definitions",',
-    to: '"title": "Shared definitions",\n  "const": 1,',
+    to: '"title": "Shared definitions, mutated",\n  "const": 1,',
     mustFail: "keeps common.schema.json free of anything anyone would validate against",
   },
   {
@@ -152,8 +152,8 @@ export const MUTATIONS = [
     // proves the same nothing the gate proves, and drift lives on indefinitely.
     id: "release-skips-the-live-check",
     file: "scripts/release.mjs",
-    from: '  step("verify the deployment", "node", ["scripts/verify-deployment.mjs"]);',
-    to: "  // skipped",
+    from: '  "verify-the-deployment",\n  "re-record-the-baseline",',
+    to: '  "re-record-the-baseline",',
     mustFail: "runs verify-deployment as part of the chain",
   },
   {
@@ -424,8 +424,8 @@ export const MUTATIONS = [
     // refusal that says which agent produced nothing.
     id: "collect-throws-instead-of-returning-null",
     file: "scripts/generate-workflow.mjs",
-    from: "        + ` var o; try { o = JSON.parse(t); } catch (e) { return null; }`",
-    to: "        + ` var o = JSON.parse(t);`",
+    from: "        + ` var read = function (x) { try { return JSON.parse(x); } catch (e) { return undefined; } };`",
+    to: "        + ` var read = function (x) { return JSON.parse(x); };`",
     mustFail: "turns an unparseable answer into null rather than throwing inside n8n",
   },
   {
@@ -572,7 +572,7 @@ export const MUTATIONS = [
     // scenario recorded as unestablished became FAILED.
     id: "recorded-unestablished-read-as-failure",
     file: "scripts/readiness.mjs",
-    from: '    if (state === "unestablished") {\n      return unknown(`scenario-${n}`, `not established in ${latest.file}${many}`, PAID);\n    }',
+    from: '    if (state === "unestablished" || state === "unasked") {\n      return unknown(`scenario-${n}`, `not established in ${latest.file}${many}`, PAID);\n    }',
     to: "    if (false) {\n      return unknown(`scenario-${n}`, `x`, PAID);\n    }",
     mustFail: "keeps the scorer's own unestablished state instead of calling it a failure",
   },
@@ -667,8 +667,8 @@ export const MUTATIONS = [
   {
     id: "insufficient-evidence-offered-as-the-safe-default",
     file: "prompts/root-cause-agent.md",
-    from: "**Not enough to tell is a real answer, for one situation only.** Use",
-    to: "**Not enough to tell is a real answer, and it is the safe one.** When in doubt return no hypotheses. Use",
+    from: "**Not enough to tell is a real answer, for one situation only.** That situation",
+    to: "**Not enough to tell is a real answer, and it is the safe one.** When in doubt return no hypotheses. That situation",
     mustFail: "keeps insufficient evidence a narrow answer, not the safe default",
   },
   {
@@ -720,7 +720,7 @@ export const MUTATIONS = [
     // the strength of a record that answered nothing.
     id: "empty-scores-counted-as-a-scored-run",
     file: "scripts/acceptance-gate.mjs",
-    from: "      if (scored !== null && typeof scored === \"object\" && !Array.isArray(scored)\n        && Object.keys(scored).length > 0) return true;",
+    from: "      if (scored !== null && typeof scored === \"object\" && !Array.isArray(scored)\n        && Object.values(scored).some((v) => v !== \"unasked\" && v !== \"unestablished\")) return true;",
     to: "      if (scored !== undefined) return true;",
     mustFail: "treats a run record with no machine-readable scores as no scored run",
   },
@@ -1148,8 +1148,8 @@ export const MUTATIONS = [
     // by a run in which the confidence went UP.
     id: "a-refusal-held-as-firmly-as-a-conclusion",
     file: "scripts/score-run.mjs",
-    from: "  if (want.maxConfidence !== null && refused) {",
-    to: "  if (false) {",
+    from: "    if (ceiling !== null) scoreRefusalCeiling(answer, ceiling, unqualified);",
+    to: "    if (false) scoreRefusalCeiling(answer, ceiling, unqualified);",
     mustFail: "refuses a refusal that is held as firmly as a conclusion",
   },
   {
@@ -1183,25 +1183,411 @@ export const MUTATIONS = [
     // a fix — which is the thing repeating a measurement exists to refuse.
     id: "the-best-attempt-decides",
     file: "scripts/readiness.mjs",
-    from: '    const worst = states.includes("wrong") ? "wrong"',
-    to: '    const worst = states.includes("correct") ? "correct"',
+    from: "    const worst = RANK.find((r) => kept.includes(r))",
+    to: '    const worst = kept.includes("correct") ? "correct" : RANK.find((r) => kept.includes(r))',
     mustFail: "lets the worst attempt decide, so two of three is not a fix",
   },
   {
     // A citation invented one level below a real path, counted as evidence.
     id: "an-invented-path-counted-as-a-citation",
     file: "scripts/score-run.mjs",
-    from: "  const canResolve = hasObservations(answer);",
-    to: "  const canResolve = false;",
+    from: "  const cited = citedRefs(answer).filter((c) => resolvesForAgent(answer, c)).map((c) => c.ref);",
+    to: "  const cited = citedRefs(answer).map((c) => c.ref);",
     mustFail: "refuses a path invented one level below a real one",
+  },
+  {
+    // The gate's "could not establish" read as "failed", in the file whose
+    // header refuses exactly that.
+    id: "gate-exit-two-read-as-failure",
+    file: "scripts/readiness.mjs",
+    from: "    if (r.exitCode === 2) {",
+    to: "    if (false) {",
+    mustFail: "keeps the gate's four exit codes apart instead of folding them into two",
+  },
+  {
+    // A run that established nothing, counted by the gate as a measurement.
+    id: "a-run-that-established-nothing-counted-as-scored",
+    file: "scripts/acceptance-gate.mjs",
+    from: '        && Object.values(scored).some((v) => v !== "unasked" && v !== "unestablished")) return true;',
+    to: "        && Object.keys(scored).length > 0) return true;",
+    mustFail: "treats a run record with no machine-readable scores as no scored run",
+  },
+  {
+    // A record that carries no verdicts, taken as the answer — so the run that
+    // DID score is replaced by the one that has not been scored yet.
+    id: "a-record-with-no-verdicts-taken-as-the-answer",
+    file: "scripts/readiness.mjs",
+    from: "    if (scored !== null && typeof scored === \"object\" && !Array.isArray(scored)\n      && Object.values(scored).some((v) => v !== \"unasked\" && v !== \"unestablished\")) {",
+    to: "    if (scored !== null && typeof scored === \"object\" && !Array.isArray(scored)\n      && Object.keys(scored).length > 0) {",
+    mustFail: "walks past a record that carries no verdicts to one that does",
+  },
+  {
+    // A file truncated in place, so a kill leaves half of it — and the file is
+    // the record of money already spent.
+    id: "a-record-truncated-in-place",
+    file: "scripts/run-scenarios.mjs",
+    from: "  renameSync(tmp, path);",
+    to: "  writeFileSync(path, text);",
+    mustFail: "leaves either the old file or the new one, never half of one",
+  },
+  {
+    // One wrong address buying the whole list.
+    id: "one-wrong-address-buying-the-whole-list",
+    file: "scripts/run-scenarios.mjs",
+    from: "  if (m === null) return true;                 // no reply at all: DNS, refused, redirect, timeout",
+    to: "  if (m === null) return false;",
+    mustFail: "stops the line when the failure is about the address, not the scenario",
+  },
+  {
+    // A timeout overwriting the one state that says a charge may exist.
+    id: "a-timeout-overwriting-may-have-been-charged",
+    file: "scripts/run-scenarios.mjs",
+    from: "  if (m === null) return true;\n  const code = Number(m[1]);\n  return !(code === 401 || code === 403 || code === 404 || code === 405);",
+    to: "  if (m === null) return true;\n  const code = Number(m[1]);\n  return false;",
+    mustFail: "keeps a timeout saying the call may have been charged",
+  },
+  {
+    // A write that failed, and the call made anyway — a charge with no evidence.
+    id: "a-failed-write-that-does-not-stop-the-call",
+    file: "scripts/run-scenarios.mjs",
+    from: "    if (!flush()) {",
+    to: "    if (false) {",
+    mustFail: "does not call anything when it cannot write what a call would produce",
+  },
+  {
+    // The record written before the answer it describes, reopening the
+    // duplicate-charge window the order was meant to close.
+    id: "the-record-written-before-the-answer",
+    file: "scripts/run-scenarios.mjs",
+    from: '  return answersFirst ? ["answers", "record"] : ["record", "answers"];',
+    to: '  return ["record", "answers"];',
+    mustFail: "writes the cautious half first, and which half that is depends on the direction",
+  },
+  {
+    // One scratch name shared by every write, so two runs at once lose bodies
+    // that were paid for.
+    id: "the-restart-scan-that-misses-a-custom-record-path",
+    file: "scripts/run-scenarios.mjs",
+    from: "    ...inFlightFromRecords(dirname(recordAt)),\n  ]);",
+    to: "  ]);",
+    mustFail: "refuses a key an earlier run may have paid for, wherever that run's record was written",
+  },
+  {
+    id: "one-scratch-name-for-every-write",
+    file: "scripts/run-scenarios.mjs",
+    from: "  return `${path}.${pid}.${tmpCounter += 1}.tmp`;",
+    to: "  return `${path}.tmp`;",
+    mustFail: "gives each write its own scratch name",
+  },
+  {
+    // A call that produced no answer, and the rest of the list bought anyway.
+    id: "a-failed-call-that-does-not-stop-the-list",
+    file: "scripts/run-scenarios.mjs",
+    from: '    if (r.state !== "answered") {',
+    to: "    if (false) {",
+    mustFail: "stops after a call that produced no answer, and does not buy the rest",
+  },
+  {
+    // Evidence that a charge may exist, which nothing reads.
+    id: "in-flight-evidence-nobody-reads",
+    file: "scripts/run-scenarios.mjs",
+    from: '      if (typeof v === "string" && v.startsWith("called,")) out.set(k, f);',
+    to: "      if (false) out.set(k, f);",
+    mustFail: "finds keys an earlier record says were called with no reply",
+  },
+  {
+    // A key an earlier run may already have paid for, bought again.
+    id: "an-in-flight-key-bought-again",
+    file: "scripts/run-scenarios.mjs",
+    from: "  const unresolved = keys.filter((k) => inFlight.has(k));",
+    to: "  const unresolved = [];",
+    mustFail: "finds keys an earlier record says were called with no reply",
+  },
+  {
+    // Two names for one inode, compared as strings.
+    id: "two-names-for-one-inode-compared-as-strings",
+    file: "scripts/run-scenarios.mjs",
+    from: "      try { return join(real(at), ...tail); } catch { /* not there yet; go up */ }",
+    to: "      try { return join(at, ...tail); } catch { /* not there yet; go up */ }",
+    mustFail: "sees two names for one file even when neither exists yet",
+  },
+  {
+    // The record written over the answers, so a paid run keeps nothing.
+    id: "the-record-written-over-the-answers",
+    file: "scripts/run-scenarios.mjs",
+    from: "  if (settled(answersAt) === settled(recordAt)) {",
+    to: "  if (false) {",
+    mustFail: "refuses to write the record over the answers",
+  },
+  {
+    // A redirect replaying a POST that has already been paid for.
+    id: "a-redirect-replaying-a-paid-post",
+    file: "scripts/run-scenarios.mjs",
+    from: '      redirect: "error",',
+    to: '      redirect: "follow",',
+    mustFail: "does not follow a redirect, because following it POSTs again",
+  },
+  {
+    // A charged call whose reply is dropped, leaving no evidence of the charge.
+    id: "a-charged-call-whose-body-is-dropped",
+    file: "scripts/run-scenarios.mjs",
+    from: '      return { state: "unreachable", why: `HTTP ${res.status}`, body: text.slice(0, 500) };',
+    to: '      return { state: "unreachable", why: `HTTP ${res.status}` };',
+    mustFail: "keeps the body of a reply it could not use, because that call may have been charged",
+  },
+  {
+    // A flag's value bought as if it were a scenario to run.
+    id: "a-flag-value-bought-as-a-run",
+    file: "scripts/run-scenarios.mjs",
+    from: '    if (VALUED_FLAGS.includes(a)) { flags[a] = argv[i + 1] ?? null; i += 1; continue; }',
+    to: '    if (false) { flags[a] = argv[i + 1] ?? null; i += 1; continue; }',
+    mustFail: "does not buy the value of a flag as if it were a scenario",
+  },
+  {
+    // One key named twice: two payments, one answer kept.
+    id: "one-key-named-twice-paid-twice",
+    file: "scripts/run-scenarios.mjs",
+    from: "    if (seen.has(k)) {",
+    to: "    if (false) {",
+    mustFail: "refuses a key named twice, before anything is called",
+  },
+  {
+    // Paying again for a key the answers file already answers, then throwing
+    // the new body away.
+    id: "paying-again-for-an-answer-already-held",
+    file: "scripts/run-scenarios.mjs",
+    from: "  if (already.length > 0) {",
+    to: "  if (false) {",
+    mustFail: "refuses a key the answers file already answers, before anything is called",
+  },
+  {
+    // A run record written over an earlier run's record.
+    id: "a-run-record-written-over-another",
+    file: "scripts/run-scenarios.mjs",
+    from: "  if (!exists(resolve(base))) return resolve(base);",
+    to: "  if (true) return resolve(base);",
+    mustFail: "never writes a run record over another run's record",
+  },
+  {
+    // A transport failure recorded as the model's answer.
+    id: "an-http-error-recorded-as-an-answer",
+    file: "scripts/run-scenarios.mjs",
+    from: "    if (!res.ok) {\n      return { state: \"unreachable\", why: `HTTP ${res.status}`, body: text.slice(0, 500) };\n    }",
+    to: "    if (false) {\n      return { state: \"unreachable\", why: `HTTP ${res.status}`, body: text.slice(0, 500) };\n    }",
+    mustFail: "never turns a transport failure into an answer",
+  },
+  {
+    // An answer that was paid for, overwritten by a later part.
+    id: "a-paid-answer-overwritten-by-a-later-part",
+    file: "scripts/run-scenarios.mjs",
+    from: "    if (Object.prototype.hasOwnProperty.call(out, key)) { refused.push(key); continue; }",
+    to: "    if (false) { refused.push(key); continue; }",
+    mustFail: "does not overwrite an answer that was already paid for",
+  },
+  {
+    // Token counts nobody read, written as zero.
+    id: "unread-token-counts-written-as-zero",
+    file: "scripts/run-scenarios.mjs",
+    from: "      input_tokens: null,\n      output_tokens: null,",
+    to: "      input_tokens: 0,\n      output_tokens: 0,",
+    mustFail: "writes the token counts as unestablished rather than as zero",
+  },
+  {
+    // A stale line in a file, replacing the instance somebody chose.
+    id: "the-env-file-overriding-a-chosen-value",
+    file: "scripts/run-scenarios.mjs",
+    from: "    if (env[key] !== undefined) continue;",
+    to: "    if (false) continue;",
+    mustFail: "lets the environment win over the file, and ignores lines that are not settings",
+  },
+  {
+    // A value deliberately blanked, refilled from the file — so the run goes to
+    // whatever instance the file still names.
+    id: "a-blanked-value-refilled-from-the-file",
+    file: "scripts/run-scenarios.mjs",
+    from: "    if (env[key] !== undefined) continue;\n    env[key] = value;",
+    to: '    if (env[key] !== undefined && env[key] !== "") continue;\n    env[key] = value;',
+    mustFail: "treats a value deliberately blanked in the environment as chosen",
+  },
+  {
+    // Nobody asking, written as if it had been asked and settled nothing — so a
+    // later part's bare row overwrites an earlier part's verdict.
+    id: "unasked-collapsed-into-unestablished",
+    file: "scripts/score-run.mjs",
+    from: '    return { scenario, state: "unasked", why: "no answer was recorded", expected: want.code };',
+    to: '    return { scenario, state: "unestablished", why: "no answer was recorded", expected: want.code };',
+    mustFail: "carries six correct attempts through three parts without losing one",
+  },
+  {
+    // A row saying nobody asked, counted against the attempts that answered.
+    id: "an-unasked-row-outvoting-the-attempts",
+    file: "scripts/readiness.mjs",
+    from: '    const answered = states.filter((x) => x !== "unasked");',
+    to: "    const answered = states;",
+    mustFail: "does not let a row saying nobody asked outvote the attempts that answered",
+  },
+  {
+    // A later part writing less than the record already says.
+    id: "a-later-part-lowering-what-a-key-says",
+    file: "scripts/score-run.mjs",
+    from: "    const arriving = results.filter((r) => says(r.state) >= says(before[r.scenario]));",
+    to: "    const arriving = results;",
+    mustFail: "fills keys the record does not answer yet, and leaves the rest standing",
+  },
+  {
+    // A scenario answered only under attempt keys, still printed unestablished
+    // beside its own successful attempts — a clean run reported half unasked.
+    id: "a-synthetic-row-beside-the-attempts-that-answered-it",
+    file: "scripts/score-run.mjs",
+    from: "    .filter((s) => Object.prototype.hasOwnProperty.call(answers ?? {}, s) || !attempted.has(s))",
+    to: "    .filter(() => true)",
+    mustFail: "does not report a scenario unestablished when its attempts answered it",
+  },
+  {
+    // One agent credited with what another one saw.
+    id: "a-citation-resolved-in-another-agents-slot",
+    file: "scripts/score-run.mjs",
+    from: "  if (SCORE_SLOTS.includes(cited.agent)) {",
+    to: "  if (false) {",
+    mustFail: "refuses a citation that resolves only in another agent's slot",
+  },
+  {
+    // "I could not look" folded into "clean", on the branch added to keep them
+    // apart.
+    id: "an-answer-with-no-observation-scored-correct",
+    file: "scripts/score-run.mjs",
+    from: "  if (want.mustCite.length > 0 && !hasObservations(answer)) {",
+    to: "  if (false) {",
+    mustFail: "calls an answer carrying no observation unestablished, not correct",
+  },
+  {
+    // Dissent written by someone who asked no source.
+    id: "dissent-from-a-source-that-never-answered",
+    file: "scripts/score-run.mjs",
+    from: "      && answered.has(e.source));",
+    to: "      && true);",
+    mustFail: "does not accept dissent from a source that never answered",
+  },
+  {
+    // The reason a scenario is red, decided by the order its attempts sit in.
+    id: "the-worst-attempt-picked-by-insertion-order",
+    file: "scripts/readiness.mjs",
+    from: '    const RANK = ["wrong", "correct-without-its-evidence", "correct-but-unqualified",',
+    to: '    const RANK = ["wrong", "correct-but-unqualified", "correct-without-its-evidence",',
+    mustFail: "names the worst attempt by rank, not by the order they arrived",
   },
   {
     // A refusal whose confidence is a string or Infinity, slipping past the
     // ceiling in silence — the null > 0.6 shape, written a second time.
+    id: "the-unchecked-reason-that-never-reaches-the-caller",
+    file: "src/core/thread.ts",
+    from: 'errors: r.state === "invalid" ? r.errors : [r.reason]',
+    to: 'errors: r.state === "invalid" ? r.errors : []',
+    mustFail: "refuses to write a thread message it could not check",
+  },
+  {
+    id: "only-one-fenced-block-ever-tried",
+    file: "scripts/generate-workflow.mjs",
+    from: "        + `   while ((m1 = re.exec(t)) !== null) { got = asObject(m1[1]); if (got) { o = got; break; } }`",
+    to: "        + `   m1 = re.exec(t); if (m1) { got = asObject(m1[1]); if (got) o = got; }`",
+    mustFail: "reads the first fenced block that is an answer, when the reply carries two",
+  },
+  {
+    id: "a-fenced-encoded-answer-thrown-away",
+    file: "scripts/generate-workflow.mjs",
+    from: "        + `   if (typeof v === 'string') { var i2 = read(v); return plain(i2) ? i2 : undefined; }`",
+    to: "        + `   if (typeof v === 'string') { return undefined; }`",
+    mustFail: "reads an answer that is fenced AND encoded as a string",
+  },
+  {
+    id: "a-fence-searched-for-before-the-answer-is-parsed",
+    file: "scripts/generate-workflow.mjs",
+    from: "        + ` var o = read(t);`",
+    to: "        + ` var f0 = t.match(/\\`\\`\\`(?:json)?\\\\s*([\\\\s\\\\S]*?)\\`\\`\\`/); if (f0) t = f0[1]; var o = read(t);`",
+    mustFail: "keeps an answer whose own text contains a fenced block",
+  },
+  {
+    id: "a-low-confidence-where-the-schema-wants-zero",
+    file: "prompts/root-cause-agent.md",
+    from: "evidence does not support a cause, return **no hypotheses at all** and\n`confidence: 0`.",
+    to: "evidence does not support a cause, return **no hypotheses at all**, with your\nfindings and a low confidence.",
+    mustFail: "asks for the confidence the schema requires when nothing was concluded",
+  },
+  {
+    id: "error-asked-for-in-every-answer",
+    file: "prompts/logs-agent.md",
+    from: "`error` is the exception: it belongs **only**\nto `status: \"error\"`, and an answer that carries it beside `ok` or `no_data` is\nrefused for that alone.",
+    to: "All of them, including `error`, are required in every answer.",
+    mustFail: "does not let a prompt ask for `error` in every answer",
+  },
+  {
+    id: "a-hypothesis-field-the-prompt-never-names",
+    file: "prompts/kubernetes-agent.md",
+    from: "**And every hypothesis needs `statement`** — one sentence saying what you think\nhappened. All three of `code`, `statement` and `supported_by` are required;",
+    to: "**And every hypothesis needs a sentence** saying what you think happened.\nBoth of `code` and `supported_by` are required;",
+    mustFail: "names every field a hypothesis must carry, in every prompt that permits one",
+  },
+  {
+    id: "the-prompt-telling-the-model-to-use-the-forbidden-code",
+    file: "prompts/root-cause-agent.md",
+    from: "That situation\nis the findings pointing nowhere",
+    to: "Use `INSUFFICIENT_EVIDENCE` when the findings point nowhere",
+    mustFail: "never tells the model to USE the one code no field can carry",
+  },
+  {
+    id: "the-paid-request-built-without-the-prompt",
+    file: "scripts/generate-workflow.mjs",
+    from: "\"{ role: 'system', content: $json.prompt }, \"",
+    to: "\"{ role: 'system', content: $json.prompt || '' }, \"",
+    mustFail: "produces a body with a null message rather than a valid one when the prompt is missing",
+  },
+  {
+    id: "the-payload-sent-as-an-object",
+    file: "scripts/generate-workflow.mjs",
+    from: "\"{ role: 'user', content: JSON.stringify($json.payload) } ] }) }}\"",
+    to: "\"{ role: 'user', content: $json.payload } ] }) }}\"",
+    mustFail: "sends the payload as a string, not as an object",
+  },
+  {
+    id: "assemble-skipping-a-contaminated-slot-as-an-absence",
+    file: "scripts/workflow-runtime.mjs",
+    from: '  if (kubeRecord.state === "nothing" && ctx.why === "empty-slot") {',
+    to: '  if (kubeRecord.state === "nothing") {',
+    mustFail: "asks both conditions in both carriers, so one cannot be taught and the other left behind",
+  },
+  {
+    id: "the-repair-evaluated-beside-the-gate",
+    file: "scripts/acceptance-gate.mjs",
+    from: "  const repaired = restoreInterruptedMutation();\n  const gate = withRepair(runGate(), repaired);",
+    to: "  const gate = withRepair(runGate(), restoreInterruptedMutation());",
+    mustFail: "takes the repair before it runs the gate, or there is nothing left to repair",
+  },
+  {
+    id: "drift-blind-to-the-wiring",
+    file: "scripts/drift.mjs",
+    from: '  { path: "nodes/*/webhookId", why: "assigned by the instance when a webhook node is created" },\n];',
+    to: '  { path: "connections", why: "instance bookkeeping" },\n];',
+    mustFail: "keeps every field that decides what the deployment does",
+  },
+  {
+    id: "a-run-held-wrongly-that-still-exits-clean",
+    file: "scripts/score-run.mjs",
+    from: '    || r.state === "correct-but-unqualified");',
+    to: "    );",
+    mustFail: "gives each combination of states its own exit code",
+  },
+  {
+    id: "the-refusal-ceiling-restated-instead-of-read",
+    file: "scripts/score-run.mjs",
+    from: "        : Math.min(want.maxConfidence, fromSchema);",
+    to: "        : want.maxConfidence;",
+    mustFail: "refuses a refusal that is held as firmly as a conclusion",
+  },
+  {
     id: "a-refusal-whose-confidence-is-not-a-number",
     file: "scripts/score-run.mjs",
-    from: "    if (c !== undefined && c !== null && (typeof c !== \"number\" || !Number.isFinite(c))) {",
-    to: "    if (false) {",
+    from: "  if (c !== undefined && c !== null && (typeof c !== \"number\" || !Number.isFinite(c))) {",
+    to: "  if (false) {",
     mustFail: "refuses a refusal whose confidence is not a number",
   },
   {
@@ -1245,8 +1631,8 @@ export const MUTATIONS = [
     // rest on a sentence somebody wrote about their own run.
     id: "run-record-prose-counted-as-a-score",
     file: "scripts/readiness.mjs",
-    from: "    if (scored !== null && typeof scored === \"object\" && !Array.isArray(scored) && Object.keys(scored).length > 0) {",
-    to: "    if (scored !== undefined || rec?.outcome !== undefined) {",
+    from: "    if (scored !== null && typeof scored === \"object\" && !Array.isArray(scored)\n      && Object.values(scored).some((v) => v !== \"unasked\" && v !== \"unestablished\")) {\n      return { scored, file: f, why: null };",
+    to: "    if (scored !== undefined || rec?.outcome !== undefined) {\n      return { scored, file: f, why: null };",
     mustFail: "skips a run record that carries no machine-readable scores",
   },
   {
@@ -1272,7 +1658,7 @@ export const MUTATIONS = [
     // knows the field name satisfies a requirement about weighing a conflict.
     id: "dissent-satisfied-by-a-bare-flag",
     file: "scripts/score-run.mjs",
-    from: "    const shaped = ev.filter((e) => typeof e?.source === \"string\" && e.source.length > 0\n      && typeof e?.fact === \"string\" && e.fact.length > 0);",
+    from: "    const shaped = ev.filter((e) => typeof e?.source === \"string\" && e.source.length > 0\n      && typeof e?.fact === \"string\" && e.fact.length > 0\n      && answered.has(e.source));",
     to: "    const shaped = ev;",
     mustFail: "refuses a dissent that is a flag rather than evidence",
   },
@@ -1515,7 +1901,7 @@ export const MUTATIONS = [
     id: "healthy-cluster-routed-to-no-data-beside-the-guarded-row",
     file: "prompts/kubernetes-agent.md",
     from: "The last row is not permission to name a cause.",
-    to: "When the cluster looks fine, return no_data. The last row is not permission to name a cause.",
+    to: "When the cluster looks fine, return no_data.",
     mustFail: "asks each agent only for what its own slot can answer",
   },
   {
@@ -1528,8 +1914,8 @@ export const MUTATIONS = [
   {
     id: "code-table-turned-into-an-instruction-to-choose",
     file: "prompts/kubernetes-agent.md",
-    from: "**Usually you return no hypotheses at all, and that is the expected answer.**",
-    to: "**Usually you return no hypotheses at all, and that is the expected answer.** Otherwise pick the code that fits what you saw.",
+    from: "**Usually you return no hypotheses at all, and that is the expected answer.**\nNaming the cause is the root cause agent's job.",
+    to: "**Usually you return no hypotheses at all, and that is the expected answer.**\nOtherwise pick the code that fits what you saw.",
     mustFail: "asks each agent only for what its own slot can answer",
   },
   {
@@ -1554,8 +1940,8 @@ export const MUTATIONS = [
     // happens to see.
     id: "code-list-without-saying-why-it-is-there",
     file: "prompts/kubernetes-agent.md",
-    from: "**Usually you return no hypotheses at all, and that is the expected answer.**",
-    to: "**Pick the code that fits what you saw.**",
+    from: "**Usually you return no hypotheses at all, and that is the expected answer.**\nNaming the cause is the root cause agent's job. You return a hypothesis only",
+    to: "You return a hypothesis only",
     mustFail: "asks each agent only for what its own slot can answer",
   },
   {

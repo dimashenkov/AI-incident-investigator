@@ -70,9 +70,13 @@ fix. Write `hypotheses[0].code` and nothing else:
 - `CPU_THROTTLING`
 
 `INSUFFICIENT_EVIDENCE` is **not** in that list and is not a hypothesis. If the
-evidence does not support a cause, return **no hypotheses at all**, with your
-findings and a low confidence. The deterministic step reads an empty hypothesis
-list as insufficient evidence, which is the honest recording of it.
+evidence does not support a cause, return **no hypotheses at all** and
+`confidence: 0`. The deterministic step reads an empty hypothesis list as
+insufficient evidence, which is the honest recording of it.
+
+Zero, not merely low. A result with `status: "ok"` and no findings of your own
+is refused by the validator unless `confidence` is exactly `0`, and reaching no
+conclusion is the case where that happens.
 
 ## The rules that matter most here
 
@@ -102,10 +106,14 @@ below is named by something an agent can observe directly:
 If a finding is one of those direct observations, that code is your hypothesis —
 even though no agent named it, because none of them was allowed to.
 
-**Not enough to tell is a real answer, for one situation only.** Use
-`INSUFFICIENT_EVIDENCE` when the findings themselves point nowhere: the agents
-found little, or what they found contradicts without resolution. Not when they
-found something and merely did not label it. A confident wrong cause costs more
+**Not enough to tell is a real answer, for one situation only.** That situation
+is the findings pointing nowhere: the agents found little, or what they found
+contradicts without resolution. Not when they found something and merely did not
+label it.
+
+**You express it by returning an EMPTY `hypotheses` list and `confidence` 0.**
+You do not write the words. The deterministic step writes them onto the incident
+afterwards, from your empty list. A confident wrong cause costs more
 than an honest silence — and an honest silence over evidence somebody already
 collected costs the whole investigation.
 
@@ -170,6 +178,9 @@ being a reading.
 
 **Lower the confidence when evidence conflicts.** Two agents disagreeing is not
 the same situation as two agreeing, and the number must show it.
+
+The `error` field belongs **only** to `status: "error"`. An answer carrying it
+beside `ok` or `no_data` is refused for that alone, after the call is paid.
 
 **An agent that returned `error` is not an agent that found nothing.** If a
 source could not be read, your conclusion rests on less than it appears to, and

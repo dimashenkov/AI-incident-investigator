@@ -39,7 +39,7 @@ function collectTests(dir: string): string[] {
 }
 // Plain .mjs — the same file node runs in production, so there are no types.
 // @ts-expect-error
-import { runGate, format, restoreInterruptedMutation, CHECKS, CHILD_MARKER, LIMITATIONS, DEBT, SECRET_SHAPED, readFreshReport, interpretVitestReport, interpretScripts, findSecretShaped, parsePorcelainZ, readCurrentChunk, namedTestFailed, coverageGaps, someRunWasScored, withRepair, reportIsFromThisRun} from "../scripts/acceptance-gate.mjs";
+import { runGate, format, restoreInterruptedMutation, CHECKS, CHILD_MARKER, LIMITATIONS, DEBT, SECRET_SHAPED, readFreshReport, interpretVitestReport, interpretScripts, findSecretShaped, parsePorcelainZ, readCurrentChunk, namedTestFailed, coverageGaps, someRunWasScored, withRepair, reportIsFromThisRun, splitDebt} from "../scripts/acceptance-gate.mjs";
 // @ts-expect-error
 import { MUTATIONS } from "../scripts/mutations.mjs";
 
@@ -546,12 +546,56 @@ describe("the mutation machinery, which is what makes 'every fix has a test' che
       expect(m.to, `${m.id} replaces its anchor with itself, so it changes nothing`).not.toBe(m.from);
     }
 
+    /*
+     * And no mutation may CONTAIN its own anchor.
+     *
+     * `to.includes(from)` means the anchor survives the mutation — so if a run
+     * is killed with that one applied, the next run reads the already-mutated
+     * text as the original, mutates on top of it, and restores the mutated text
+     * in `finally`. The planted defect becomes permanent while the harness
+     * reports it caught. A subagent found four of these on 2026-09-09; unlike
+     * the others they do not even leave an unresolved anchor behind to notice.
+     */
+    for (const m of MUTATIONS as Array<{ id: string; from: string; to: string }>) {
+      expect(m.to.includes(m.from),
+        `${m.id} keeps its own anchor inside the replacement, so a killed run would make it permanent`)
+        .toBe(false);
+    }
+
     const root = new URL("../", import.meta.url).pathname;
     for (const m of MUTATIONS as Array<{ id: string; file: string; from: string }>) {
       const text = readFileSync(join(root, m.file), "utf8");
       const hits = text.split(m.from).length - 1;
       expect(hits, `${m.id}: anchor appears ${hits} times in ${m.file}`).toBe(1);
     }
+  });
+
+  it("answers for the test it was asked about, not for one whose name ends the same way", () => {
+    /*
+     * `namedTestFailed` matched `fullName.endsWith(name)`, so a title ENDING
+     * with another test's title answered for it — and which one the loop
+     * reached first depended on how vitest happened to order the files that
+     * run. A mutation was reported caught or survived by file ordering rather
+     * than by the code. A subagent found it on 2026-09-09.
+     */
+    const report = {
+      testResults: [
+        { assertionResults: [
+          { title: "the readiness counter refuses a claim that names no test",
+            fullName: "readiness the readiness counter refuses a claim that names no test",
+            status: "passed" },
+          { title: "refuses a claim that names no test",
+            fullName: "gate refuses a claim that names no test",
+            status: "failed" },
+        ] },
+      ],
+    };
+    expect(namedTestFailed(report, "refuses a claim that names no test"),
+      "the suffix must not answer for the test actually named").toBe(true);
+    expect(namedTestFailed(report, "the readiness counter refuses a claim that names no test"))
+      .toBe(false);
+    expect(namedTestFailed(report, "a title nobody wrote"),
+      "not found is still its own answer").toBeNull();
   });
 
   it("names a real test for every mutation, so none can be caught by accident", () => {
@@ -685,6 +729,35 @@ describe("what a killed mutation run leaves behind", () => {
     expect(r?.id).toBe("some-mutation");
     expect(readFileSync(target, "utf8")).toBe("the original text");
     expect(existsSync(path), "the record must go, or every later run repeats the repair").toBe(false);
+  });
+
+  it("takes the repair before it runs the gate, or there is nothing left to repair", () => {
+    /*
+     * Passing the repair as the second argument beside a call to the gate reads
+     * as "repair alongside the gate". JavaScript evaluates arguments left to
+     * right, so
+     * `runGate()` went first — and its mutation check writes and then deletes
+     * `out/mutation-in-flight.json` once per mutation, so the repair that
+     * followed found nothing, every time. The guarantee that a killed run is
+     * put back and said out loud was dead from the commit that folded two
+     * statements into one expression, and nothing failed. A subagent found it
+     * on 2026-09-09.
+     *
+     * Asserted against the source for the same reason as the test below: the
+     * property is an ORDERING, and both halves pass their own unit tests while
+     * the order between them is wrong.
+     */
+    const src = readFileSync(new URL("../scripts/acceptance-gate.mjs", import.meta.url).pathname, "utf8");
+    const takes = src.indexOf("const repaired = restoreInterruptedMutation();");
+    // The STATEMENT, not any mention of it: the comment above names the same
+    // call, and comparing against a comment is comparing against prose.
+    const runs = src.indexOf("const gate = withRepair(runGate()");
+    expect(takes, "the repair is not taken into a variable before the gate runs").toBeGreaterThan(-1);
+    expect(runs, "nothing calls withRepair around the gate").toBeGreaterThan(-1);
+    expect(takes, "the repair is read after the gate has already deleted the evidence")
+      .toBeLessThan(runs);
+    expect(src, "the repair may not be an argument evaluated beside the gate")
+      .not.toContain("withRepair(runGate(), restoreInterruptedMutation())");
   });
 
   it("records the file before it damages it, which is the only ordering that survives a kill", () => {
@@ -876,8 +949,21 @@ describe("a debt waits on a condition something can answer", () => {
     expect(someRunWasScored(d), "prose is not a recorded result").toBe(false);
     writeFileSync(join(d, "b.json"), JSON.stringify({ scored: {} }));
     expect(someRunWasScored(d), "an empty scores object is not a scored run").toBe(false);
-    writeFileSync(join(d, "c.json"), JSON.stringify({ scored: { "container-oom": "correct" } }));
-    expect(someRunWasScored(d)).toBe(true);
+    /*
+     * The scorer writes a key for EVERY scenario whatever happened — `unasked`
+     * for one no part of a staged purchase bought, `unestablished` for one that
+     * answered nothing. Counting keys alone let a record of nothing but those
+     * two flip the promised checks from waiting to due, on the strength of a
+     * run that established nothing. `recordInto` refuses to write such a
+     * record; this reader must not lean on a guarantee made in another file,
+     * because a hand-edited record reaches it too.
+     */
+    writeFileSync(join(d, "c.json"), JSON.stringify({
+      scored: { "container-oom": "unasked", "cpu-throttling": "unestablished" } }));
+    expect(someRunWasScored(d), "nothing established is not a scored run").toBe(false);
+    writeFileSync(join(d, "d.json"), JSON.stringify({
+      scored: { "container-oom": "unasked", "cpu-throttling": "correct" } }));
+    expect(someRunWasScored(d), "one real verdict beside them is").toBe(true);
   });
 
   it("says no when the directory is not there, rather than throwing", () => {
@@ -975,6 +1061,43 @@ describe("every gate check is exercised, or says why not", () => {
     "mutations-still-caught": "it breaks source files on purpose and runs the suite per mutation",
     "no-drift-from-baseline": "it compares against a recorded export and reads out/",
   };
+
+  it("calls a promise due when its chunk has come and nothing is waiting on it", () => {
+    /*
+     * The only test over this asserted the check's STATE — one of pass, fail,
+     * unknown — which every branch satisfies. So `const due = []` reported PASS
+     * while a promise was overdue, and the whole purpose of DEBT could be
+     * deleted in one line. A subagent measured it on 2026-09-09.
+     */
+    const yes = () => true;
+    const no = () => false;
+    const debts = [
+      { claim: "a", dueFromChunk: 5 },
+      { claim: "b", dueFromChunk: 5, unlessArtifact: "docs/x.md" },
+      { claim: "c", dueFromChunk: 5, unlessScoredRun: true },
+      { claim: "d", dueFromChunk: 9 },
+    ];
+    const at6 = splitDebt(debts, 6, { artifactExists: no, scored: false });
+    expect(at6.due.map((d: { claim: string }) => d.claim), "only the one with nothing to wait for")
+      .toEqual(["a"]);
+    expect(at6.waiting.map((d: { claim: string }) => d.claim)).toEqual(["b", "c"]);
+
+    const settled = splitDebt(debts, 6, { artifactExists: yes, scored: true });
+    expect(settled.due.map((d: { claim: string }) => d.claim),
+      "once what they waited for happened, they are due").toEqual(["a", "b", "c"]);
+
+    expect(splitDebt(debts, 4, { artifactExists: yes, scored: true }).due,
+      "a chunk that has not come yet owes nothing").toEqual([]);
+
+    /*
+     * A debt with no `dueFromChunk` used to be due NEVER, because
+     * `chunk >= undefined` is false — the only required field was the one
+     * nothing required.
+     */
+    expect(splitDebt([{ claim: "e" }], 1, { artifactExists: yes, scored: true })
+      .due.map((d: { claim: string }) => d.claim),
+      "a promise with no chunk is due from the first one, not from none").toEqual(["e"]);
+  });
 
   it("recognises the state of every check it can run", () => {
     expect(RUN_HERE.length, "nothing is run; this would pass on an empty set").toBeGreaterThan(3);

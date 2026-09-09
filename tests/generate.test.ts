@@ -194,10 +194,27 @@ describe("the shape of the deployed chain", () => {
   });
 
   it("pins the model and the temperature, so two runs can be compared", () => {
-    expect(MODEL).toMatch(/^gpt-/);
+    /*
+     * The literal, not the constant.
+     *
+     * This compared the generated body against `MODEL` — which the body is
+     * BUILT from — so the two could never disagree, and `/^gpt-/` accepts any
+     * name. Changing the model to a different price and a different answer left
+     * the test green, and two runs measured against each other would not have
+     * been the same measurement. A subagent found it on 2026-09-09.
+     *
+     * If the model is deliberately changed, this line changes with it, and the
+     * change is then visible in the diff rather than only in the bill.
+     */
+    expect(MODEL, "the model this project measures against, spelled out once")
+      .toBe("gpt-4o-mini");
     const ask = node("Ask kubernetes");
-    expect(ask.parameters.jsonBody).toContain(MODEL);
+    expect(ask.parameters.jsonBody).toContain("gpt-4o-mini");
     expect(ask.parameters.jsonBody).toContain("temperature: 0");
+    // Every agent call is the same model, or the runs are not comparable.
+    for (const name of ["Ask kubernetes", "Ask logs", "Ask metrics", "Ask root-cause"]) {
+      expect(node(name).parameters.jsonBody, `${name} asks the same model`).toContain("gpt-4o-mini");
+    }
   });
 
   it("sends the prompt and payload from the item, never from the node", () => {

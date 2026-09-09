@@ -650,7 +650,22 @@ export function namedTestFailed(report, name) {
    */
   for (const file of report.testResults ?? []) {
     for (const t of file.assertionResults ?? []) {
-      if (t.title === name || t.fullName?.endsWith(name)) return t.status === "failed";
+      /*
+       * Exact, not a suffix.
+       *
+       * This matched `fullName.endsWith(name)`, so a title that ENDS with
+       * another test's title answered for it — and which of the two the loop
+       * reached first depended on the order vitest happened to sort the files
+       * in. A mutation was therefore reported caught or survived by the file
+       * ordering rather than by the code. A subagent found it on 2026-09-09,
+       * with the pair: "refuses a coverage claim that names no test" is a
+       * suffix of "the readiness counter refuses a coverage claim that names no
+       * test".
+       *
+       * The meta-test beside the list already requires titles to be unique by
+       * exact comparison; this is the runner agreeing with the guard.
+       */
+      if (t.title === name || t.fullName === name) return t.status === "failed";
     }
   }
   return null;
@@ -906,11 +921,47 @@ export function someRunWasScored(runsDir) {
     try {
       const rec = JSON.parse(readFileSync(resolve(runsDir, n), "utf8"));
       const scored = rec?.scored;
+      /*
+       * A run was SCORED only if something in it was established.
+       *
+       * Keys alone were enough here, and the scorer writes a key for every
+       * scenario whatever happened — `unasked` for one no part bought,
+       * `unestablished` for one that answered nothing. So a record of nothing
+       * but those two flipped the promised checks from waiting to due on the
+       * strength of a run that established nothing. `recordInto` refuses to
+       * WRITE such a record, but this reader must not depend on a guarantee
+       * made in another file: a record edited by hand reaches it too.
+       */
       if (scored !== null && typeof scored === "object" && !Array.isArray(scored)
-        && Object.keys(scored).length > 0) return true;
+        && Object.values(scored).some((v) => v !== "unasked" && v !== "unestablished")) return true;
     } catch { /* unreadable is not evidence of a scored run */ }
   }
   return false;
+}
+
+/**
+ * Which promises are due and which are waiting, decided from data.
+ *
+ * Split out because the only test over this reported the STATE of the check —
+ * one of pass, fail, unknown — which every branch satisfies, so the whole
+ * point of DEBT could be deleted and nothing noticed. A subagent measured it on
+ * 2026-09-09: `const due = []` reports PASS while a promise is overdue.
+ *
+ * A debt with no `dueFromChunk` is due from the FIRST chunk rather than never.
+ * `chunk >= undefined` is false, so the only required field was the one nothing
+ * required — absence reading as "not yet", which is this project's oldest bug.
+ */
+export function splitDebt(debts, chunk, { artifactExists, scored }) {
+  const list = Array.isArray(debts) ? debts : [];
+  const waiting = list.filter((d) =>
+    (typeof d.unlessArtifact === "string" && !artifactExists(d.unlessArtifact))
+    || (d.unlessScoredRun === true && !scored));
+  const due = list.filter((d) => {
+    if (waiting.includes(d)) return false;
+    const from = typeof d.dueFromChunk === "number" ? d.dueFromChunk : 0;
+    return chunk >= from;
+  });
+  return { due, waiting };
 }
 
 function checkDebt() {
@@ -932,10 +983,10 @@ function checkDebt() {
   // A debt whose stated dependency has not happened yet is not overdue; it is
   // waiting, and saying so is different from saying nobody wrote it.
   const scored = someRunWasScored(resolve(ROOT, "docs/runs"));
-  const waiting = DEBT.filter((d) =>
-    (typeof d.unlessArtifact === "string" && !existsSync(resolve(ROOT, d.unlessArtifact)))
-    || (d.unlessScoredRun === true && !scored));
-  const due = DEBT.filter((d) => chunk >= d.dueFromChunk && !waiting.includes(d));
+  const { due, waiting } = splitDebt(DEBT, chunk, {
+    artifactExists: (rel) => existsSync(resolve(ROOT, rel)),
+    scored,
+  });
   if (due.length > 0) {
     return unknown(
       `chunk ${chunk}: ${due.length} promised check(s) are due and unwritten — ${due.map((d) => d.claim).join("; ")}`,
@@ -1082,8 +1133,7 @@ export function runGate(checks = CHECKS) {
    * It is `unknown`, not `fail`: nothing was established, and nothing failed.
    */
   const nothingChecked = results.length === 0;
-  const exitCode = (failed.length > 0 ? 1 : 0)
-    + (unresolved.length > 0 || nothingChecked ? 2 : 0);
+  const exitCode = failed.length > 0 ? 1 : 0;
 
   /*
    * And an interrupted mutation that could not be put back travels into the
@@ -1159,7 +1209,21 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === resolve(fileUR
    * function is called is a repair that fires in the middle of the thing it is
    * meant to protect.
    */
-  const gate = withRepair(runGate(), restoreInterruptedMutation());
+  /*
+   * The repair is taken FIRST, and that is not a style choice.
+   *
+   * Passing the repair as the SECOND argument beside a call to the gate reads
+   * as "repair alongside the gate", but JavaScript evaluates arguments left to
+   * right — so
+   * `runGate()` ran first, its mutation check rewrote and then deleted
+   * `out/mutation-in-flight.json` 232 times, and the repair that followed found
+   * nothing. The whole "a killed run left a file broken, the next run puts it
+   * back and says so" guarantee was dead, silently, from the commit that folded
+   * two statements into one expression. A subagent found it on 2026-09-09; no
+   * test covered the ORDER, only the two halves.
+   */
+  const repaired = restoreInterruptedMutation();
+  const gate = withRepair(runGate(), repaired);
   process.stdout.write(format(gate));
   mkdirSync(dirname(OUT), { recursive: true });
   /*

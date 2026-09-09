@@ -283,6 +283,105 @@ describe("a readiness figure that admits what it does not know", () => {
     } finally { rmSync(d, { recursive: true, force: true }); }
   });
 
+  it("walks past a record that carries no verdicts to one that does", () => {
+    /*
+     * The runner writes a record the moment a paid call arrives, with `scored`
+     * still null — the scorer fills it later. That record is newer than every
+     * earlier one, so if it were taken as the answer it would silently replace
+     * a run that DID score, and the reason printed would be "no run record
+     * scores this scenario", which is false while an older file does.
+     *
+     * Grok raised it on 2026-09-08 from a partial reading of this file; the
+     * skip was already here and nothing pinned it. This pins it.
+     */
+    const d = tmp();
+    try {
+      mkdirSync(join(d, "scenarios", "alpha"), { recursive: true });
+      mkdirSync(join(d, "docs", "runs"), { recursive: true });
+      writeFileSync(join(d, "docs", "runs", "2026-09-07-old.json"), JSON.stringify({
+        when: "2026-09-07", scored: { alpha: "correct" },
+      }));
+      writeFileSync(join(d, "docs", "runs", "2026-09-08-new.json"), JSON.stringify({
+        when: "2026-09-08", totals: { input_tokens: null, output_tokens: null }, scored: null,
+      }));
+      /*
+       * And the harder shape: a record with KEYS, none of which is a verdict.
+       * The scorer writes one key per scenario whatever happened, so this is
+       * what a staged part looks like the moment it is scored. Counting keys
+       * alone let it outrank an older record that really had answers — Codex,
+       * 2026-09-08, after the same predicate had been strengthened in the gate
+       * and not here.
+       */
+      writeFileSync(join(d, "docs", "runs", "2026-09-08-zz-newer.json"), JSON.stringify({
+        when: "2026-09-08", scored: { alpha: "unasked", beta: "unestablished" },
+      }));
+      const l = latestScored(join(d, "docs", "runs"));
+      expect(l.file, "the newer record says nothing, so it is not the answer").toBe("2026-09-07-old.json");
+      expect(l.scored).toEqual({ alpha: "correct" });
+      const c = scenariosMeasured(d).find((x: any) => x.id === "scenario-alpha");
+      expect(c!.state, "and the verdict that exists is still read").toBe("green");
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it("does not let a row saying nobody asked outvote the attempts that answered", () => {
+    /*
+     * A run bought in parts writes one record, so a scenario answered under
+     * three attempt keys also carries a bare row from the parts that bought
+     * something else. Counting that row turned six correct measurements into
+     * two unanswered scenarios — Codex, 2026-09-08, against the staged purchase.
+     */
+    const d = tmp();
+    try {
+      for (const n of ["alpha", "beta"]) mkdirSync(join(d, "scenarios", n), { recursive: true });
+      mkdirSync(join(d, "docs", "runs"), { recursive: true });
+      writeFileSync(join(d, "docs", "runs", "2026-09-08-a.json"), JSON.stringify({
+        when: "2026-09-08",
+        scored: { alpha: "unasked", "alpha#1": "correct", "alpha#2": "correct", "alpha#3": "correct",
+                  beta: "unasked" },
+      }));
+      const byId = new Map<string, { state: string; why: string }>(
+        scenariosMeasured(d).map((c: any) => [c.id as string, c as { state: string; why: string }]));
+      expect(byId.get("scenario-alpha")!.state, "three correct attempts are a correct scenario").toBe("green");
+      expect(byId.get("scenario-alpha")!.why, "and only the attempts are counted")
+        .toMatch(/3 attempts/);
+      expect(byId.get("scenario-beta")!.state,
+        "but a scenario where nobody asked at all is still unknown").toBe("unestablished");
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it("names the worst attempt by rank, not by the order they arrived", () => {
+    /*
+     * Codex, 2026-09-08: the first version took whichever failing state came
+     * first, so a scenario that was both correct-without-its-evidence and
+     * correct-but-unqualified reported a different reason depending on the
+     * order the keys sat in. Both are red either way — the figure did not move,
+     * the REASON moved, and a reason that changes with the order is not a
+     * reading of anything.
+     */
+    const d = tmp();
+    try {
+      for (const n of ["alpha", "beta"]) mkdirSync(join(d, "scenarios", n), { recursive: true });
+      mkdirSync(join(d, "docs", "runs"), { recursive: true });
+      writeFileSync(join(d, "docs", "runs", "2026-09-08-a.json"), JSON.stringify({
+        when: "2026-09-08",
+        scored: { "alpha#1": "correct-without-its-evidence", "alpha#2": "correct-but-unqualified",
+                  "beta#1": "correct-but-unqualified", "beta#2": "correct-without-its-evidence" },
+      }));
+      const byId = new Map<string, { state: string; why: string }>(
+        scenariosMeasured(d).map((c: any) => [c.id as string, c as { state: string; why: string }]));
+      const a = byId.get("scenario-alpha")!;
+      const b = byId.get("scenario-beta")!;
+      expect(a.state).toBe("red");
+      expect(b.state).toBe("red");
+      expect(b.why.replace("beta", "alpha"), "the same two states must read the same either way")
+        .toBe(a.why);
+      expect(a.why, "and the one that is worse is the one that is named")
+        .toMatch(/^correct-without-its-evidence/);
+      expect(a.why, "the other is still said, so nothing is dropped")
+        .toMatch(/also correct-but-unqualified/);
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
   it("keeps the scorer's own unestablished state instead of calling it a failure", () => {
     const d = tmp();
     try {
@@ -364,7 +463,7 @@ describe("a readiness figure that admits what it does not know", () => {
     } finally { rmSync(d, { recursive: true, force: true }); }
   });
 
-  it("reads a recorded gate result in both directions", () => {
+  it("keeps the gate's four exit codes apart instead of folding them into two", () => {
     const d = tmp();
     try {
       mkdirSync(join(d, "out"), { recursive: true });
@@ -373,8 +472,18 @@ describe("a readiness figure that admits what it does not know", () => {
       const fresh = Date.now() + 60_000;
       writeFileSync(join(d, "out", "acceptance-gate.json"), JSON.stringify({ exitCode: 0, finishedAt: fresh }));
       expect(gateResult(d)[0].state).toBe("green");
+      /*
+       * The gate has FOUR exit codes and this test used to pin two of them
+       * together: `exitCode: 2` was asserted to be red, which is the collapse
+       * the whole file exists to refuse, enshrined by the test that should have
+       * caught it. A subagent found it on 2026-09-09.
+       */
+      writeFileSync(join(d, "out", "acceptance-gate.json"), JSON.stringify({ exitCode: 1, finishedAt: fresh }));
+      expect(gateResult(d)[0].state, "something failed is red").toBe("red");
       writeFileSync(join(d, "out", "acceptance-gate.json"), JSON.stringify({ exitCode: 2, finishedAt: fresh }));
-      expect(gateResult(d)[0].state).toBe("red");
+      expect(gateResult(d)[0].state, "could not establish is not failed").toBe("unestablished");
+      writeFileSync(join(d, "out", "acceptance-gate.json"), JSON.stringify({ exitCode: 3, finishedAt: fresh }));
+      expect(gateResult(d)[0].state, "a real failure beside an unknown is still red").toBe("red");
       writeFileSync(join(d, "out", "acceptance-gate.json"), JSON.stringify({ nothing: true, finishedAt: fresh }));
       expect(gateResult(d)[0].state, "a result with no exit code establishes nothing").toBe("unestablished");
     } finally { rmSync(d, { recursive: true, force: true }); }

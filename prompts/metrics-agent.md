@@ -85,9 +85,13 @@ never "flat". Flat is a shape you saw; no points is nothing to see. Reporting
 the first as the second hands the next agent a measurement nobody took.
 
 **If you cannot read the observation**, return `status: "error"` with `error`
-set, `findings` and `hypotheses` as empty arrays, and `confidence: 0`. Those
-four fields are always required, in every answer — an answer carrying only
-`status` and `error` is refused by the validator, and the run is wasted.
+set, `findings` and `hypotheses` as empty arrays, and `confidence: 0`.
+
+`agent`, `status`, `findings`, `hypotheses` and `confidence` are required in
+**every** answer — an answer carrying only `status` and `error` is refused by the
+validator, and the run is wasted. `error` is the exception: it belongs **only**
+to `status: "error"`, and an answer that carries it beside `ok` or `no_data` is
+refused for that alone.
 
 Could-not-read and found-nothing are different answers and must not arrive as
 the same one.

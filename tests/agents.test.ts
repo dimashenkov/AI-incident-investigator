@@ -319,6 +319,88 @@ describe("every prompt carries the rules its schema will enforce", () => {
       .toMatch(/`INSUFFICIENT_EVIDENCE` is not a code you may write/);
   });
 
+  it("asks for the confidence the schema requires when nothing was concluded", () => {
+    /*
+     * The schema refuses `status: "ok"` with no findings unless `confidence` is
+     * exactly 0 — and the root cause agent is the one that legitimately answers
+     * ok with no findings of its own. The prompt asked for "a low confidence",
+     * which is any number, so an obedient 0.2 buys a refused document. Grok
+     * found it on 2026-09-09, in the paragraph beside the one just rewritten.
+     */
+    const text = readPrompt("root-cause")!;
+    expect(text, "a number that is merely low is not what the validator accepts")
+      .not.toMatch(/no hypotheses at all\*\*, with your\s*\n?findings and a low confidence/);
+    expect(text, "and zero has to be asked for by name").toMatch(/`confidence: 0`/);
+  });
+
+  it("does not let a prompt ask for `error` in every answer", () => {
+    /*
+     * `error` may not appear beside `ok` or `no_data` at all — the schema says
+     * `not: { required: ["error"] }` for both. The logs and metrics prompts said
+     * "those four fields are always required, in every answer" directly after a
+     * sentence naming five things, one of them `error`. A model reading it the
+     * other way buys a refused document.
+     */
+    for (const agent of ["logs", "metrics", "kubernetes", "root-cause"] as AgentName[]) {
+      const text = readPrompt(agent)!;
+      const claims = text.split("\n\n").filter((p) => /in every answer/i.test(p));
+      for (const p of claims) {
+        expect(p, `${agent} asks for error in every answer`).not.toMatch(/`error`[^.]{0,80}every answer/i);
+      }
+      if (/`error`/.test(text)) {
+        expect(text, `${agent} mentions error without saying it belongs only to status error`)
+          .toMatch(/only[^.]{0,60}`status: "error"`|`status: "error"`[^.]{0,80}only/);
+      }
+    }
+  });
+
+  it("names every field a hypothesis must carry, in every prompt that permits one", () => {
+    /*
+     * The kubernetes prompt permitted a hypothesis for a directly observed
+     * cause, named `code` and `supported_by`, and never named `statement` —
+     * which the schema requires. Its only example showed an empty list, so a
+     * model writing its first hypothesis had nothing to copy, and
+     * image-pull-failure is a scenario where this prompt is meant to produce
+     * one. Found on 2026-09-09.
+     */
+    const required = JSON.parse(readFileSync(
+      new URL("../schemas/agent-result.schema.json", import.meta.url).pathname, "utf8"))
+      .properties.hypotheses.items.required as string[];
+    expect(required, "the schema no longer requires three fields; this test is stale")
+      .toEqual(["code", "statement", "supported_by"]);
+    for (const agent of ["kubernetes", "root-cause"] as AgentName[]) {
+      const text = readPrompt(agent)!;
+      for (const field of required) {
+        expect(text, `${agent} permits a hypothesis and never names \`${field}\``)
+          .toContain(`\`${field}\``);
+      }
+    }
+  });
+
+  it("never tells the model to USE the one code no field can carry", () => {
+    /*
+     * The row was fixed on 2026-09-07 and a whole paragraph elsewhere was not:
+     * "Use `INSUFFICIENT_EVIDENCE` when the findings themselves point nowhere"
+     * still stood, two paragraphs after the sentence saying it is not a code
+     * the model may write. An obedient model writes it into `hypotheses[0].code`,
+     * the schema refuses the document, and the call has already been paid for.
+     * Grok found it on 2026-09-09, before the run it would have wasted.
+     *
+     * The check is over the WHOLE prompt, not one row, because that is where
+     * the second carrier was hiding.
+     */
+    const text = readPrompt("root-cause")!;
+    const instructions = text.split("\n")
+      .filter((l) => /INSUFFICIENT_EVIDENCE/.test(l))
+      .filter((l) => /\b(use|write|return|set|put|name)\b/i.test(l))
+      .filter((l) => !/not (a code|in that list)|is not|do not|never|may not|cannot/i.test(l));
+    expect(instructions, `the prompt tells the model to produce it: ${instructions.join(" | ")}`)
+      .toEqual([]);
+    // And it must still say what to do instead, or the removal creates a gap.
+    expect(text, "the empty-hypotheses answer has to be stated somewhere")
+      .toMatch(/EMPTY `hypotheses`|no hypotheses/);
+  });
+
   it("does not both require and forbid naming a cause from one finding", () => {
     /*
      * Codex and Grok, independently, 2026-09-06: the prompt said a finding

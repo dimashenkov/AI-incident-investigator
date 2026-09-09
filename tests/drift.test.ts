@@ -115,6 +115,31 @@ describe("normalisation removes what the instance owns, and nothing else", () =>
     }
   });
 
+  it("keeps every field that decides what the deployment does", () => {
+    /*
+     * The test above builds its input FROM the list it checks, so the list can
+     * grow and it still passes — add `connections` to INSTANCE_FIELDS and drift
+     * goes blind to a deployment rewired in the n8n UI, which is the one thing
+     * drift detection exists for. A subagent found it on 2026-09-09.
+     *
+     * This names the fields that must NEVER be dropped, independently of the
+     * list, so growing the list past them fails here.
+     */
+    const behaviour: Record<string, unknown> = {
+      nodes: [{ name: "Ask kubernetes", type: "n8n-nodes-base.httpRequest", parameters: { url: "x" } }],
+      connections: { "Ask kubernetes": { main: [[{ node: "Collect kubernetes", type: "main", index: 0 }]] } },
+      settings: { executionOrder: "v1" },
+      name: "AI SRE — incident investigation",
+    };
+    const out = normalise(behaviour) as Record<string, unknown>;
+    for (const key of ["nodes", "connections", "settings", "name"]) {
+      expect(out, `${key} decides what the deployment does and must survive normalisation`)
+        .toHaveProperty(key);
+    }
+    expect(out.connections, "the wiring itself, not just the key").toEqual(behaviour.connections);
+    expect(out.nodes, "and the nodes with their parameters").toEqual(behaviour.nodes);
+  });
+
   it("gives a reason for every field it ignores", () => {
     // A path with no reason beside it is a field somebody silenced without
     // saying why, and the next person cannot tell it from a mistake.

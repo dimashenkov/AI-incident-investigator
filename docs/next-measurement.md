@@ -37,16 +37,20 @@ document were wrong, and three of them would have wasted the run.
 | What this document said | What was measured |
 |---|---|
 | three attempts of one scenario are recorded | `answers.json` is keyed by SCENARIO, so three attempts collapse to the last, silently. Fixed below: each attempt is its own key |
-| 48 calls, ~$0.015–0.020 | **43 calls.** Three scenarios ask 3 agents, not 4, because a `__nothing` slot skips its agent. ~$0.0174 at the measured $0.000405 a call |
+| 48 calls, ~$0.015–0.020 | **43 calls** for the twelve-run plan — and that plan itself was superseded on 2026-09-08 by the three-part staging below, which buys 10 runs and 30–40 calls |
 | the criterion is decided in advance | it was decided for `image-pull-failure`'s three attempts and **not** for `readiness-probe-failure`'s. Three of the twelve runs had no verdict named. Fixed below |
 | item 3 closes if confidence is lowered | a refusal at **0.95** scored `correct`, so the item could have read as closed by a run in which confidence went UP. The scorer refuses that since 2026-09-08 |
 | `deployment-regression` is reachable | reachable, but the kubernetes prompt said to report events showing something WRONG — and a rollout says `Normal`. An obedient agent dropped the only evidence the scenario is scored on. Fixed in the prompt |
-| eleven readiness checks move | **eight.** The three Definition-of-Done items need a hand edit and named tests; no run moves them |
+| eleven readiness checks move | **six.** The three Definition-of-Done items need a hand edit and named tests, and two of the eight scenarios are not bought at all |
 
-**One thing nothing in this repository does yet:** issue the calls and write the
-record. There is no runner. `recordInto` writes only the scored states, so the
-token counts, the cost and `normalised` are hand-entered afterwards — which this
-document's last section says must not happen. That is a gap, and it is stated
+**The runner exists since 2026-09-08:** `scripts/run-scenarios.mjs` issues the
+calls and writes both files as each answer arrives. This paragraph said there was
+none for a day after it was written, in the same document that describes what it
+writes — a stale sentence beside a live one.
+
+What is still hand-entered is the **token count and the cost**, and only because
+the webhook does not carry them. They are written as `null` with the reason, and
+`spend` reports a floor rather than a total. That is the gap, and it is stated
 here rather than discovered after paying.
 
 ## Corrected again on 2026-09-08, after all three reviewers said no
@@ -68,15 +72,38 @@ Grok's objection, and it is right: the protocol says a wrong readiness attempt
 stops everything else, so paying for everything up front buys runs that a bad
 first result makes meaningless.
 
-| Part | Calls | Bought only if |
-|---|---|---|
-| 1 · one `readiness-probe-failure` | 3 | — |
-| 2 · three `image-pull-failure` | 9 | part 1 came back fully correct |
-| 3 · the three never-asked scenarios, one each | ~10 | part 2 settled the rewrite either way |
+| Part | Chain runs | Calls | Bought only if |
+|---|---|---|---|
+| 1 · `readiness-probe-failure` ×3 | 3 | ~9 | — |
+| 2 · `image-pull-failure` ×3 | 3 | ~9 | part 1 came back fully correct |
+| 3 · `conflicting-evidence`, `container-oom`, `application-startup-failure`, `deployment-regression`, one each | 4 | ~13 | part 2 settled the rewrite either way |
 
-Part 1 is the cheap question with the largest consequence: it was correct three
-times out of three on 2026-09-07, so a wrong answer now is a REGRESSION, and
-nothing else should be measured until its cause is known.
+**A part is bought from a verdict the CURRENT scorer produced.** If the scorer
+was corrected after an earlier part was scored, that part is re-scored from its
+recorded answers first, and the decision is taken from the new number. A verdict
+produced by a scorer that has since been fixed authorises nothing — Codex,
+2026-09-08: the evidence being recoverable does not make the SPENDING it
+authorised recoverable.
+
+Total if all three are bought: **10 chain runs**, and the last section says what
+each of them answers. `cpu-throttling` and `insufficient-evidence` are NOT
+bought: both were answered correctly on 2026-09-07, neither is a comparator for
+anything asked here, and re-buying an answer nobody doubts is spending to see
+the same thing twice.
+
+**Part 1 buys three attempts, not one, because the criterion below asks for
+three.** The first staging bought one and then judged it against a 3-of-3 rule —
+Codex and Grok both named it on 2026-09-08, and it is the same defect as buying
+a measurement that cannot answer the question it is bought for. Part 1 is still
+the cheap question with the largest consequence: `readiness-probe-failure` was
+correct three times out of three on 2026-09-07, so a wrong answer now is a
+REGRESSION, and nothing else is measured until its cause is known.
+
+**Part 3 carries `container-oom` because item 3 is a COMPARISON.** The closing
+condition needs the confidence on `conflicting-evidence` against the confidence
+on `container-oom` in the same run; buying only the first leaves the comparison
+unavailable, so the item could not close whatever the model returned. It was
+missing from the first staging.
 
 ## What item 3 needs, said once
 
@@ -91,19 +118,25 @@ the reason is that the comparison was not available — not that it failed.
 
 **Nothing here moves Definition-of-Done items 2, 3 or 10 by itself.** They are
 `covered: false` and readiness reads that flag and the test report; closing them
-needs a hand edit and named tests that pass. This run moves **eight** of the
-nineteen readiness checks — the scenarios — and no more.
+needs a hand edit and named tests that pass. This run moves **six** of the
+nineteen readiness checks — six of the eight scenarios — and no more.
 
 ## What is asked
 
-Eight scenarios, one attempt each, on one deployment.
+Ten chain runs on one deployment, in the three parts above, and no more.
 
-The two that a previous run left uncertain — `image-pull-failure` and
-`readiness-probe-failure` — get **three** attempts, because a single attempt
+The two that a previous run left uncertain — `readiness-probe-failure` and
+`image-pull-failure` — get **three** attempts each, because a single attempt
 cannot separate a fix from a lucky draw and that is what stopped the last run
-from being accepted.
+from being accepted. `container-oom` is bought once as the comparator item 3
+needs. The two scenarios never asked live — `application-startup-failure` and
+`deployment-regression` — get one attempt each, which establishes whether their
+code is reachable and nothing more.
 
-Total: 8 + 4 extra attempts = 12 chain runs.
+`cpu-throttling` and `insufficient-evidence` are not bought, and their readiness
+checks stay unestablished. **This run moves six of the eight scenario checks,
+not eight.** Ten runs answer ten questions; a figure that moved further than
+that would be counting runs nobody paid for.
 
 ## The criterion, decided now
 
@@ -115,47 +148,107 @@ Total: 8 + 4 extra attempts = 12 chain runs.
 
 | `readiness-probe-failure` result | Verdict |
 |---|---|
+| **any** attempt scores `wrong` | a regression against a scenario that was passing; the cause is found before anything else is measured, and parts 2 and 3 are not bought |
+| no attempt wrong, and fewer than 3 fully correct | the earlier 3-of-3 was luck; the scenario goes back on the list |
 | fully correct in **3 of 3** | it is settled; it stops being re-run |
-| correct in 1 or 2 of 3 | the earlier 3-of-3 was luck, and the scenario goes back on the list |
-| wrong in any attempt | a regression against a scenario that was passing, and the cause is found before anything else is measured |
+
+Read top to bottom, first row that matches. The earlier version let one wrong
+attempt satisfy both "luck" and "regression", which are different decisions
+about whether to spend more.
 
 **Each attempt is its own key.** `answers.json` maps a name to an answer, so
 three attempts under one scenario name keep only the last — measured on
 2026-09-08, and the attempt that DID cite the missing path was the one thrown
-away. Write them as `image-pull-failure#1`, `#2`, `#3`, score each, and record
-all twelve in ONE run record: `latestScored` returns a single record, so a
-second file would send the other seven scenarios back to unestablished.
+away. Write them as `image-pull-failure#1`, `#2`, `#3`, and score each.
+
+**One record holds all three parts, and each part is added to it as it
+arrives.** `latestScored` returns a single record, so a second file would send
+the earlier parts back to unestablished — and writing part 2 over part 1 with
+`--replace` orphans it just as completely. The third door is
+`--record docs/runs/<file>.json --add`: it fills a key the record does not
+answer yet, leaves an established verdict standing, and refuses to turn one
+established verdict into a different one without `--replace`. So the record is
+written when each part arrives, which is what keeps the numbers out of my
+hands.
 
 | Result | Verdict |
 |---|---|
 | `application-startup-failure` → `APPLICATION_STARTUP_FAILURE` | the code is reachable |
 | → `CONTAINER_OOM` | the fixture's decoy worked and the chain reasons from restart count instead of the termination reason |
 | `deployment-regression` → `DEPLOYMENT_REGRESSION` | a cause with no pod-level symptom is reachable |
-| `conflicting-evidence` → `CONTAINER_OOM` at 60% or below with dissent from metrics, **or** `INSUFFICIENT_EVIDENCE` with evidence stated | Definition of Done item 3 closes |
-| → `CONTAINER_OOM` above 60% | the model does not lower confidence under conflict, and the item stays open with a measured reason |
+| `conflicting-evidence` → `CONTAINER_OOM` **strictly below** the confidence on `container-oom` in this same run, with dissent recorded from a different source | item 3 has its **evidence**; the item itself closes only by a hand edit to `scripts/definition-of-done.mjs` and a named test that passes, which no run does by itself |
+| → `CONTAINER_OOM` at or above `container-oom` | the model does not lower confidence under conflict; the item stays open with a measured reason |
+| → `INSUFFICIENT_EVIDENCE` | an acceptable ANSWER, and item 3 stays open: a refusal states no confidence to compare |
 
-**The comparison that item 3 actually rests on:** the confidence on
-`conflicting-evidence` must come back **lower** than on `container-oom`, which
-poses the same cause without contradiction. Equal numbers mean the ceiling was
-met by accident.
+One row closes it, and the other two say why it did not. The earlier table had
+two closing rows and a 60% ceiling beside a comparison it could contradict — a
+run at 55% on both satisfied the ceiling and failed the comparison. The ceiling
+is not the criterion; the comparison is.
 
 ## What is recorded, and when
 
 `node scripts/score-run.mjs <answers.json> --record docs/runs/<date>-<name>.json`
 
 at the moment the answers arrive, not afterwards from memory. The run record
-carries the token counts, the cost, and the scorer's own states — so
-`scripts/readiness.mjs` stops reporting eight unestablished scenarios and starts
-reporting what was actually answered.
+carries the scorer's own states. It does NOT carry the token counts or the
+cost: the webhook returns the chain's report and the Collect nodes keep only the
+reply, so both are written as `null` with the reason, and `spend` reports a
+floor. This sentence claimed all three until 2026-09-09, two sections after the
+one that says the opposite. So
+`scripts/readiness.mjs` stops reporting six of the eight scenarios as
+unestablished and starts reporting what was actually answered. The other two are
+not bought and stay unestablished, which is the honest reading of a question
+nobody asked.
 
 ## What happens if it is not run
 
-Eleven of the nineteen readiness checks stay unestablished, including every
-scenario and three Definition-of-Done items. Nothing else in the repository can
+Thirteen of the nineteen readiness checks stay unestablished: eight scenarios
+and five Definition-of-Done items. **Eleven** of those thirteen wait on money;
+the other two wait on code nobody has written. The two numbers are different
+questions and this line used to give the money number as the total — the exact
+conflation `scripts/readiness.mjs` records as already fixed once. Nothing else in the repository can
 move them: they are the items whose evidence is a model's answer.
+
+
+## When a call may have been charged and nothing came back
+
+The runner writes `called, no reply recorded — this key may have been charged`
+into the run record BEFORE it posts, and leaves it there for any failure that
+does not prove the request was refused at the door. A later run reads every
+record in `docs/runs/` and **refuses** that key.
+
+That refusal has no automatic way out, and that is a limitation rather than a
+mechanism: a person has to look. The steps, so the way out is not invented under
+pressure:
+
+1. Open the n8n execution list for that workflow and find the execution whose
+   time matches the record's `when` and the key's position in `keys`.
+2. **If it ran:** copy the final report into the answers file under that key.
+   The refusal then changes to "already carries an answer", which is correct —
+   it was paid for and it is kept.
+3. **If it did not run:** edit that run record and change the outcome to
+   `not executed — checked in n8n on <date>`. Keep the original sentence beside
+   it; the record is evidence, and evidence that is edited without saying so is
+   worse than none.
+4. Only then issue the key again.
+
+**Never resolve it by writing a new attempt number.** `key#2` is a new question
+and a new charge, and it leaves the first one unexplained forever.
 
 ## Estimated cost
 
-From the last comparable run: **$0.0085 for 21 calls**. Twelve chain runs at
-four calls each is 48 calls, so roughly **$0.015 – $0.020**. The figure is from
-`docs/runs/2026-09-07-repeated-measurement.json`, not from an estimate.
+From the last comparable run: **$0.0085 for 21 calls**, which is **$0.000405 a
+call**. The figure is from `docs/runs/2026-09-07-repeated-measurement.json`, not
+from an estimate.
+
+Ten chain runs. A scenario whose slot reports an established absence skips that
+agent, so a run is 3 or 4 calls, not always 4 — between 30 and 40 calls.
+
+| Part | Chain runs | Calls | At $0.000405 |
+|---|---|---|---|
+| 1 | 3 | 9–12 | $0.0036 – $0.0049 |
+| 2 | 3 | 9–12 | $0.0036 – $0.0049 |
+| 3 | 4 | 12–16 | $0.0049 – $0.0065 |
+| **all three** | **10** | **30–40** | **$0.012 – $0.016** |
+
+Each part is asked for on its own, with its own word. One `харчи` is one part.

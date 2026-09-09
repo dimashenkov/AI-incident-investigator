@@ -87,12 +87,89 @@ export function expectedFor(scenario, root = SCENARIOS) {
  * `unestablished`, never `wrong`: it did not give an answer to be wrong about,
  * and folding the two together would make a broken chain look like a bad model.
  */
+/**
+ * The ceiling a refusal may not exceed, read from the schema rather than restated.
+ *
+ * The schema says a refusal's confidence is at most 0.5; the scenario says the
+ * answer's confidence is at most 0.6. Both are ceilings on the same number for
+ * the same run, and they disagreed — so a hand-built refusal at 0.55 scored
+ * `correct` here while the chain could never have produced that document. A
+ * subagent found it on 2026-09-09.
+ *
+ * Reading it rather than copying it is what stops the two from drifting again.
+ * If the schema stops saying it, that is `null` and only the scenario's ceiling
+ * applies — an absent rule is not a rule of zero.
+ */
+export function refusalCeiling(schemaPath = new URL("../schemas/incident.schema.json", import.meta.url).pathname) {
+  let doc;
+  try { doc = JSON.parse(readFileSync(schemaPath, "utf8")); } catch { return null; }
+  const found = [];
+  const walk = (node) => {
+    if (node === null || typeof node !== "object") return;
+    if (!Array.isArray(node)) {
+      const props = node.properties;
+      if (props !== null && typeof props === "object") {
+        const rc = props.root_cause_code;
+        const conf = props.confidence;
+        if (rc !== null && typeof rc === "object" && rc.const === "INSUFFICIENT_EVIDENCE"
+          && conf !== null && typeof conf === "object" && typeof conf.maximum === "number") {
+          found.push(conf.maximum);
+        }
+      }
+    }
+    for (const v of Array.isArray(node) ? node : Object.values(node)) walk(v);
+  };
+  walk(doc);
+  return found.length === 0 ? null : Math.min(...found);
+}
+
+/**
+ * A refusal that is held as firmly as a conclusion, reported rather than passed.
+ *
+ * Split out when the ceiling stopped being a single number: the scenario has
+ * one and the schema has one, and both are about this same value.
+ */
+function scoreRefusalCeiling(answer, ceiling, unqualified) {
+  const c = answer.incident?.analysis?.confidence;
+  /*
+   * A number that is not a number does not slip past the ceiling.
+   *
+   * The first version asked `typeof c === "number" && isFinite && c > max`, so
+   * `"0.95"` as a string and Infinity walked through in silence — the same
+   * `null > 0.6` shape this file already refuses on the other branch, written
+   * again on the branch added a day later. Grok found it on 2026-09-08.
+   *
+   * Absent is still fine: a refusal that states no confidence is honest, and
+   * that is the whole reason this is separate from the other branch.
+   */
+  if (c !== undefined && c !== null && (typeof c !== "number" || !Number.isFinite(c))) {
+    unqualified.push(`it refused and stated a confidence of ${JSON.stringify(c)}, `
+      + "which is not a number, so whether it is under the ceiling cannot be established");
+  } else if (typeof c === "number" && Number.isFinite(c) && c > ceiling) {
+    unqualified.push(`it refused and then stated confidence ${c}, above the ceiling of `
+      + `${ceiling} — a refusal held that firmly is not a refusal`);
+  }
+}
+
 export function score(scenario, answer, root = SCENARIOS) {
   const want = expectedFor(scenario, root);
   if (want.state !== "known") return { scenario, state: "unestablished", why: want.why };
 
+  /*
+   * Nobody asked, and nobody answering is not the same as answering nothing.
+   *
+   * Codex, 2026-09-08, reproducing the staged purchase: part 2 scores an
+   * answers file that holds no readiness keys, so `scoreAll` writes a bare
+   * `readiness-probe-failure: unestablished` — and `--add` merges it beside the
+   * three correct attempts part 1 recorded, because the bare key carried no
+   * verdict to protect. Six correct measurements read back as two unanswered
+   * scenarios. The two cases were one word, so nothing downstream could tell
+   * them apart: `unasked` is "this part did not ask", `unestablished` is "it
+   * was asked and established nothing". Both are unknown, and only one of them
+   * may be overwritten by anything at all.
+   */
   if (answer === null || typeof answer !== "object") {
-    return { scenario, state: "unestablished", why: "no answer was recorded", expected: want.code };
+    return { scenario, state: "unasked", why: "no answer was recorded", expected: want.code };
   }
   if (answer.state !== "concluded") {
     return { scenario, state: "unestablished", expected: want.code,
@@ -159,26 +236,15 @@ export function score(scenario, answer, root = SCENARIOS) {
    * deliberately loose: a refusal may say anything up to the scenario's own
    * ceiling, which is the most a refusal could honestly claim.
    */
-  if (want.maxConfidence !== null && refused) {
-    const c = answer.incident?.analysis?.confidence;
+  if (refused) {
     /*
-     * A number that is not a number does not slip past the ceiling.
-     *
-     * The first version asked `typeof c === "number" && isFinite && c > max`,
-     * so `"0.95"` as a string and Infinity walked through in silence — the same
-     * `null > 0.6` shape this file already refuses on the other branch, written
-     * again on the branch added a day later. Grok found it on 2026-09-08.
-     *
-     * Absent is still fine: a refusal that states no confidence is honest, and
-     * that is the whole reason this branch is separate from the other one.
+     * The stricter of the two ceilings, because both are about this number.
      */
-    if (c !== undefined && c !== null && (typeof c !== "number" || !Number.isFinite(c))) {
-      unqualified.push(`it refused and stated a confidence of ${JSON.stringify(c)}, `
-        + "which is not a number, so whether it is under the ceiling cannot be established");
-    } else if (typeof c === "number" && Number.isFinite(c) && c > want.maxConfidence) {
-      unqualified.push(`it refused and then stated confidence ${c}, above the ceiling of `
-        + `${want.maxConfidence} — a refusal held that firmly is not a refusal`);
-    }
+    const fromSchema = refusalCeiling();
+    const ceiling = want.maxConfidence === null ? fromSchema
+      : fromSchema === null ? want.maxConfidence
+        : Math.min(want.maxConfidence, fromSchema);
+    if (ceiling !== null) scoreRefusalCeiling(answer, ceiling, unqualified);
   }
   if (want.maxConfidence !== null && !refused) {
     const c = answer.incident?.analysis?.confidence;
@@ -212,8 +278,22 @@ export function score(scenario, answer, root = SCENARIOS) {
    */
   if (want.requiresDissent) {
     const ev = Array.isArray(answer.incident?.analysis?.evidence) ? answer.incident.analysis.evidence : [];
+    /*
+     * The source must be an agent that actually answered.
+     *
+     * Grok, 2026-09-08, on the half of this that was never changed: two
+     * invented rows with two different `source` strings, one `for` and one
+     * `against`, satisfy the pair. The shape was checked and the anchoring was
+     * not — so "a different source disagreed" could be written by someone who
+     * had not asked any source. What is checkable is that the name belongs to
+     * an agent this incident recorded a result from; whether the dissent is
+     * TRUE is still for a human, and is still not claimed.
+     */
+    const answered = new Set((Array.isArray(answer.incident?.analysis?.agents)
+      ? answer.incident.analysis.agents : []).map((a) => a?.agent).filter((n) => typeof n === "string"));
     const shaped = ev.filter((e) => typeof e?.source === "string" && e.source.length > 0
-      && typeof e?.fact === "string" && e.fact.length > 0);
+      && typeof e?.fact === "string" && e.fact.length > 0
+      && answered.has(e.source));
     if (refused) {
       /*
        * A refusal has no conclusion, so `against` has nothing to point away
@@ -287,19 +367,25 @@ export function score(scenario, answer, root = SCENARIOS) {
    * for: nothing deeper is needed to satisfy it, so nothing deeper is accepted.
    */
   /*
-   * Checked only when there is something to check against.
+   * Nothing to resolve against is its own answer, and it is not success.
    *
-   * An answer that carries no observations cannot have its citations resolved,
-   * and "I could not look" is not "you cited nothing" — dropping every citation
-   * there would report a run as resting on other ground for a reason that has
-   * nothing to do with the run. Three states, in the smallest place they turn
-   * up: resolvable and resolved, resolvable and not, and nothing to resolve
-   * against.
+   * The first version skipped resolution when the answer carried no
+   * observations and then let the citation strings stand on their own. Codex
+   * reproduced the consequence on 2026-09-08: an answer holding the expected
+   * code and the two required path strings, with no observations and no facts,
+   * scored `correct`. "I could not look" had been folded into "clean" — the
+   * defect this repository names everywhere else.
+   *
+   * So it is the third state. A run whose citations cannot be resolved is
+   * unestablished, with the reason said out loud, and it moves no counter that
+   * a green result moves. A scenario that requires no citation is unaffected:
+   * there is nothing to resolve, so nothing is claimed.
    */
-  const canResolve = hasObservations(answer);
-  const cited = canResolve
-    ? citedPaths(answer).filter((got) => resolvesInSomeSlot(answer, got))
-    : citedPaths(answer);
+  if (want.mustCite.length > 0 && !hasObservations(answer)) {
+    return { scenario, state: "unestablished", expected: want.code,
+      why: "it answered without carrying any observation, so no citation of it could be resolved" };
+  }
+  const cited = citedRefs(answer).filter((c) => resolvesForAgent(answer, c)).map((c) => c.ref);
   const missing = want.mustCite.filter((c) => !cited.some((got) => citationCovers(c, got)));
   if (missing.length > 0) {
     return { scenario, state: "correct-without-its-evidence", code: got, missingCitations: missing };
@@ -345,10 +431,23 @@ export function score(scenario, answer, root = SCENARIOS) {
  * is whether the path RESOLVES, and the answer carries the incident, so the
  * scorer can look rather than reason about it.
  *
- * A citation is checked against every slot, because the scorer is not told
- * which agent reported it. An incident with no observations at all resolves
- * nothing, which is correct: there was nothing to cite.
+ * A citation is checked against the slot of the agent that reported it.
+ *
+ * The first version searched every slot, with a comment saying the scorer is
+ * not told which agent reported the path. It is told: `citedPaths` walks
+ * `analysis.agents`, and threw the name away one line later. Codex reproduced
+ * the cost on 2026-09-08 — a readiness finding attributed to `kubernetes`, an
+ * empty kubernetes slot, and both required paths sitting in `logs`, scored
+ * `correct`. One agent was credited with what another one saw, which is the
+ * same defect `recordAgentResult` refuses in the chain.
+ *
+ * An agent that is not one of the three collection slots — the synthesiser
+ * that writes the root cause — is checked against every slot, because it is
+ * reading all of them and has no slot of its own.
  */
+/** The three slots an agent can be asked to read; anything else reads all of them. */
+export const SCORE_SLOTS = ["kubernetes", "logs", "metrics"];
+
 /** Is there any observation at all to resolve a citation against? */
 export function hasObservations(answer) {
   const obs = answer?.incident?.observations;
@@ -359,19 +458,19 @@ export function hasObservations(answer) {
 export function resolvesInSomeSlot(answer, path) {
   const obs = answer?.incident?.observations;
   if (typeof obs !== "object" || obs === null) return false;
-  const segs = segments(path);
-  for (const slot of Object.values(obs)) {
-    if (typeof slot !== "object" || slot === null) continue;
-    let cur = slot;
-    let ok = true;
-    for (const seg of segs) {
-      if (cur === null || typeof cur !== "object"
-        || !Object.prototype.hasOwnProperty.call(cur, seg)) { ok = false; break; }
-      cur = cur[seg];
-    }
-    if (ok) return true;
+  return Object.values(obs).some((slot) => resolvesIn(slot, path));
+}
+
+/** Does the path resolve inside ONE slot? Own properties only, so `toString` is not a citation. */
+export function resolvesIn(slot, path) {
+  if (typeof slot !== "object" || slot === null) return false;
+  let cur = slot;
+  for (const seg of segments(path)) {
+    if (cur === null || typeof cur !== "object"
+      || !Object.prototype.hasOwnProperty.call(cur, seg)) return false;
+    cur = cur[seg];
   }
-  return false;
+  return true;
 }
 
 /** A path as segments, with `[0]` folded into the path so indexes compare. */
@@ -388,10 +487,31 @@ export function citationCovers(required, got) {
 }
 
 export function citedPaths(answer) {
+  return citedRefs(answer).map((c) => c.ref);
+}
+
+/** Every citation with the agent that reported it, which is what decides the slot. */
+export function citedRefs(answer) {
   const agents = answer?.incident?.analysis?.agents;
   if (!Array.isArray(agents)) return [];
-  return agents.flatMap((a) => (Array.isArray(a?.findings) ? a.findings : []).map((f) => f?.source_ref))
-    .filter((r) => typeof r === "string");
+  return agents.flatMap((a) => (Array.isArray(a?.findings) ? a.findings : [])
+    .map((f) => ({ agent: typeof a?.agent === "string" ? a.agent : null, ref: f?.source_ref })))
+    .filter((c) => typeof c.ref === "string");
+}
+
+/**
+ * Does this citation resolve where its own agent could have seen it?
+ *
+ * A named collection agent is held to its own slot. Anything else — the
+ * synthesiser, or an agent whose name is missing — is held to the weaker rule
+ * of resolving somewhere, which is still stronger than not resolving at all.
+ */
+export function resolvesForAgent(answer, cited) {
+  const slot = answer?.incident?.observations?.[cited.agent];
+  if (SCORE_SLOTS.includes(cited.agent)) {
+    return resolvesIn(slot, cited.ref);
+  }
+  return resolvesInSomeSlot(answer, cited.ref);
 }
 
 /**
@@ -403,14 +523,31 @@ export function citedPaths(answer) {
  * appears beside `image-pull-failure` instead of vanishing.
  */
 export function scoreAll(answers, root = SCENARIOS) {
-  const extra = Object.keys(answers ?? {})
+  const keys = Object.keys(answers ?? {});
+  const extra = keys
     .filter((k) => attemptOf(k) !== null)
     .sort()
     .map((k) => score(k, answers[k], root));
+  /*
+   * A scenario answered ONLY under numbered attempts was still answered.
+   *
+   * The first version always emitted the bare row, so eight successful `#1`
+   * answers printed "8 correct, 8 not established, of 16" and the CLI exited 2
+   * — a clean run reported as half unestablished, and readiness read the
+   * synthetic row as a fourth attempt nobody had made. Codex measured it on
+   * 2026-09-08.
+   *
+   * A bare answer that IS present is still scored beside its attempts: two
+   * answers are two measurements, and only the absent one is synthetic.
+   */
+  const attempted = new Set(keys.filter((k) => attemptOf(k) !== null).map((k) => scenarioOf(k)));
   const scenarios = existsSync(root)
     ? readdirSync(root, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort()
     : [];
-  return [...scenarios.map((s) => score(s, answers[s] ?? null, root)), ...extra];
+  const bare = scenarios
+    .filter((s) => Object.prototype.hasOwnProperty.call(answers ?? {}, s) || !attempted.has(s))
+    .map((s) => score(s, answers?.[s] ?? null, root));
+  return [...bare, ...extra];
 }
 
 export function format(results) {
@@ -426,6 +563,10 @@ export function format(results) {
       for (const w of r.why) lines.push(`  UNQUALIFIED      ${w}`);
     } else if (r.state === "wrong") {
       lines.push(`  WRONG          ${r.scenario} → ${r.got}, expected ${r.expected}`);
+    } else if (r.state === "unasked") {
+      // Printed apart because the record keeps them apart: nobody asking is not
+      // the same failure as asking and settling nothing.
+      lines.push(`  NOT ASKED      ${r.scenario} — ${r.why}`);
     } else {
       lines.push(`  UNESTABLISHED  ${r.scenario} — ${r.why}`);
     }
@@ -434,7 +575,7 @@ export function format(results) {
   const ungrounded = results.filter((r) => r.state === "correct-without-its-evidence").length;
   const unqualified = results.filter((r) => r.state === "correct-but-unqualified").length;
   const wrong = results.filter((r) => r.state === "wrong").length;
-  const unestablished = results.filter((r) => r.state === "unestablished").length;
+  const unestablished = results.filter((r) => r.state === "unestablished" || r.state === "unasked").length;
   lines.push("", `  ${correct} correct, ${ungrounded} right code on other ground, ` +
     `${unqualified} right code held wrongly, ${wrong} wrong, ` +
     `${unestablished} not established, of ${results.length}`);
@@ -453,7 +594,7 @@ export function format(results) {
  * the fix at the source: the scorer writes what it decided, at the moment it
  * decides it, next to the cost of the run that produced it.
  */
-export function recordInto(recordPath, results, { replace = false } = {}) {
+export function recordInto(recordPath, results, { replace = false, add = false } = {}) {
   const rec = JSON.parse(readFileSync(recordPath, "utf8"));
 
   /*
@@ -472,7 +613,7 @@ export function recordInto(recordPath, results, { replace = false } = {}) {
    * eight would flip promised checks from waiting to due on the strength of a
    * run that established nothing.
    */
-  const established = results.filter((r) => r.state !== "unestablished");
+  const established = results.filter((r) => r.state !== "unestablished" && r.state !== "unasked");
   if (established.length === 0) {
     throw new Error(`refusing to record scores into ${recordPath}: every scenario came back `
       + "unestablished, which is a run that answered nothing rather than a measurement");
@@ -481,6 +622,43 @@ export function recordInto(recordPath, results, { replace = false } = {}) {
   const before = rec.scored;
   const hasVerdict = before !== null && typeof before === "object" && !Array.isArray(before)
     && Object.keys(before).length > 0;
+
+  /*
+   * A run bought in parts arrives in parts, and one record has to hold them.
+   *
+   * Grok, 2026-09-08: `latestScored` returns a SINGLE record, so a second file
+   * sends the scenarios of the first part back to unestablished — but writing
+   * the second part over the first with `--replace` orphans it just as
+   * completely, and waiting until the end means hand-entering what the last
+   * section of the protocol forbids. So there is a third door, and it is narrow
+   * on purpose: `--add` may fill a key that says nothing yet, and may rewrite a
+   * key with the SAME verdict, and may not turn one established verdict into a
+   * different one. Changing a verdict that was already established is what
+   * `--replace` is for, and it still asks the caller to say why.
+   */
+  if (hasVerdict && add && !replace) {
+    /*
+     * How much a value says, so a later part cannot say less over it.
+     *
+     * `unasked` says nothing at all, `unestablished` says it was asked and
+     * settled nothing, and anything else is a verdict. A part may raise what a
+     * key says and may repeat it; it may not lower it, and two different
+     * verdicts for one key are a conflict rather than an update.
+     */
+    const SAYS = { unasked: 0, unestablished: 1 };
+    const says = (v) => (typeof v === "string" ? (SAYS[v] ?? 2) : -1);
+    const conflicts = results.filter((r) =>
+      says(before[r.scenario]) === 2 && says(r.state) === 2 && before[r.scenario] !== r.state);
+    if (conflicts.length > 0) {
+      throw new Error(`${recordPath} already scores ${conflicts.map((c) => c.scenario).join(", ")} `
+        + "differently. Pass --replace to change a verdict, and say why the first one was wrong");
+    }
+    const arriving = results.filter((r) => says(r.state) >= says(before[r.scenario]));
+    rec.scored = { ...before, ...Object.fromEntries(arriving.map((r) => [r.scenario, r.state])) };
+    writeFileSync(recordPath, `${JSON.stringify(rec, null, 2)}\n`);
+    return rec.scored;
+  }
+
   if (hasVerdict && !replace) {
     throw new Error(`${recordPath} already carries scores. Pass --replace to overwrite them, `
       + "and say in the record why the first ones were wrong");
@@ -489,6 +667,26 @@ export function recordInto(recordPath, results, { replace = false } = {}) {
   rec.scored = Object.fromEntries(results.map((r) => [r.scenario, r.state]));
   writeFileSync(recordPath, `${JSON.stringify(rec, null, 2)}\n`);
   return rec.scored;
+}
+
+/**
+ * The four exit codes, as a function rather than as an expression inside main.
+ *
+ * Nothing spawned this script, so the only thing that read the exit code was a
+ * person. A subagent measured the consequence on 2026-09-09: dropping
+ * `correct-but-unqualified` from the failure side left every test green while a
+ * paid run whose right code was held above the ceiling exited 0 — reported as
+ * clean by the number CI reads.
+ *
+ * `0` clean, `1` something is wrong, `2` something could not be established,
+ * `3` both. The same four the gate uses, and for the same reason: a person
+ * reads the report, a machine reads only this.
+ */
+export function exitCodeFor(results) {
+  const failed = results.some((r) => r.state === "wrong" || r.state === "correct-without-its-evidence"
+    || r.state === "correct-but-unqualified");
+  const unknown = results.some((r) => r.state === "unestablished" || r.state === "unasked");
+  return (failed ? 1 : 0) + (unknown ? 2 : 0);
 }
 
 function main() {
@@ -510,7 +708,8 @@ function main() {
       process.exit(2);
     }
     try {
-      recordInto(target, results, { replace: process.argv.includes("--replace") });
+      recordInto(target, results, { replace: process.argv.includes("--replace"),
+        add: process.argv.includes("--add") });
     } catch (e) {
       process.stderr.write(`${e instanceof Error ? e.message : String(e)}\n`);
       process.exit(2);
@@ -519,9 +718,7 @@ function main() {
   }
   // Wrong is a failure; not established is not the same failure.
   // The right code on other ground is not a clean result and does not exit 0.
-  process.exit((results.some((r) => r.state === "wrong" || r.state === "correct-without-its-evidence"
-    || r.state === "correct-but-unqualified") ? 1 : 0) +
-    (results.some((r) => r.state === "unestablished") ? 2 : 0));
+  process.exit(exitCodeFor(results));
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main();

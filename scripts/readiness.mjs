@@ -114,11 +114,35 @@ export function scenariosMeasured(root = ROOT) {
     if (states.length === 0) {
       return unknown(`scenario-${n}`, latest.why ?? "no run record scores this scenario", PAID);
     }
-    const worst = states.includes("wrong") ? "wrong"
-      : states.find((x) => x !== "correct" && x !== "unestablished")
-        ?? (states.includes("unestablished") ? "unestablished" : "correct");
+    /*
+     * Ranked, so the order the attempts happen to sit in decides nothing.
+     *
+     * `find` picked whichever failing state came first, so a scenario that was
+     * both correct-without-its-evidence and correct-but-unqualified reported a
+     * different reason depending on insertion order. Codex, 2026-09-08. Both
+     * are red either way, so the figure did not move — the REASON moved, and a
+     * reason that changes with the order is not a reading of anything.
+     */
+    /*
+     * A row that says nobody asked is dropped when anything else answered.
+     *
+     * The scorer writes `unasked` for a scenario a part did not buy, and the
+     * record keeps every part — so a scenario answered under three attempt keys
+     * also carries a bare `unasked` row from the parts that asked something
+     * else. Counting it would turn six correct measurements into two unanswered
+     * scenarios, which Codex reproduced on 2026-09-08. If `unasked` is ALL
+     * there is, it stands, because then nobody really did ask.
+     */
+    const answered = states.filter((x) => x !== "unasked");
+    const kept = answered.length > 0 ? answered : states;
+    const RANK = ["wrong", "correct-without-its-evidence", "correct-but-unqualified",
+      "unestablished", "unasked", "correct"];
+    const worst = RANK.find((r) => kept.includes(r))
+      ?? kept.find((x) => x !== "correct") ?? "correct";
     const state = worst;
-    const many = states.length > 1 ? ` (${states.length} attempts, worst kept)` : "";
+    const others = [...new Set(kept.filter((x) => x !== worst))].sort();
+    const alsoSaid = state !== "correct" && others.length > 0 ? `; also ${others.join(", ")}` : "";
+    const many = kept.length > 1 ? ` (${kept.length} attempts, worst kept${alsoSaid})` : "";
     if (state === "correct") return green(`scenario-${n}`, `answered correctly in ${latest.file}${many}`);
     /*
      * The scorer has its own third state and it must survive the journey here.
@@ -129,7 +153,7 @@ export function scenariosMeasured(root = ROOT) {
      * exact collapse the rest of this file exists to refuse, committed by the
      * file that refuses it.
      */
-    if (state === "unestablished") {
+    if (state === "unestablished" || state === "unasked") {
       return unknown(`scenario-${n}`, `not established in ${latest.file}${many}`, PAID);
     }
     return red(`scenario-${n}`, `${state} in ${latest.file}${many}`);
@@ -231,7 +255,19 @@ export function latestScored(runsDir) {
           + "so what the newest run scored is unestablished" };
     }
     const scored = rec?.scored;
-    if (scored !== null && typeof scored === "object" && !Array.isArray(scored) && Object.keys(scored).length > 0) {
+    /*
+     * A record ANSWERS only if something in it was established.
+     *
+     * Keys alone were enough here, and the scorer writes a key for every
+     * scenario whatever happened. So a newer record of nothing but `unasked`
+     * and `unestablished` — which the runner produces the moment a staged part
+     * is scored — outranked an older record that actually carried verdicts, and
+     * readiness then printed "no run record scores this scenario" while one on
+     * disk did. Codex, 2026-09-08; the gate's own reader was strengthened the
+     * same day and this one was not, which is the second-carrier defect again.
+     */
+    if (scored !== null && typeof scored === "object" && !Array.isArray(scored)
+      && Object.values(scored).some((v) => v !== "unasked" && v !== "unestablished")) {
       return { scored, file: f, why: null };
     }
   }
@@ -302,7 +338,22 @@ export function gateResult(root = ROOT) {
     if (newer !== null) {
       return [unknown("gate", `the recorded gate result predates ${newer}, so it is not about this tree`)];
     }
+    /*
+     * The gate's four exit codes are FOUR, and this file folded them into two.
+     *
+     * `0` clean, `1` something failed, `2` something could not be established,
+     * `3` both. Reading anything non-zero as red turned "nobody could tell" into
+     * "it failed" — in the file whose own header says THREE STATES, NOT TWO, and
+     * this is where a readiness figure usually lies. A subagent found it on
+     * 2026-09-09, and the test that should have caught it pinned the collapse
+     * instead: `exitCode: 2` was asserted to be red.
+     *
+     * `3` is red, because it carries a real failure alongside the unknown.
+     */
     if (r.exitCode === 0) return [green("gate", "the acceptance gate passed")];
+    if (r.exitCode === 2) {
+      return [unknown("gate", "the acceptance gate could not establish some of its checks (exit 2)", "work not yet done")];
+    }
     return [red("gate", `the acceptance gate exited ${r.exitCode}`)];
   } catch (e) {
     return [unknown("gate", `out/acceptance-gate.json is unreadable: ${e instanceof Error ? e.message : String(e)}`)];

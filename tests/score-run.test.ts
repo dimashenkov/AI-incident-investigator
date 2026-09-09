@@ -7,11 +7,11 @@
  * the two and the only thing between them was somebody reading both files.
  */
 import { describe, it, expect } from "vitest";
-import { readdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { readdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 // @ts-expect-error - plain .mjs script, no types
-import { score, scoreAll, expectedFor, format, citationCovers, recordInto, scenarioOf, attemptOf, resolvesInSomeSlot } from "../scripts/score-run.mjs";
+import { score, scoreAll, expectedFor, format, citationCovers, recordInto, scenarioOf, attemptOf, resolvesInSomeSlot, refusalCeiling, exitCodeFor } from "../scripts/score-run.mjs";
 
 const SCENARIOS = new URL("../scenarios/", import.meta.url).pathname;
 /**
@@ -22,10 +22,59 @@ const SCENARIOS = new URL("../scenarios/", import.meta.url).pathname;
  * ever match must_cite and the citation verdict was noise. Caught by looking at
  * a recorded answer instead of trusting a field name.
  */
+const SLOT_OF: Record<string, string> = {
+  pods: "kubernetes", events: "kubernetes", deployment: "kubernetes",
+  lines: "logs", series: "metrics",
+};
+
+/** A path as segments, `[0]` folded in, the same reading the scorer uses. */
+const segs = (p: string) => p.replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean);
+
+/**
+ * Build an observation that actually holds these paths.
+ *
+ * A fixture that cites a path its incident does not carry is the run the
+ * scorer must refuse — so the honest fixture has to carry them, or every test
+ * here would be measuring the refusal instead of the thing it names.
+ */
+const materialise = (refs: string[]) => {
+  const obs: Record<string, any> = {};
+  for (const ref of refs) {
+    const path = segs(ref);
+    const slot = SLOT_OF[path[0]!] ?? "logs";
+    obs[slot] ??= {};
+    let cur: any = obs[slot];
+    for (let i = 0; i < path.length; i++) {
+      const here = path[i]!;
+      const key: any = /^\d+$/.test(here) ? Number(here) : here;
+      if (i === path.length - 1) { cur[key] ??= "seen"; break; }
+      const nextIsIndex = /^\d+$/.test(path[i + 1]!);
+      cur[key] ??= nextIsIndex ? [] : {};
+      cur = cur[key];
+    }
+  }
+  return obs;
+};
+
+/** Which agent could honestly have cited each path — its own slot, never another's. */
+const agentsFor = (cited: string[]) => {
+  const by = new Map<string, string[]>();
+  for (const r of cited) {
+    const slot = SLOT_OF[segs(r)[0]!] ?? "logs";
+    by.set(slot, [...(by.get(slot) ?? []), r]);
+  }
+  if (by.size === 0) return [{ agent: "kubernetes", findings: [] as unknown[] }];
+  return [...by.entries()].map(([agent, refs]) =>
+    ({ agent, findings: refs.map((r) => ({ fact: "f", source_ref: r })) }));
+};
+
 const concluded = (code: string, cited: string[] = []) => ({
   state: "concluded",
   root_cause_code: code,
-  incident: { analysis: { agents: [{ agent: "kubernetes", findings: cited.map((r) => ({ fact: "f", source_ref: r })) }] } },
+  incident: {
+    observations: { kubernetes: {}, logs: {}, metrics: {}, ...materialise(cited) },
+    analysis: { agents: agentsFor(cited) },
+  },
 });
 
 const mustCiteOf = (scenario: string): string[] => expectedFor(scenario, SCENARIOS).mustCite;
@@ -43,6 +92,13 @@ const qualified = (code: string, cited: string[], confidence: unknown, against: 
       source: "metrics", fact: "memory never approached the limit", supports: "against",
     })),
   ];
+  // Evidence names an agent, and an agent that never answered cannot have
+  // dissented — so a fixture that wants the pair weighed has to have asked both.
+  for (const name of ["kubernetes", "metrics"]) {
+    if (!a.incident.analysis.agents.some((g: any) => g.agent === name)) {
+      a.incident.analysis.agents.push({ agent: name, findings: [] });
+    }
+  }
   return a;
 };
 
@@ -88,8 +144,12 @@ describe("scoring a run against what the scenario is for", () => {
       undefined,
     ]) {
       const r = score("container-oom", answer, SCENARIOS);
-      expect(r.state, `${JSON.stringify(answer)} was scored as an answer`).toBe("unestablished");
-      expect(r.got, "an unestablished run must carry no answer to compare").toBeUndefined();
+      // A chain that ran and did not conclude is unestablished; nothing on
+      // disk at all is `unasked`, which the record has to keep apart so a
+      // later part cannot write it over an earlier part's verdict.
+      const expectState = answer === null || answer === undefined ? "unasked" : "unestablished";
+      expect(r.state, `${JSON.stringify(answer)} was scored as an answer`).toBe(expectState);
+      expect(r.got, "a run that established nothing must carry no answer to compare").toBeUndefined();
     }
   });
 
@@ -117,7 +177,9 @@ describe("scoring a run against what the scenario is for", () => {
     // finding. Comparing must_cite against the agent name matches nothing, and
     // the verdict becomes noise that always says the same thing.
     const needed = mustCiteOf("cpu-throttling");
+    const held = { observations: materialise(needed), analysis: { agents: [] } };
     const wrongPlace = { state: "concluded", root_cause_code: "CPU_THROTTLING",
+      incident: held,
       evidence: needed.map((r) => ({ source: r, fact: "f", supports: "for" })) };
     expect(score("cpu-throttling", wrongPlace, SCENARIOS).state,
       "citations in the evidence list are not the agents' source_refs").toBe("correct-without-its-evidence");
@@ -127,7 +189,7 @@ describe("scoring a run against what the scenario is for", () => {
     // every input the other cases use, and the difference is untested.
     const outsideTheIncident = { state: "concluded", root_cause_code: "CPU_THROTTLING",
       analysis: { agents: [{ findings: needed.map((r) => ({ fact: "f", source_ref: r })) }] },
-      incident: { analysis: { agents: [] } } };
+      incident: { observations: materialise(needed), analysis: { agents: [] } } };
     expect(score("cpu-throttling", outsideTheIncident, SCENARIOS).state,
       "findings outside the incident are not the incident's citations").toBe("correct-without-its-evidence");
   });
@@ -137,7 +199,7 @@ describe("scoring a run against what the scenario is for", () => {
     const names = readdirSync(SCENARIOS, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
     expect(results).toHaveLength(names.length);
     expect(results.filter((r: { state: string }) => r.state.startsWith("correct"))).toHaveLength(1);
-    expect(results.filter((r: { state: string }) => r.state === "unestablished")).toHaveLength(names.length - 1);
+    expect(results.filter((r: { state: string }) => r.state === "unasked")).toHaveLength(names.length - 1);
   });
 
   it("says the difference out loud in the report a human reads", () => {
@@ -316,12 +378,43 @@ describe("a scenario whose evidence conflicts is scored on more than its code", 
     expect(firm.state, "a refusal at 95% is not a refusal").toBe("correct-but-unqualified");
     expect(firm.why.join(" ")).toMatch(/above the ceiling/);
 
-    // Everything up to the scenario's own ceiling is the honest range, and a
-    // refusal that states no number at all is honest too.
-    for (const c of [0, 0.3, 0.6, null, undefined]) {
+    /*
+     * The ceiling for a REFUSAL is the stricter of two, and they are not equal.
+     *
+     * The scenario says 0.6 and the schema says a refusal may not exceed 0.5 —
+     * two carriers of one rule about one number, and this test asserted the
+     * looser one, so a hand-built refusal at 0.6 scored `correct` although the
+     * chain could never have produced that document. A subagent found it on
+     * 2026-09-09.
+     */
+    expect(refusalCeiling(), "read from the schema, not restated here").toBe(0.5);
+    for (const c of [0, 0.3, 0.5, null, undefined]) {
       expect(score(S, refusal(c), SCENARIOS).state, `a refusal at ${JSON.stringify(c)} is honest`)
         .toBe("correct");
     }
+    const overSchema = score(S, refusal(0.6), SCENARIOS);
+    expect(overSchema.state, "0.6 is under the scenario's ceiling and over the schema's")
+      .toBe("correct-but-unqualified");
+    expect(overSchema.why.join(" ")).toMatch(/above the ceiling of 0\.5/);
+  });
+
+  it("gives each combination of states its own exit code", () => {
+    /*
+     * The exit code was an expression inside main, and nothing spawned main —
+     * so the only reader was a person. A subagent measured it on 2026-09-09:
+     * dropping `correct-but-unqualified` from the failure side left the whole
+     * suite green while a run whose right code was held above the ceiling
+     * exited 0, which is the number a machine reads.
+     */
+    const r = (...states: string[]) => exitCodeFor(states.map((state) => ({ state })));
+    expect(r("correct"), "everything answered and right").toBe(0);
+    expect(r("correct", "wrong"), "a wrong answer is a failure").toBe(1);
+    expect(r("correct", "correct-without-its-evidence"), "right code on other ground is not clean").toBe(1);
+    expect(r("correct", "correct-but-unqualified"), "right code held wrongly is not clean").toBe(1);
+    expect(r("correct", "unestablished"), "asked and settled nothing is unknown").toBe(2);
+    expect(r("correct", "unasked"), "nobody asked is unknown").toBe(2);
+    expect(r("wrong", "unasked"), "a failure beside an unknown is both").toBe(3);
+    expect(r(), "nothing scored at all is not a clean run").toBe(0);
   });
 
   it("counts the new state separately in the report and does not exit clean", () => {
@@ -451,7 +544,7 @@ describe("an attempt is scored as itself, not lost under its scenario", () => {
     // them rather than the keys it was handed.
     const rows = scoreAll({ "image-pull-failure#1": answer("IMAGE_PULL_FAILURE") }, SCENARIOS);
     const bare = rows.find((r: { scenario: string }) => r.scenario === "container-oom");
-    expect(bare!.state, "an unanswered scenario is unestablished, not absent").toBe("unestablished");
+    expect(bare!.state, "an unanswered scenario is reported as not asked, not absent").toBe("unasked");
   });
 });
 
@@ -468,7 +561,10 @@ describe("a citation counts only when it points at something the incident holds"
       analysis: { confidence: 0.5,
         evidence: [{ source: "kubernetes", fact: "a", supports: "for" },
                    { source: "metrics", fact: "b", supports: "against" }],
-        agents: [{ agent: "kubernetes", findings: refs.map((r) => ({ fact: "f", source_ref: r })) }] },
+        // Each ref is attributed to the agent whose slot could hold it. A
+        // fixture that credits kubernetes with a metrics path is the defect
+        // this file measures elsewhere, not the honest answer it needs here.
+        agents: agentsFor(refs) },
     },
   });
 
@@ -490,7 +586,7 @@ describe("a citation counts only when it points at something the incident holds"
       .toBe("correct-without-its-evidence");
   });
 
-  it("resolves a path against every slot, since it is not told which agent cited it", () => {
+  it("resolves a path against every slot, which is the weaker rule for an agent with no slot", () => {
     const a = withObservations([]);
     expect(resolvesInSomeSlot(a, "pods[0].containers[0].last_state.terminated.reason")).toBe(true);
     expect(resolvesInSomeSlot(a, "series[0].points[3].value")).toBe(true);
@@ -525,5 +621,187 @@ describe("a citation counts only when it points at something the incident holds"
     }
     // Absent is still honest — that is why this branch is separate from the other.
     expect(score(S, refusal(undefined), SCENARIOS).state).toBe("correct");
+  });
+});
+
+/*
+ * Five ways a run could have been recorded better than it was, all found on
+ * 2026-09-08 by Codex and Grok · 2 independently, BEFORE the run they would
+ * have flattered. Each test names one and fails without its fix.
+ */
+describe("what the scorer refuses to call an answer", () => {
+  const cite = (agent: string, refs: string[]) =>
+    ({ agent, findings: refs.map((r) => ({ fact: "f", source_ref: r })) });
+
+  it("does not report a scenario unestablished when its attempts answered it", () => {
+    /*
+     * Eight successful `#1` answers printed "8 correct, 8 not established, of
+     * 16", because the bare row was emitted whether or not anything answered
+     * under it. The CLI exited 2 on a clean run, and readiness read the
+     * synthetic row as a fourth attempt nobody had made.
+     */
+    const answers: Record<string, unknown> = {};
+    const names = readdirSync(SCENARIOS, { withFileTypes: true })
+      .filter((e) => e.isDirectory()).map((e) => e.name);
+    for (const n of names) {
+      const want = expectedFor(n, SCENARIOS);
+      answers[`${n}#1`] = qualified(want.code, mustCiteOf(n), 0.5, 1);
+    }
+    const rows = scoreAll(answers, SCENARIOS);
+    expect(rows, "one row per attempt, and no synthetic row beside it").toHaveLength(names.length);
+    expect(rows.filter((r: { state: string }) => r.state === "unestablished"),
+      "a scenario answered under an attempt key was answered").toHaveLength(0);
+  });
+
+  it("still reports the bare scenario when a bare answer was recorded beside its attempts", () => {
+    // Two answers are two measurements. Only the ABSENT bare row is synthetic.
+    const rows = scoreAll({
+      "container-oom": qualified("CONTAINER_OOM", mustCiteOf("container-oom"), 0.5, 1),
+      "container-oom#2": qualified("CONTAINER_OOM", mustCiteOf("container-oom"), 0.5, 1),
+    }, SCENARIOS).filter((r: { scenario: string }) => r.scenario.startsWith("container-oom"));
+    expect(rows.map((r: { scenario: string }) => r.scenario)).toEqual(["container-oom", "container-oom#2"]);
+  });
+
+  it("refuses a citation that resolves only in another agent's slot", () => {
+    /*
+     * Codex reproduced this: a readiness finding attributed to kubernetes, an
+     * empty kubernetes slot, and both required paths sitting in logs, scored
+     * correct. One agent credited with what another one saw — the same thing
+     * recordAgentResult refuses inside the chain.
+     */
+    const needed = mustCiteOf("readiness-probe-failure");
+    const obs = materialise(needed);
+    const honest = { state: "concluded", root_cause_code: "READINESS_PROBE_FAILURE",
+      incident: { observations: obs, analysis: { agents: agentsFor(needed) } } };
+    expect(score("readiness-probe-failure", honest, SCENARIOS).state,
+      "the honest attribution must still be correct").toBe("correct");
+
+    /*
+     * Both required paths sit in ONE foreign slot, and the agent's own slot is
+     * empty. The first version of this fixture emptied kubernetes and left the
+     * kubernetes path nowhere at all — so the citation failed to resolve
+     * anywhere, and the test passed even with the slot rule turned off. The
+     * mutation run caught it; nothing else would have.
+     */
+    const elsewhere = Object.assign({}, ...Object.values(obs));
+    const misattributed = { state: "concluded", root_cause_code: "READINESS_PROBE_FAILURE",
+      incident: { observations: { kubernetes: {}, logs: elsewhere },
+        analysis: { agents: [cite("kubernetes", needed)] } } };
+    expect(resolvesInSomeSlot(misattributed, needed[0]!),
+      "the paths must resolve SOMEWHERE, or this measures the wrong refusal").toBe(true);
+    expect(score("readiness-probe-failure", misattributed, SCENARIOS).state,
+      "a path its own agent could not have seen is not that agent's citation")
+      .toBe("correct-without-its-evidence");
+  });
+
+  it("calls an answer carrying no observation unestablished, not correct", () => {
+    /*
+     * A fabricated answer holding the expected code and the two required path
+     * strings, with no observations and no facts, scored correct: "I could not
+     * look" folded into "clean".
+     */
+    const needed = mustCiteOf("container-oom");
+    const nothingToCheck = { state: "concluded", root_cause_code: "CONTAINER_OOM",
+      incident: { analysis: { agents: [cite("kubernetes", needed)] } } };
+    const r = score("container-oom", nothingToCheck, SCENARIOS);
+    expect(r.state).toBe("unestablished");
+    expect(r.why).toMatch(/no citation of it could be resolved/);
+  });
+
+  it("does not accept dissent from a source that never answered", () => {
+    /*
+     * Grok · 2: two invented rows with two different `source` strings, one for
+     * and one against, satisfied the pair. The shape was checked; the anchoring
+     * was not, so "a different source disagreed" could be written by someone
+     * who had asked no source at all.
+     */
+    const needed = mustCiteOf("conflicting-evidence");
+    const base = () => ({ state: "concluded", root_cause_code: "CONTAINER_OOM",
+      incident: { observations: materialise(needed),
+        analysis: { confidence: 0.5, agents: agentsFor(needed),
+          evidence: [{ source: "kubernetes", fact: "a", supports: "for" },
+                     { source: "metrics", fact: "b", supports: "against" }] } } });
+    expect(score("conflicting-evidence", base(), SCENARIOS).state,
+      "both sources answered, so the pair stands").toBe("correct");
+
+    const invented = base();
+    invented.incident.analysis.evidence = [
+      { source: "datadog", fact: "a", supports: "for" },
+      { source: "pagerduty", fact: "b", supports: "against" }];
+    const r = score("conflicting-evidence", invented, SCENARIOS);
+    expect(r.state, "a source that never answered cannot have dissented").toBe("correct-but-unqualified");
+    expect(r.why.join(" ")).toMatch(/nothing was weighed|no conflict/);
+  });
+});
+
+describe("a run bought in parts is recorded in one record", () => {
+  const rec = () => {
+    const d = mkdtempSync(join(tmpdir(), "rec-"));
+    const f = join(d, "2026-09-08-a.json");
+    writeFileSync(f, JSON.stringify({ when: "2026-09-08", scored: null }));
+    return { d, f };
+  };
+
+  it("fills keys the record does not answer yet, and leaves the rest standing", () => {
+    /*
+     * Grok, 2026-09-08: latestScored returns a SINGLE record, so a second file
+     * sends part one back to unestablished — and --replace over the same file
+     * orphans it just as completely. This is the third door.
+     */
+    const { d, f } = rec();
+    try {
+      recordInto(f, [{ scenario: "alpha", state: "correct" },
+                     { scenario: "beta", state: "unestablished" }]);
+      recordInto(f, [{ scenario: "alpha", state: "unestablished" },
+                     { scenario: "beta", state: "wrong" }], { add: true });
+      const after = JSON.parse(readFileSync(f, "utf8")).scored;
+      expect(after.alpha, "an established verdict is not undone by a later part").toBe("correct");
+      expect(after.beta, "and a key that said nothing yet is filled").toBe("wrong");
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it("carries six correct attempts through three parts without losing one", () => {
+    /*
+     * Codex reproduced this on 2026-09-08, against the staged purchase itself:
+     * part 2 scores an answers file with no readiness keys, so a bare
+     * `readiness-probe-failure` row arrives — and merged beside the three
+     * correct attempts part 1 recorded, it turned six correct measurements into
+     * two unanswered scenarios, each reported as "4 attempts, worst kept".
+     *
+     * This walks the parts through the real scorer and the real reader, which
+     * is the only place the defect showed.
+     */
+    const { d, f } = rec();
+    try {
+      const part = (scenario: string, n: number) => {
+        const answers: Record<string, unknown> = {};
+        for (let i = 1; i <= n; i++) {
+          answers[`${scenario}#${i}`] =
+            qualified(expectedFor(scenario, SCENARIOS).code, mustCiteOf(scenario), 0.5, 1);
+        }
+        recordInto(f, scoreAll(answers, SCENARIOS), { add: true });
+      };
+      part("readiness-probe-failure", 3);
+      part("image-pull-failure", 3);
+
+      const scored = JSON.parse(readFileSync(f, "utf8")).scored;
+      for (const s of ["readiness-probe-failure", "image-pull-failure"]) {
+        for (let i = 1; i <= 3; i++) {
+          expect(scored[`${s}#${i}`], `${s}#${i} must survive the other part`).toBe("correct");
+        }
+        expect(scored[s], "and the bare key must still say only that nobody asked it").toBe("unasked");
+      }
+      expect(scored["container-oom"], "a scenario no part bought says nobody asked").toBe("unasked");
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it("refuses to turn one established verdict into a different one without --replace", () => {
+    const { d, f } = rec();
+    try {
+      recordInto(f, [{ scenario: "alpha", state: "correct" }]);
+      expect(() => recordInto(f, [{ scenario: "alpha", state: "wrong" }], { add: true }))
+        .toThrow(/scores alpha differently/);
+      expect(JSON.parse(readFileSync(f, "utf8")).scored.alpha).toBe("correct");
+    } finally { rmSync(d, { recursive: true, force: true }); }
   });
 });
