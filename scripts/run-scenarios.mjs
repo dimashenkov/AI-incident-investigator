@@ -142,6 +142,33 @@ export function alertFor(scenario, root = SCENARIOS) {
 }
 
 /**
+ * What each key will post, worked out before a single call is made.
+ *
+ * Exported so the body can be checked without buying a run. Nothing checked it
+ * before: the harness builds its own item and the generate tests read the
+ * workflow as text, so the one field a real call must carry was the one field
+ * nothing looked at — and three paid executions came back "no such scenario:
+ * undefined" on 2026-09-07, refused at the first node.
+ *
+ * Throws rather than exiting, so a caller that is not the CLI can see why.
+ */
+export function planFor(keys, root = SCENARIOS) {
+  const plan = [];
+  for (const key of keys) {
+    const { scenario } = splitKey(key);
+    const a = alertFor(scenario, root);
+    if (a.state !== "known") throw new Error(`refusing to start: ${a.why}`);
+    /*
+     * The SCENARIO travels with the alert, because the workflow asks for it.
+     * It is added BESIDE the alert rather than into it: alert.json is what a
+     * provider would hand over, and this field is ours.
+     */
+    plan.push({ key, alert: { ...a.alert, scenario } });
+  }
+  return plan;
+}
+
+/**
  * What one call produced, in the three states this project keeps apart.
  *
  * `answered` carries the body whatever it says — a refusal by the chain is an
@@ -450,15 +477,12 @@ async function main() {
     }
   }
 
-  const plan = [];
-  for (const key of keys) {
-    const { scenario } = splitKey(key);
-    const a = alertFor(scenario);
-    if (a.state !== "known") {
-      process.stderr.write(`refusing to start: ${a.why}\n`);
-      process.exit(2);
-    }
-    plan.push({ key, alert: a.alert });
+  let plan;
+  try {
+    plan = planFor(keys);
+  } catch (e) {
+    process.stderr.write(`${e instanceof Error ? e.message : String(e)}\n`);
+    process.exit(2);
   }
 
   const when = new Date().toISOString().slice(0, 10);

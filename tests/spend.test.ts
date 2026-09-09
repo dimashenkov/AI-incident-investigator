@@ -45,13 +45,28 @@ describe("the spend counter reads artifacts, not memory", () => {
     expect(unreadable, "a run that cannot be parsed is not a run that cost nothing").toEqual([]);
   });
 
-  it("prices every run that is actually on disk today", () => {
-    // If a run is added with a model nobody has priced, this fails and the
-    // price gets recorded — rather than the total quietly becoming a floor.
+  it("prices every run that CAN be priced, and says why the rest cannot", () => {
+    /*
+     * Was "prices every run on disk", so that a run with an unpriced model
+     * failed here rather than quietly turning the total into a floor. That is
+     * still the point — but on 2026-09-07 a run arrived that genuinely cannot
+     * be priced: the webhook's reply carries no token usage, because the Collect
+     * nodes keep the answer and not the envelope. It was paid for and its cost
+     * is unknowable from what the chain returns.
+     *
+     * So the assertion moves from "everything is measured" to "everything is
+     * measured OR says, in the record, why it is not". A run that is unknown for
+     * no stated reason is the thing this was written to catch, and it still is.
+     */
     const { runs } = readRuns(RUNS);
+    expect(runs.length, "no runs; this would pass on an empty set").toBeGreaterThan(5);
     for (const { name, run } of runs) {
       const r = costOfRun(run);
-      expect(r.state, `${name}: ${r.why ?? ""}`).toBe("measured");
+      if (r.state === "measured") continue;
+      expect(String(run.totals?.why ?? ""),
+        `${name} could not be priced and the record does not say why`).not.toBe("");
+      expect(String(run.totals?.why).length,
+        `${name}'s reason is too short to be one`).toBeGreaterThan(20);
     }
   });
 

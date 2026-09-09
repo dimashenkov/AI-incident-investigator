@@ -1,0 +1,17 @@
+{
+  "readiness-probe-failure#1": {
+    "index": 0,
+    "state": "refused",
+    "reason": "no such scenario: undefined; this workflow carries application-startup-failure, conflicting-evidence, container-oom, cpu-throttling, deployment-regression, image-pull-failure, insufficient-evidence, readiness-probe-failure"
+  },
+  "readiness-probe-failure#2": {
+    "index": 0,
+    "state": "refused",
+    "reason": "no such scenario: undefined; this workflow carries application-startup-failure, conflicting-evidence, container-oom, cpu-throttling, deployment-regression, image-pull-failure, insufficient-evidence, readiness-probe-failure"
+  },
+  "readiness-probe-failure#3": {
+    "index": 0,
+    "state": "refused",
+    "reason": "no such scenario: undefined; this workflow carries application-startup-failure, conflicting-evidence, container-oom, cpu-throttling, deployment-regression, image-pull-failure, insufficient-evidence, readiness-probe-failure"
+  }
+}

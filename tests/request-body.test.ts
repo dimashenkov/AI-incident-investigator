@@ -77,3 +77,47 @@ describe("the request that spends the money, evaluated rather than matched", () 
     expect(JSON.parse(body.messages[1].content)).toEqual({ deep: { nested: [1, 2, 3] } });
   });
 });
+
+/*
+ * The OTHER paid request: the one this repository posts to the webhook.
+ *
+ * The file above covers the body that goes to OpenAI. Nothing covered the body
+ * that starts the chain — the harness builds its own item, and the generate
+ * tests read the workflow as text. So the one field a real call must carry was
+ * the one field nothing checked, and three paid executions on 2026-09-07 came
+ * back "no such scenario: undefined", refused at the first node.
+ *
+ * Nothing was spent on models: the refusal is before the first Ask. What was
+ * spent is the run.
+ */
+describe("the body this repository posts to the webhook", () => {
+  it("carries the scenario the Assemble node asks for", async () => {
+    // @ts-expect-error - plain .mjs script, no types
+    const { planFor } = await import("../scripts/run-scenarios.mjs");
+    const plan = planFor(["container-oom", "image-pull-failure#2"]);
+    expect(plan, "no plan; this would pass on an empty set").toHaveLength(2);
+    expect(plan[0]!.alert.scenario, "Assemble reads body.scenario").toBe("container-oom");
+    expect(plan[1]!.alert.scenario, "an attempt suffix is ours, not the chain's")
+      .toBe("image-pull-failure");
+    // And the alert's own fields survive: it is what a provider handed over.
+    expect(plan[0]!.alert.id).toBeTruthy();
+    expect(plan[0]!.alert.title).toBeTruthy();
+  });
+
+  it("names a scenario the deployed workflow actually carries", async () => {
+    /*
+     * The refusal message lists what the workflow holds. Comparing the two
+     * lists here means a scenario added to disk and not regenerated into the
+     * workflow fails before a call is bought, rather than after.
+     */
+    // @ts-expect-error - plain .mjs script, no types
+    const { planFor } = await import("../scripts/run-scenarios.mjs");
+    const { workflow } = await generate();
+    const assemble = (workflow.nodes as Node[]).find((n) => n.name === "Assemble")!;
+    const code = assemble.parameters.jsCode as string;
+    for (const p of planFor(["container-oom", "conflicting-evidence"])) {
+      expect(code, `the workflow does not carry ${p.alert.scenario}`)
+        .toContain(`"${p.alert.scenario}"`);
+    }
+  });
+});
