@@ -1,0 +1,1015 @@
+{
+  "readiness-probe-failure#1": {
+    "index": 0,
+    "state": "concluded",
+    "scenario": "readiness-probe-failure",
+    "normalised": 0,
+    "raw_answers": {
+      "kubernetes": "{\n  \"agent\": \"kubernetes\",\n  \"status\": \"ok\",\n  \"findings\": [\n    { \"fact\": \"the pod is in phase Running but not ready\", \"source_ref\": \"pods[0].phase\", \"severity\": \"warning\" },\n    { \"fact\": \"the event says: Readiness probe failed: HTTP probe failed with statuscode: 503\", \"source_ref\": \"events[0].message\", \"severity\": \"warning\" },\n    { \"fact\": \"the deployment image is registry.internal/search-api:5.2.0\", \"source_ref\": \"deployment.image\" },\n    { \"fact\": \"the container's memory limit is 2Gi\", \"source_ref\": \"pods[0].containers[0].limits.memory\" },\n    { \"fact\": \"the container's cpu limit is 2000m\", \"source_ref\": \"pods[0].containers[0].limits.cpu\" }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "logs": "{\n  \"agent\": \"logs\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"index warmup at 61%, readiness withheld\",\n      \"source_ref\": \"lines[0].message\"\n    },\n    {\n      \"fact\": \"index warmup at 68%, readiness withheld\",\n      \"source_ref\": \"lines[1].message\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "metrics": "{\n  \"agent\": \"metrics\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"container memory working set reached 1181116006 bytes by 09:13\",\n      \"source_ref\": \"series[0].points[2].value\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "root-cause": "{\n  \"agent\": \"root_cause\",\n  \"status\": \"ok\",\n  \"findings\": [\n    { \"fact\": \"the pod is in phase Running but not ready\", \"source_ref\": \"pods[0].phase\" },\n    { \"fact\": \"the event says: Readiness probe failed: HTTP probe failed with statuscode: 503\", \"source_ref\": \"events[0].message\" },\n    { \"fact\": \"index warmup at 61%, readiness withheld\", \"source_ref\": \"lines[0].message\" },\n    { \"fact\": \"index warmup at 68%, readiness withheld\", \"source_ref\": \"lines[1].message\" }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0\n}"
+    },
+    "root_cause_code": "INSUFFICIENT_EVIDENCE",
+    "root_cause": "The evidence collected does not support naming a cause.",
+    "confidence": 0,
+    "evidence": [],
+    "incident": {
+      "incident_id": "INC-2026-0301",
+      "status": "insufficient_evidence",
+      "service": "search-api",
+      "namespace": "production",
+      "cluster": "prod-eu",
+      "started_at": "2026-09-04T09:12:00Z",
+      "scenario": "readiness-probe-failure",
+      "source": {
+        "provider": "fake-datadog",
+        "alert": {
+          "id": "alert-7b20",
+          "title": "search-api removed from load balancer",
+          "triggered_at": "2026-09-04T09:12:00Z",
+          "severity": "warning",
+          "monitor_id": "mon-2210",
+          "tags": [
+            "service:search-api",
+            "env:production"
+          ]
+        }
+      },
+      "observations": {
+        "kubernetes": {
+          "collected_at": "2026-09-04T09:13:05Z",
+          "pods": [
+            {
+              "name": "search-api-58d9c7f6b-t4wqz",
+              "namespace": "production",
+              "phase": "Running",
+              "restart_count": 0,
+              "containers": [
+                {
+                  "name": "search-api",
+                  "ready": false,
+                  "restart_count": 0,
+                  "limits": {
+                    "memory": "2Gi",
+                    "cpu": "2000m"
+                  },
+                  "requests": {
+                    "memory": "1Gi",
+                    "cpu": "1000m"
+                  }
+                }
+              ]
+            }
+          ],
+          "events": [
+            {
+              "type": "Warning",
+              "reason": "Unhealthy",
+              "message": "Readiness probe failed: HTTP probe failed with statuscode: 503",
+              "count": 27,
+              "last_seen": "2026-09-04T09:12:58Z",
+              "involved_object": "pod/search-api-58d9c7f6b-t4wqz"
+            }
+          ],
+          "deployment": {
+            "name": "search-api",
+            "namespace": "production",
+            "replicas": {
+              "desired": 4,
+              "ready": 1,
+              "available": 1
+            },
+            "image": "registry.internal/search-api:5.2.0"
+          },
+          "provenance": {
+            "collection_id": "16e5dac2-5782-415a-8d25-ccba8e646cf8",
+            "requested_for": "INC-2026-0301",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-kubernetes"
+          }
+        },
+        "logs": {
+          "collected_at": "2026-09-04T09:13:07Z",
+          "window": {
+            "from": "2026-09-04T09:05:00Z",
+            "to": "2026-09-04T09:13:00Z"
+          },
+          "truncated": true,
+          "lines": [
+            {
+              "ts": "2026-09-04T09:11:40Z",
+              "level": "warn",
+              "container": "search-api",
+              "message": "index warmup at 61%, readiness withheld"
+            },
+            {
+              "ts": "2026-09-04T09:12:30Z",
+              "level": "warn",
+              "container": "search-api",
+              "message": "index warmup at 68%, readiness withheld"
+            }
+          ],
+          "provenance": {
+            "collection_id": "16e5dac2-5782-415a-8d25-ccba8e646cf8",
+            "requested_for": "INC-2026-0301",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-logs"
+          }
+        },
+        "metrics": {
+          "collected_at": "2026-09-04T09:13:09Z",
+          "window": {
+            "from": "2026-09-04T09:05:00Z",
+            "to": "2026-09-04T09:13:00Z"
+          },
+          "series": [
+            {
+              "name": "container_memory_working_set_bytes",
+              "unit": "bytes",
+              "container": "search-api",
+              "points": [
+                {
+                  "ts": "2026-09-04T09:07:00Z",
+                  "value": 934281216
+                },
+                {
+                  "ts": "2026-09-04T09:10:00Z",
+                  "value": 1073741824
+                },
+                {
+                  "ts": "2026-09-04T09:13:00Z",
+                  "value": 1181116006
+                }
+              ]
+            }
+          ],
+          "provenance": {
+            "collection_id": "16e5dac2-5782-415a-8d25-ccba8e646cf8",
+            "requested_for": "INC-2026-0301",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-metrics"
+          }
+        }
+      },
+      "collection": {
+        "kubernetes": {
+          "state": "collected"
+        },
+        "logs": {
+          "state": "collected"
+        },
+        "metrics": {
+          "state": "collected"
+        }
+      },
+      "analysis": {
+        "agents": [
+          {
+            "agent": "kubernetes",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the pod is in phase Running but not ready",
+                "source_ref": "pods[0].phase",
+                "severity": "warning"
+              },
+              {
+                "fact": "the event says: Readiness probe failed: HTTP probe failed with statuscode: 503",
+                "source_ref": "events[0].message",
+                "severity": "warning"
+              },
+              {
+                "fact": "the deployment image is registry.internal/search-api:5.2.0",
+                "source_ref": "deployment.image"
+              },
+              {
+                "fact": "the container's memory limit is 2Gi",
+                "source_ref": "pods[0].containers[0].limits.memory"
+              },
+              {
+                "fact": "the container's cpu limit is 2000m",
+                "source_ref": "pods[0].containers[0].limits.cpu"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "logs",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "index warmup at 61%, readiness withheld",
+                "source_ref": "lines[0].message"
+              },
+              {
+                "fact": "index warmup at 68%, readiness withheld",
+                "source_ref": "lines[1].message"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "metrics",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "container memory working set reached 1181116006 bytes by 09:13",
+                "source_ref": "series[0].points[2].value"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "root_cause",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the pod is in phase Running but not ready",
+                "source_ref": "pods[0].phase"
+              },
+              {
+                "fact": "the event says: Readiness probe failed: HTTP probe failed with statuscode: 503",
+                "source_ref": "events[0].message"
+              },
+              {
+                "fact": "index warmup at 61%, readiness withheld",
+                "source_ref": "lines[0].message"
+              },
+              {
+                "fact": "index warmup at 68%, readiness withheld",
+                "source_ref": "lines[1].message"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          }
+        ],
+        "root_cause_code": "INSUFFICIENT_EVIDENCE",
+        "root_cause": "The evidence collected does not support naming a cause.",
+        "confidence": 0,
+        "evidence": []
+      },
+      "remediation": {
+        "recommended_actions": []
+      },
+      "conversation": {
+        "provider": "fake-slack",
+        "channel_id": "fake-prod-incidents",
+        "thread_id": "thread-INC-2026-0301",
+        "incident_id": "INC-2026-0301",
+        "messages": [
+          {
+            "role": "system",
+            "text": "INC-2026-0301: search-api in production — investigating.",
+            "ts": "2026-09-04T09:12:00Z",
+            "incident_id": "INC-2026-0301"
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0301",
+            "ts": "2026-09-04T09:12:00Z",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the pod is in phase Running but not ready"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the event says: Readiness probe failed: HTTP probe failed with statuscode: 503"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the deployment image is registry.internal/search-api:5.2.0"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container's memory limit is 2Gi"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container's cpu limit is 2000m"
+              }
+            ],
+            "text": "kubernetes: the pod is in phase Running but not ready; the event says: Readiness probe failed: HTTP probe failed with statuscode: 503; the deployment image is registry.internal/search-api:5.2.0; the container's memory limit is 2Gi; the container's cpu limit is 2000m."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0301",
+            "ts": "2026-09-04T09:12:00Z",
+            "cited_evidence": [
+              {
+                "source": "logs",
+                "fact": "index warmup at 61%, readiness withheld"
+              },
+              {
+                "source": "logs",
+                "fact": "index warmup at 68%, readiness withheld"
+              }
+            ],
+            "text": "logs: index warmup at 61%, readiness withheld; index warmup at 68%, readiness withheld."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0301",
+            "ts": "2026-09-04T09:12:00Z",
+            "cited_evidence": [
+              {
+                "source": "metrics",
+                "fact": "container memory working set reached 1181116006 bytes by 09:13"
+              }
+            ],
+            "text": "metrics: container memory working set reached 1181116006 bytes by 09:13."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0301",
+            "ts": "2026-09-04T09:12:00Z",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the pod is in phase Running but not ready"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the event says: Readiness probe failed: HTTP probe failed with statuscode: 503"
+              },
+              {
+                "source": "logs",
+                "fact": "index warmup at 61%, readiness withheld"
+              },
+              {
+                "source": "logs",
+                "fact": "index warmup at 68%, readiness withheld"
+              }
+            ],
+            "text": "root_cause: the pod is in phase Running but not ready; the event says: Readiness probe failed: HTTP probe failed with statuscode: 503; index warmup at 61%, readiness withheld; index warmup at 68%, readiness withheld."
+          },
+          {
+            "role": "system",
+            "incident_id": "INC-2026-0301",
+            "ts": "2026-09-04T09:12:00Z",
+            "text": "No cause was established from the recorded analysis."
+          }
+        ]
+      }
+    },
+    "thread": [
+      "INC-2026-0301: search-api in production — investigating.",
+      "kubernetes: the pod is in phase Running but not ready; the event says: Readiness probe failed: HTTP probe failed with statuscode: 503; the deployment image is registry.internal/search-api:5.2.0; the container's memory limit is 2Gi; the container's cpu limit is 2000m.",
+      "logs: index warmup at 61%, readiness withheld; index warmup at 68%, readiness withheld.",
+      "metrics: container memory working set reached 1181116006 bytes by 09:13.",
+      "root_cause: the pod is in phase Running but not ready; the event says: Readiness probe failed: HTTP probe failed with statuscode: 503; index warmup at 61%, readiness withheld; index warmup at 68%, readiness withheld.",
+      "No cause was established from the recorded analysis."
+    ]
+  },
+  "readiness-probe-failure#2": {
+    "index": 0,
+    "state": "refused",
+    "agent": "kubernetes",
+    "scenario": "readiness-probe-failure",
+    "incident": {
+      "incident_id": "INC-2026-0301",
+      "status": "investigating",
+      "service": "search-api",
+      "namespace": "production",
+      "cluster": "prod-eu",
+      "started_at": "2026-09-04T09:12:00Z",
+      "scenario": "readiness-probe-failure",
+      "source": {
+        "provider": "fake-datadog",
+        "alert": {
+          "id": "alert-7b20",
+          "title": "search-api removed from load balancer",
+          "triggered_at": "2026-09-04T09:12:00Z",
+          "severity": "warning",
+          "monitor_id": "mon-2210",
+          "tags": [
+            "service:search-api",
+            "env:production"
+          ]
+        }
+      },
+      "observations": {
+        "kubernetes": {
+          "collected_at": "2026-09-04T09:13:05Z",
+          "pods": [
+            {
+              "name": "search-api-58d9c7f6b-t4wqz",
+              "namespace": "production",
+              "phase": "Running",
+              "restart_count": 0,
+              "containers": [
+                {
+                  "name": "search-api",
+                  "ready": false,
+                  "restart_count": 0,
+                  "limits": {
+                    "memory": "2Gi",
+                    "cpu": "2000m"
+                  },
+                  "requests": {
+                    "memory": "1Gi",
+                    "cpu": "1000m"
+                  }
+                }
+              ]
+            }
+          ],
+          "events": [
+            {
+              "type": "Warning",
+              "reason": "Unhealthy",
+              "message": "Readiness probe failed: HTTP probe failed with statuscode: 503",
+              "count": 27,
+              "last_seen": "2026-09-04T09:12:58Z",
+              "involved_object": "pod/search-api-58d9c7f6b-t4wqz"
+            }
+          ],
+          "deployment": {
+            "name": "search-api",
+            "namespace": "production",
+            "replicas": {
+              "desired": 4,
+              "ready": 1,
+              "available": 1
+            },
+            "image": "registry.internal/search-api:5.2.0"
+          },
+          "provenance": {
+            "collection_id": "16e5dac2-5782-415a-8d25-ccba8e646cf8",
+            "requested_for": "INC-2026-0301",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-kubernetes"
+          }
+        },
+        "logs": {
+          "collected_at": "2026-09-04T09:13:07Z",
+          "window": {
+            "from": "2026-09-04T09:05:00Z",
+            "to": "2026-09-04T09:13:00Z"
+          },
+          "truncated": true,
+          "lines": [
+            {
+              "ts": "2026-09-04T09:11:40Z",
+              "level": "warn",
+              "container": "search-api",
+              "message": "index warmup at 61%, readiness withheld"
+            },
+            {
+              "ts": "2026-09-04T09:12:30Z",
+              "level": "warn",
+              "container": "search-api",
+              "message": "index warmup at 68%, readiness withheld"
+            }
+          ],
+          "provenance": {
+            "collection_id": "16e5dac2-5782-415a-8d25-ccba8e646cf8",
+            "requested_for": "INC-2026-0301",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-logs"
+          }
+        },
+        "metrics": {
+          "collected_at": "2026-09-04T09:13:09Z",
+          "window": {
+            "from": "2026-09-04T09:05:00Z",
+            "to": "2026-09-04T09:13:00Z"
+          },
+          "series": [
+            {
+              "name": "container_memory_working_set_bytes",
+              "unit": "bytes",
+              "container": "search-api",
+              "points": [
+                {
+                  "ts": "2026-09-04T09:07:00Z",
+                  "value": 934281216
+                },
+                {
+                  "ts": "2026-09-04T09:10:00Z",
+                  "value": 1073741824
+                },
+                {
+                  "ts": "2026-09-04T09:13:00Z",
+                  "value": 1181116006
+                }
+              ]
+            }
+          ],
+          "provenance": {
+            "collection_id": "16e5dac2-5782-415a-8d25-ccba8e646cf8",
+            "requested_for": "INC-2026-0301",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-metrics"
+          }
+        }
+      },
+      "collection": {
+        "kubernetes": {
+          "state": "collected"
+        },
+        "logs": {
+          "state": "collected"
+        },
+        "metrics": {
+          "state": "collected"
+        }
+      },
+      "analysis": {
+        "agents": [],
+        "root_cause_code": null,
+        "root_cause": null,
+        "confidence": null,
+        "evidence": []
+      },
+      "remediation": {
+        "recommended_actions": []
+      },
+      "conversation": {
+        "provider": "fake-slack",
+        "channel_id": "fake-prod-incidents",
+        "thread_id": "thread-INC-2026-0301",
+        "incident_id": "INC-2026-0301",
+        "messages": []
+      }
+    },
+    "prompt": "# Kubernetes Agent\n\nYou are given the Kubernetes observation for exactly one incident. Report what\nthe cluster state shows.\n\n**Do not diagnose the incident.** Naming the cause is another agent's job, and\nit is given your findings to do it with. Reporting what an event says is not\ndiagnosing: if `events[0].message` reads `Failed to pull image ... not found`,\nthat sentence is the observation talking, and quoting it is your work. Deciding\nthat the incident IS an image-pull failure is not.\n\n## What you receive\n\nA JSON object with the incident id, and the `kubernetes` observation for that\nincident and no other:\n\n```\n{ \"incident_id\": \"...\", \"observation\": { \"collected_at\": ..., \"pods\": [...],\n                                         \"events\": [...], \"deployment\": {...} } }\n```\n\n## What you return\n\nJSON matching the agent-result schema, with `agent` set to `kubernetes`. Nothing\nelse — no prose before or after.\n\n```json\n{\n  \"agent\": \"kubernetes\",\n  \"status\": \"ok\",\n  \"findings\": [{ \"fact\": \"...\", \"source_ref\": \"collected_at\", \"severity\": \"warning\" }],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}\n```\n\nThe `source_ref` shown there is `collected_at` on purpose: it is the one path\npresent in every observation, so an answer copying it literally still cites\nsomething real. Yours should point at whatever your fact is about, and\n`collected_at` almost never is.\n\nThe `hypotheses` list is shown empty on purpose too. A filled-in example is a\ntrap: the natural way to answer is to rewrite the finding and leave the\nhypothesis alone, and then `supported_by` names a citation your findings no\nlonger carry, and the whole answer is refused.\n\n## What to report\n\n**Your answer has two parts, and it is incomplete without either.** Not two\npriorities — priorities compete, and each time this file has ranked them, the\nlower one has vanished from the answer. Measured five times in three days: the\nconfiguration duty displaced the event, the symptom-first correction displaced\nthe configuration, and on 2026-09-07 \"report every distinct symptom\" displaced\nit again — three symptoms cited, `deployment.image` absent, three runs out of\nthree.\n\n| Part | Without it |\n|---|---|\n| **the symptoms** — what the observation shows going wrong | the next agent has no cause to name |\n| **the configuration** — the values only your slot holds | the next agent has a cause and no way to weigh it |\n\nWrite the symptoms first because they are what the incident is about. Then stop\nand ask: **which rows of the configuration table apply to what I just wrote?**\nRows, plural — they are not exclusive, and more than one usually fires. Answer\nit before you finish.\n\n| Look at | Report |\n|---|---|\n| `events` | every event that shows something wrong **or something CHANGING**, quoting its message |\n| pod and container state | a phase, a readiness, a restart count, a termination that is not normal |\n| **then** the configuration below | the values only you can see |\n\n**A change is reportable even when nothing looks wrong.** A rollout, a scale-up,\na replica set replacing another — those events say `Normal`, and they are the\nonly thing that can explain a failure whose pods are all healthy. Quote the\nevent and give its `last_seen`; the time is the whole point, because a cause of\nthis kind is a change that lines up with the first error.\n\nMeasured on 2026-09-08, before the run that would have paid for it: the file\ntold you to report events that show something WRONG, so an obedient agent\ndropped `ScalingReplicaSet` and the one scenario built around a rollout came\nback either wrong or right-for-the-wrong-reason. The evidence was filtered out\nbefore the agent that needed it ever saw it.\n\n**Report every distinct symptom; report each one once.** A failing probe and a\nrestarting container are two findings. Two events saying the same thing are one:\ncite the one that says it precisely — `Failed to pull image ... not found`\nrather than `Back-off pulling image`.\n\n**Two things are equivalent only when they say the same thing.** An event and a\npod state are different sources and both are reported: a pod waiting in\n`ImagePullBackOff` and an event saying `Failed to pull image ... not found` are\ntwo findings, not one, and the event is the one that says why. Grok, 2026-09-07:\nread loosely, deduplication drops the finding that names the cause and keeps the\nvague one.\n\n**You hold the configuration, and the other agents do not.** You are the only\nagent that can see the container's limits, the deployment's image and its\nreplica count. The logs agent sees lines; the metrics agent sees numbers. When\ntheir numbers turn out to matter, the value those numbers are measured against\nis in YOUR observation and nowhere else.\n\nMeasured live on 2026-09-06, twice in one run: the metrics agent reported\nthrottled time and nobody cited `pods[0].containers[0].limits.cpu`, because it\nis not in the metrics slot; and an image could not be pulled with nobody citing\n`deployment.image`.\n\n**The configuration table is not optional, and it is the half most often\ndropped.** For every symptom above, find its row here and report that value too:\n\n**Every row that matches fires, and rows are not exclusive.** A pod can be\nunready and its event name an image; that is two rows and two values, not a\nchoice between them.\n\n**A row is matched on the words in front of you, not on what they mean.** You\ndo not have to decide what is wrong to notice that an event names an image —\nmatching a row is reading, and reading is not diagnosing.\n\n| If the observation contains | Also report |\n|---|---|\n| an event or a state that **names an image** | `deployment.image` |\n| a container terminated, restarting, or unhealthy | its `limits`, memory and cpu |\n| a pod not ready or a probe failing | the probe's configuration, if the observation carries one |\n| **nothing wrong at all, but there are pods** | the limits anyway — another agent's numbers may be measured against them |\n\nThe image row is first because it is the one measured missing: on 2026-09-07 the\nagent quoted an event reading `Failed to pull image ... not found` three times\nout of three and never reported `deployment.image`. The event was in the answer.\nThe row was not matched, because matching it looked like naming the cause.\n\nThe last row is not permission to name a cause. It is the case where your slot\nis quiet and somebody else's is not, and the number they need is yours to\nprovide.\n\nEXAMPLE FOR ONE INCIDENT — an image that could not be pulled. The two paths\nbelow exist in THAT observation and may not exist in yours. Copy the order — the\nevent first, the value it names second — and read the paths from what you were\ngiven.\n\n```json\n\"findings\": [\n  { \"fact\": \"the event says: Failed to pull image ... not found\", \"source_ref\": \"events[0].message\" },\n  { \"fact\": \"the deployment image is the one your observation names\", \"source_ref\": \"deployment.image\" }\n]\n```\n\nCodex, 2026-09-06: an earlier version put a marker inside the `source_ref`\nitself, which demonstrated a citation this system would refuse. The label\nbelongs around the example, not inside the thing being shown.\n\n**Report configuration; do not rank it.** A configuration finding reads `the\ncontainer's cpu limit is 250m`, never `the cpu limit was too low`. The first is\nwhat the observation says. The second is a diagnosis, which you do not make, and\nwhich the root cause agent has the other agents' numbers to make properly.\n\n**Report the value, not any value.** Read as \"any configured number\", this\nbecomes noise: a log line saying `batch size 18400 exceeds configured page size\n500` names a configured value, and the page size is the application's business\nrather than the cluster's. Report what the cluster itself refuses or limits.\n\n## What each status means\n\n| What you see | What to return |\n|---|---|\n| a symptom | findings about it, **and** the configuration it turns on |\n| no symptom, but pods and a deployment are there | `status: \"ok\"`, with the configuration as your findings |\n| the slot is empty, or holds no pods and no deployment | `status: \"no_data\"`, empty findings, `confidence` 0 |\n| you cannot read the observation | `status: \"error\"` with `error` set, empty arrays, `confidence` 0 |\n\n**No symptom is not the same as nothing.** Reporting a limit that is really in\nthe observation is not inventing a finding. Inventing is claiming a symptom\nnobody can see.\n\n**`no_data` and `error` must not arrive as the same one.** They are different\nanswers: one says the slot was read and held nothing, the other says it could\nnot be read. Collapsing them tells the next agent that an absence was\nestablished when nobody established anything.\n\nThe `error` field belongs **only** to `status: \"error\"`. An answer carrying it\nbeside `ok` or `no_data` is refused for that alone, after the call is paid.\n\n## Citations\n\n**Every finding needs a `source_ref`** — a JSON path into the observation you\nwere given, such as `pods[0].containers[0].last_state.terminated.reason`. A fact\nnobody can trace back is an opinion, and it is refused.\n\n**A `source_ref` is a path inside the observation you were given.** Write\n`pods[0].containers[0].last_state.terminated.reason`; if you begin it with\n`observation.` that is accepted too — the prefix is stripped and what remains\nhas to resolve. The path stored in the incident is the one that resolves, so a\nhuman following your citation lands on the value that was checked.\n\n**Every hypothesis needs `supported_by`**, and each entry must be the\n`source_ref` of a finding you actually reported in this same answer. Citing\nsomething you did not report is refused.\n\n**And every hypothesis needs `statement`** — one sentence saying what you think\nhappened. All three of `code`, `statement` and `supported_by` are required; a\nhypothesis missing any of them is refused by the validator, and the answer is\nthrown away after the call has been paid for. This prompt named two of the three\nuntil 2026-09-09, and showed only an empty list, so a model writing its first\nhypothesis had nothing to copy.\n\n## Confidence\n\nA number between 0 and 1, earned by the findings you listed. A high confidence\nwith one weak finding is visible to a human reading the thread, and the point of\nthis system is that the reasoning can be checked.\n\n**Usually you return no hypotheses at all, and that is the expected answer.**\nNaming the cause is the root cause agent's job. You return a hypothesis only\nwhen your own observation states the cause outright — a termination reason of\n`OOMKilled`, an event saying an image could not be pulled — never when you have\ninferred it from numbers or from what seems likely.\n\nGrok, 2026-09-07: this file said naming the cause is another agent's work and\nthen handed over a list of cause codes, which is a contradiction a model\nresolves whichever way the shape in front of it suggests. The list is here\nbecause the schema will refuse an invented code on the rare answer that does\ncarry one, not because filling it in is your task.\n\n**A hypothesis `code` must be one of these, exactly.** Measured 2026-09-05: a\nreal model answered with `H1`, an identifier it invented, because this file\nshowed the field without saying what may go in it. The schema refused the whole\nresult, and the run was wasted on a question nobody had answered.\n\n- `CONTAINER_OOM`\n- `APPLICATION_STARTUP_FAILURE`\n- `IMAGE_PULL_FAILURE`\n- `READINESS_PROBE_FAILURE`\n- `DEPLOYMENT_REGRESSION`\n- `CPU_THROTTLING`\n\nIf none fits, report the findings and return no hypotheses at all. An invented\ncode is refused, and a wrong one from the list is worse — it sends the next\nagent looking in the wrong place.\n\n## Every answer carries these, whatever the status\n\n`agent`, `status`, `findings`, `hypotheses`, `confidence` — all five, always.\n`findings` and `hypotheses` are empty arrays when there is nothing to put in\nthem; `confidence` is `0`. A missing field is refused, and the whole answer is\nthrown away for it.\n\nNothing else may be added. A field the schema does not name — a `unit` on a\nfinding, a note of your own — is refused exactly like a missing one.\n\n<!-- rules: the ids below are asserted by tests/agents.test.ts. A rule removed\n     from the prose must be removed here too, and the test then fails, so an\n     instruction cannot quietly disappear while the file still looks complete. -->\n\n## Rule ids\n\n- `finding-needs-source-ref`\n- `report-the-configuration-the-incident-turns-on`\n- `source-ref-is-a-path-inside-the-observation`\n- `every-answer-carries-five-fields`\n- `hypothesis-code-from-the-list`\n- `no-data-is-an-answer`\n- `error-is-not-no-data`\n- `do-not-diagnose`\n- `hypothesis-cites-own-findings`\n",
+    "payload": {
+      "incident_id": "INC-2026-0301",
+      "observation": {
+        "collected_at": "2026-09-04T09:13:05Z",
+        "pods": [
+          {
+            "name": "search-api-58d9c7f6b-t4wqz",
+            "namespace": "production",
+            "phase": "Running",
+            "restart_count": 0,
+            "containers": [
+              {
+                "name": "search-api",
+                "ready": false,
+                "restart_count": 0,
+                "limits": {
+                  "memory": "2Gi",
+                  "cpu": "2000m"
+                },
+                "requests": {
+                  "memory": "1Gi",
+                  "cpu": "1000m"
+                }
+              }
+            ]
+          }
+        ],
+        "events": [
+          {
+            "type": "Warning",
+            "reason": "Unhealthy",
+            "message": "Readiness probe failed: HTTP probe failed with statuscode: 503",
+            "count": 27,
+            "last_seen": "2026-09-04T09:12:58Z",
+            "involved_object": "pod/search-api-58d9c7f6b-t4wqz"
+          }
+        ],
+        "deployment": {
+          "name": "search-api",
+          "namespace": "production",
+          "replicas": {
+            "desired": 4,
+            "ready": 1,
+            "available": 1
+          },
+          "image": "registry.internal/search-api:5.2.0"
+        },
+        "provenance": {
+          "collection_id": "16e5dac2-5782-415a-8d25-ccba8e646cf8",
+          "requested_for": "INC-2026-0301",
+          "cluster": "prod-eu",
+          "namespace": "production",
+          "provider": "fake-kubernetes"
+        }
+      }
+    },
+    "raw": "{\n  \"agent\": \"kubernetes\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"the event says: Readiness probe failed: HTTP probe failed with statuscode: 503\",\n      \"source_ref\": \"events[0].message\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"the pod is not ready\",\n      \"source_ref\": \"pods[0].containers[0].ready\",\n      \"severity\": \"warning\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0,\n  \"configuration\": [\n    {\n      \"fact\": \"the deployment image is registry.internal/search-api:5.2.0\",\n      \"source_ref\": \"deployment.image\"\n    },\n    {\n      \"fact\": \"the container's memory limit is 2Gi\",\n      \"source_ref\": \"pods[0].containers[0].limits.memory\"\n    },\n    {\n      \"fact\": \"the container's cpu limit is 2000m\",\n      \"source_ref\": \"pods[0].containers[0].limits.cpu\"\n    }\n  ]\n}",
+    "reply": {
+      "agent": "kubernetes",
+      "status": "ok",
+      "findings": [
+        {
+          "fact": "the event says: Readiness probe failed: HTTP probe failed with statuscode: 503",
+          "source_ref": "events[0].message",
+          "severity": "warning"
+        },
+        {
+          "fact": "the pod is not ready",
+          "source_ref": "pods[0].containers[0].ready",
+          "severity": "warning"
+        }
+      ],
+      "hypotheses": [],
+      "confidence": 0,
+      "configuration": [
+        {
+          "fact": "the deployment image is registry.internal/search-api:5.2.0",
+          "source_ref": "deployment.image"
+        },
+        {
+          "fact": "the container's memory limit is 2Gi",
+          "source_ref": "pods[0].containers[0].limits.memory"
+        },
+        {
+          "fact": "the container's cpu limit is 2000m",
+          "source_ref": "pods[0].containers[0].limits.cpu"
+        }
+      ]
+    },
+    "raw_answers": {
+      "kubernetes": "{\n  \"agent\": \"kubernetes\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"the event says: Readiness probe failed: HTTP probe failed with statuscode: 503\",\n      \"source_ref\": \"events[0].message\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"the pod is not ready\",\n      \"source_ref\": \"pods[0].containers[0].ready\",\n      \"severity\": \"warning\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0,\n  \"configuration\": [\n    {\n      \"fact\": \"the deployment image is registry.internal/search-api:5.2.0\",\n      \"source_ref\": \"deployment.image\"\n    },\n    {\n      \"fact\": \"the container's memory limit is 2Gi\",\n      \"source_ref\": \"pods[0].containers[0].limits.memory\"\n    },\n    {\n      \"fact\": \"the container's cpu limit is 2000m\",\n      \"source_ref\": \"pods[0].containers[0].limits.cpu\"\n    }\n  ]\n}"
+    },
+    "reason": "kubernetes: the agent result does not validate",
+    "errors": [
+      "(root) must NOT have additional properties"
+    ]
+  },
+  "readiness-probe-failure#3": {
+    "index": 0,
+    "state": "concluded",
+    "scenario": "readiness-probe-failure",
+    "normalised": 0,
+    "raw_answers": {
+      "kubernetes": "{\n  \"agent\": \"kubernetes\",\n  \"status\": \"ok\",\n  \"findings\": [\n    { \"fact\": \"the pod is in phase Running but not ready\", \"source_ref\": \"pods[0].phase\", \"severity\": \"warning\" },\n    { \"fact\": \"the event says: Readiness probe failed: HTTP probe failed with statuscode: 503\", \"source_ref\": \"events[0].message\", \"severity\": \"warning\" },\n    { \"fact\": \"the deployment image is registry.internal/search-api:5.2.0\", \"source_ref\": \"deployment.image\" },\n    { \"fact\": \"the container's memory limit is 2Gi\", \"source_ref\": \"pods[0].containers[0].limits.memory\" },\n    { \"fact\": \"the container's cpu limit is 2000m\", \"source_ref\": \"pods[0].containers[0].limits.cpu\" }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "logs": "{\n  \"agent\": \"logs\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"index warmup at 61%, readiness withheld\",\n      \"source_ref\": \"lines[0].message\"\n    },\n    {\n      \"fact\": \"index warmup at 68%, readiness withheld\",\n      \"source_ref\": \"lines[1].message\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "metrics": "{\n  \"agent\": \"metrics\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"container memory working set reached 1,181,116,006 bytes by 09:13\",\n      \"source_ref\": \"series[0].points[2].value\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "root-cause": "{\n  \"agent\": \"root_cause\",\n  \"status\": \"ok\",\n  \"findings\": [\n    { \"fact\": \"the pod is in phase Running but not ready\", \"source_ref\": \"pods[0].phase\" },\n    { \"fact\": \"the event says: Readiness probe failed: HTTP probe failed with statuscode: 503\", \"source_ref\": \"events[0].message\" },\n    { \"fact\": \"index warmup at 61%, readiness withheld\", \"source_ref\": \"lines[0].message\" },\n    { \"fact\": \"index warmup at 68%, readiness withheld\", \"source_ref\": \"lines[1].message\" }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0\n}"
+    },
+    "root_cause_code": "INSUFFICIENT_EVIDENCE",
+    "root_cause": "The evidence collected does not support naming a cause.",
+    "confidence": 0,
+    "evidence": [],
+    "incident": {
+      "incident_id": "INC-2026-0301",
+      "status": "insufficient_evidence",
+      "service": "search-api",
+      "namespace": "production",
+      "cluster": "prod-eu",
+      "started_at": "2026-09-04T09:12:00Z",
+      "scenario": "readiness-probe-failure",
+      "source": {
+        "provider": "fake-datadog",
+        "alert": {
+          "id": "alert-7b20",
+          "title": "search-api removed from load balancer",
+          "triggered_at": "2026-09-04T09:12:00Z",
+          "severity": "warning",
+          "monitor_id": "mon-2210",
+          "tags": [
+            "service:search-api",
+            "env:production"
+          ]
+        }
+      },
+      "observations": {
+        "kubernetes": {
+          "collected_at": "2026-09-04T09:13:05Z",
+          "pods": [
+            {
+              "name": "search-api-58d9c7f6b-t4wqz",
+              "namespace": "production",
+              "phase": "Running",
+              "restart_count": 0,
+              "containers": [
+                {
+                  "name": "search-api",
+                  "ready": false,
+                  "restart_count": 0,
+                  "limits": {
+                    "memory": "2Gi",
+                    "cpu": "2000m"
+                  },
+                  "requests": {
+                    "memory": "1Gi",
+                    "cpu": "1000m"
+                  }
+                }
+              ]
+            }
+          ],
+          "events": [
+            {
+              "type": "Warning",
+              "reason": "Unhealthy",
+              "message": "Readiness probe failed: HTTP probe failed with statuscode: 503",
+              "count": 27,
+              "last_seen": "2026-09-04T09:12:58Z",
+              "involved_object": "pod/search-api-58d9c7f6b-t4wqz"
+            }
+          ],
+          "deployment": {
+            "name": "search-api",
+            "namespace": "production",
+            "replicas": {
+              "desired": 4,
+              "ready": 1,
+              "available": 1
+            },
+            "image": "registry.internal/search-api:5.2.0"
+          },
+          "provenance": {
+            "collection_id": "16e5dac2-5782-415a-8d25-ccba8e646cf8",
+            "requested_for": "INC-2026-0301",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-kubernetes"
+          }
+        },
+        "logs": {
+          "collected_at": "2026-09-04T09:13:07Z",
+          "window": {
+            "from": "2026-09-04T09:05:00Z",
+            "to": "2026-09-04T09:13:00Z"
+          },
+          "truncated": true,
+          "lines": [
+            {
+              "ts": "2026-09-04T09:11:40Z",
+              "level": "warn",
+              "container": "search-api",
+              "message": "index warmup at 61%, readiness withheld"
+            },
+            {
+              "ts": "2026-09-04T09:12:30Z",
+              "level": "warn",
+              "container": "search-api",
+              "message": "index warmup at 68%, readiness withheld"
+            }
+          ],
+          "provenance": {
+            "collection_id": "16e5dac2-5782-415a-8d25-ccba8e646cf8",
+            "requested_for": "INC-2026-0301",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-logs"
+          }
+        },
+        "metrics": {
+          "collected_at": "2026-09-04T09:13:09Z",
+          "window": {
+            "from": "2026-09-04T09:05:00Z",
+            "to": "2026-09-04T09:13:00Z"
+          },
+          "series": [
+            {
+              "name": "container_memory_working_set_bytes",
+              "unit": "bytes",
+              "container": "search-api",
+              "points": [
+                {
+                  "ts": "2026-09-04T09:07:00Z",
+                  "value": 934281216
+                },
+                {
+                  "ts": "2026-09-04T09:10:00Z",
+                  "value": 1073741824
+                },
+                {
+                  "ts": "2026-09-04T09:13:00Z",
+                  "value": 1181116006
+                }
+              ]
+            }
+          ],
+          "provenance": {
+            "collection_id": "16e5dac2-5782-415a-8d25-ccba8e646cf8",
+            "requested_for": "INC-2026-0301",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-metrics"
+          }
+        }
+      },
+      "collection": {
+        "kubernetes": {
+          "state": "collected"
+        },
+        "logs": {
+          "state": "collected"
+        },
+        "metrics": {
+          "state": "collected"
+        }
+      },
+      "analysis": {
+        "agents": [
+          {
+            "agent": "kubernetes",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the pod is in phase Running but not ready",
+                "source_ref": "pods[0].phase",
+                "severity": "warning"
+              },
+              {
+                "fact": "the event says: Readiness probe failed: HTTP probe failed with statuscode: 503",
+                "source_ref": "events[0].message",
+                "severity": "warning"
+              },
+              {
+                "fact": "the deployment image is registry.internal/search-api:5.2.0",
+                "source_ref": "deployment.image"
+              },
+              {
+                "fact": "the container's memory limit is 2Gi",
+                "source_ref": "pods[0].containers[0].limits.memory"
+              },
+              {
+                "fact": "the container's cpu limit is 2000m",
+                "source_ref": "pods[0].containers[0].limits.cpu"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "logs",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "index warmup at 61%, readiness withheld",
+                "source_ref": "lines[0].message"
+              },
+              {
+                "fact": "index warmup at 68%, readiness withheld",
+                "source_ref": "lines[1].message"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "metrics",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "container memory working set reached 1,181,116,006 bytes by 09:13",
+                "source_ref": "series[0].points[2].value"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "root_cause",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the pod is in phase Running but not ready",
+                "source_ref": "pods[0].phase"
+              },
+              {
+                "fact": "the event says: Readiness probe failed: HTTP probe failed with statuscode: 503",
+                "source_ref": "events[0].message"
+              },
+              {
+                "fact": "index warmup at 61%, readiness withheld",
+                "source_ref": "lines[0].message"
+              },
+              {
+                "fact": "index warmup at 68%, readiness withheld",
+                "source_ref": "lines[1].message"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          }
+        ],
+        "root_cause_code": "INSUFFICIENT_EVIDENCE",
+        "root_cause": "The evidence collected does not support naming a cause.",
+        "confidence": 0,
+        "evidence": []
+      },
+      "remediation": {
+        "recommended_actions": []
+      },
+      "conversation": {
+        "provider": "fake-slack",
+        "channel_id": "fake-prod-incidents",
+        "thread_id": "thread-INC-2026-0301",
+        "incident_id": "INC-2026-0301",
+        "messages": [
+          {
+            "role": "system",
+            "text": "INC-2026-0301: search-api in production — investigating.",
+            "ts": "2026-09-04T09:12:00Z",
+            "incident_id": "INC-2026-0301"
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0301",
+            "ts": "2026-09-04T09:12:00Z",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the pod is in phase Running but not ready"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the event says: Readiness probe failed: HTTP probe failed with statuscode: 503"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the deployment image is registry.internal/search-api:5.2.0"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container's memory limit is 2Gi"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container's cpu limit is 2000m"
+              }
+            ],
+            "text": "kubernetes: the pod is in phase Running but not ready; the event says: Readiness probe failed: HTTP probe failed with statuscode: 503; the deployment image is registry.internal/search-api:5.2.0; the container's memory limit is 2Gi; the container's cpu limit is 2000m."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0301",
+            "ts": "2026-09-04T09:12:00Z",
+            "cited_evidence": [
+              {
+                "source": "logs",
+                "fact": "index warmup at 61%, readiness withheld"
+              },
+              {
+                "source": "logs",
+                "fact": "index warmup at 68%, readiness withheld"
+              }
+            ],
+            "text": "logs: index warmup at 61%, readiness withheld; index warmup at 68%, readiness withheld."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0301",
+            "ts": "2026-09-04T09:12:00Z",
+            "cited_evidence": [
+              {
+                "source": "metrics",
+                "fact": "container memory working set reached 1,181,116,006 bytes by 09:13"
+              }
+            ],
+            "text": "metrics: container memory working set reached 1,181,116,006 bytes by 09:13."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0301",
+            "ts": "2026-09-04T09:12:00Z",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the pod is in phase Running but not ready"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the event says: Readiness probe failed: HTTP probe failed with statuscode: 503"
+              },
+              {
+                "source": "logs",
+                "fact": "index warmup at 61%, readiness withheld"
+              },
+              {
+                "source": "logs",
+                "fact": "index warmup at 68%, readiness withheld"
+              }
+            ],
+            "text": "root_cause: the pod is in phase Running but not ready; the event says: Readiness probe failed: HTTP probe failed with statuscode: 503; index warmup at 61%, readiness withheld; index warmup at 68%, readiness withheld."
+          },
+          {
+            "role": "system",
+            "incident_id": "INC-2026-0301",
+            "ts": "2026-09-04T09:12:00Z",
+            "text": "No cause was established from the recorded analysis."
+          }
+        ]
+      }
+    },
+    "thread": [
+      "INC-2026-0301: search-api in production — investigating.",
+      "kubernetes: the pod is in phase Running but not ready; the event says: Readiness probe failed: HTTP probe failed with statuscode: 503; the deployment image is registry.internal/search-api:5.2.0; the container's memory limit is 2Gi; the container's cpu limit is 2000m.",
+      "logs: index warmup at 61%, readiness withheld; index warmup at 68%, readiness withheld.",
+      "metrics: container memory working set reached 1,181,116,006 bytes by 09:13.",
+      "root_cause: the pod is in phase Running but not ready; the event says: Readiness probe failed: HTTP probe failed with statuscode: 503; index warmup at 61%, readiness withheld; index warmup at 68%, readiness withheld.",
+      "No cause was established from the recorded analysis."
+    ]
+  }
+}

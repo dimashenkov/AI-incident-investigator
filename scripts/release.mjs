@@ -75,6 +75,8 @@ function step(name, cmd, args) {
 
 /** The check the release is allowed to proceed past, named once. */
 export const DRIFT_CHECK_ID = "no-drift-from-baseline";
+/** The debt check, named so the exception below is a list rather than a string. */
+export const DEBT_CHECK_ID = "promised-checks-due";
 
 /**
  * Decide whether a failed gate still lets the release continue.
@@ -96,22 +98,43 @@ export function releaseMayProceed(report) {
   if (notPassing.length === 0) {
     return "the gate exited non-zero while every check passed; that disagreement is itself a defect";
   }
-  const other = notPassing.filter((r) => r?.id !== DRIFT_CHECK_ID);
-  if (other.length > 0) {
-    return `the gate stopped on ${other.map((r) => `${r.id} (${r.state})`).join(", ")}`;
+  /*
+   * Exactly two checks may be non-passing, each in exactly one state, and each
+   * for a reason that is about something a release CANNOT make worse.
+   *
+   *   no-drift-from-baseline, fail     — the deployment is behind us. Releasing
+   *                                      is the thing that fixes it.
+   *   promised-checks-due,   unknown   — promised work is due and unwritten.
+   *                                      Releasing neither writes it nor
+   *                                      unwrites it.
+   *
+   * The second was added on 2026-09-07, into a genuine circle. The debt waits
+   * on a run recorded with machine-readable scores; that run happened, came
+   * back wrong, and so the debt came due while the items stayed uncovered. The
+   * items can only be covered by another paid run through the DEPLOYED
+   * workflow — which needs a release. Blocking on it makes the debt unclearable
+   * by any means.
+   *
+   * The states are named, not just the ids, and this is why: `unknown` on the
+   * drift check means the probe did not run, which is not "the deployment is
+   * behind" — Codex, 2026-09-05. `fail` on the debt check would mean promised
+   * work is overdue with its dependency met, which is a different claim from
+   * "due and unwritten" and is not waved through here.
+   */
+  const ALLOWED = new Map([[DRIFT_CHECK_ID, "fail"], [DEBT_CHECK_ID, "unknown"]]);
+  const blocking = notPassing.filter((r) => ALLOWED.get(r?.id) !== r?.state);
+  if (blocking.length > 0) {
+    return `the gate stopped on ${blocking.map((r) => `${r.id} (${r.state})`).join(", ")}`;
   }
   /*
-   * Codex, 2026-09-05: matching the id alone let the drift check through in the
-   * `unknown` state — the one state this project says must never read as a
-   * pass. "The deployment is behind us" is a thing the gate ESTABLISHED; "the
-   * drift probe did not run" is not, and a release is exactly the moment that
-   * difference matters. Duplicates got through for the same reason.
+   * And each may appear once. A duplicate makes it unclear which result the
+   * decision was taken on, and that ambiguity is what let an unknown drift
+   * check through before.
    */
-  if (notPassing.length !== 1) {
-    return `the drift check appears ${notPassing.length} times in the report, so it is not clear what failed`;
-  }
-  if (notPassing[0]?.state !== "fail") {
-    return `${DRIFT_CHECK_ID} is ${String(notPassing[0]?.state)}, not fail; a check that could not be established has not said the deployment is merely behind`;
+  const seen = new Set();
+  for (const r of notPassing) {
+    if (seen.has(r.id)) return `${r.id} appears more than once in the report, so it is not clear what failed`;
+    seen.add(r.id);
   }
   return null;
 }

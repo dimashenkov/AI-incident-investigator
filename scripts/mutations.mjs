@@ -322,8 +322,8 @@ export const MUTATIONS = [
   {
     id: "release-reads-an-unestablished-drift-check-as-behind",
     file: "scripts/release.mjs",
-    from: '  if (notPassing[0]?.state !== "fail") {',
-    to: "  if (false) {",
+    from: "  const blocking = notPassing.filter((r) => ALLOWED.get(r?.id) !== r?.state);",
+    to: "  const blocking = notPassing.filter((r) => !ALLOWED.has(r?.id));",
     mustFail: "stops when the drift check could not be established, rather than reading it as merely behind",
   },
   {
@@ -1657,6 +1657,33 @@ export const MUTATIONS = [
     mustFail: "keeps what the earlier agents were paid for when a later one refuses",
   },
   {
+    // "Two parts" with no shape beside it, which the model read as two fields —
+    // the schema refuses the sixth key and the paid call produces nothing.
+    id: "two-parts-read-as-two-fields",
+    file: "prompts/kubernetes-agent.md",
+    from: "**Exactly these five keys, and no sixth.**",
+    to: "**Report both parts.**",
+    mustFail: "says the answer has five keys and no sixth",
+  },
+  {
+    // The empty answer offered without its precondition, thirty lines from the
+    // rule that forbids it when the code table's observation is present.
+    id: "the-empty-answer-offered-unconditionally",
+    file: "prompts/root-cause-agent.md",
+    from: "| **no** direct observation from the code table, only circumstantial findings | **no hypotheses**, and `0` |",
+    to: "| circumstantial evidence only — nothing observed the cause itself | **no hypotheses**, and `0` |",
+    mustFail: "makes the empty answer conditional on the code table, not a free choice",
+  },
+  {
+    // The exception widened from a state to an id, so an unknown drift check —
+    // the probe never ran — reads as "the deployment is merely behind".
+    id: "release-exception-widened-from-state-to-id",
+    file: "scripts/release.mjs",
+    from: "  const blocking = notPassing.filter((r) => ALLOWED.get(r?.id) !== r?.state);",
+    to: "  const blocking = notPassing.filter((r) => !ALLOWED.has(r?.id));",
+    mustFail: "stops on either of them in the OTHER state",
+  },
+  {
     // The deployed node running the schemas and nothing else, so "valid" means
     // one thing in a unit test and another in production — which is exactly the
     // promise the top of src/schema/validate.ts makes.
@@ -1802,7 +1829,7 @@ export const MUTATIONS = [
     // invitation to name it.
     id: "a-confidence-band-for-guessing",
     file: "prompts/root-cause-agent.md",
-    from: "| circumstantial evidence only — nothing observed the cause itself | **no hypotheses**, and `0` |",
+    from: "| **no** direct observation from the code table, only circumstantial findings | **no hypotheses**, and `0` |",
     to: "| circumstantial evidence only — nothing observed the cause itself | 0.4 to 0.6 |",
     mustFail: "offers no confidence band for naming a cause on circumstantial evidence",
   },
@@ -2022,8 +2049,8 @@ export const MUTATIONS = [
     // release walks past the gate entirely.
     id: "release-walks-past-any-gate-failure",
     file: "scripts/release.mjs",
-    from: "  const other = notPassing.filter((r) => r?.id !== DRIFT_CHECK_ID);",
-    to: "  const other = [];",
+    from: "  const blocking = notPassing.filter((r) => ALLOWED.get(r?.id) !== r?.state);\n  if (blocking.length > 0) {",
+    to: "  const blocking = [];\n  if (blocking.length > 0) {",
     mustFail: "stops on anything else, even alongside the drift failure",
   },
   {

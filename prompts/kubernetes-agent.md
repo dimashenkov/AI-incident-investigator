@@ -24,6 +24,16 @@ incident and no other:
 JSON matching the agent-result schema, with `agent` set to `kubernetes`. Nothing
 else — no prose before or after.
 
+**Exactly these five keys, and no sixth.** The schema refuses any other, and the
+whole answer is thrown away when one appears — the run is paid for and produces
+nothing. Measured on 2026-09-07: the model added a key called `configuration`,
+because this file says the answer has "two parts", and two parts read as two
+places to put them.
+
+**Both parts go into `findings`.** The symptoms and the configuration values are
+findings, each with its own `fact` and `source_ref`. There is nowhere else for
+them to go.
+
 ```json
 {
   "agent": "kubernetes",

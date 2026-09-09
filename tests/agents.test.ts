@@ -303,7 +303,15 @@ describe("every prompt carries the rules its schema will enforce", () => {
      * an invitation to name it.
      */
     const text = readPrompt("root-cause")!;
-    const row = text.split("\n").find((l) => l.includes("circumstantial evidence only"));
+    /*
+     * The row was reworded on 2026-09-07 to carry its own precondition — "no
+     * direct observation from the code table, only circumstantial findings" —
+     * after three attempts returned the empty answer while holding exactly the
+     * observation the code table names. Matched on the word that survives both
+     * wordings rather than on the sentence, so the next rewording fails here
+     * only if the ROW goes, not if it is said differently.
+     */
+    const row = text.split("\n").find((l) => l.includes("circumstantial"));
     expect(row, "the row is gone; this test no longer checks anything").toBeDefined();
     expect(row, "circumstantial evidence has a band again").not.toMatch(/0\.\d\s*to\s*0\.\d/);
     /*
@@ -946,6 +954,44 @@ describe("the example in a prompt is the shape a model copies", () => {
       .toMatch(/such as `lines\[2\]\.message`/);
     expect(readPrompt("metrics")!, "the metrics leaf is the value")
       .toMatch(/such as `series\[0\]\.points\[3\]\.value`/);
+  });
+
+  /*
+   * Two defects the first paid run found, and both are in these files rather
+   * than in the model. Measured 2026-09-07, three attempts.
+   */
+  it("says the answer has five keys and no sixth", () => {
+    /*
+     * The model added a key called `configuration`, the schema refused the
+     * whole result, and the call was paid for and produced nothing. It did that
+     * because this file says the answer has "two parts" — and two parts read as
+     * two places to put them.
+     */
+    const kube = readPrompt("kubernetes")!;
+    expect(kube, "the shape must be stated, not left to the schema to enforce")
+      .toMatch(/Exactly these five keys, and no sixth/);
+    expect(kube, "and it must say where the second part goes")
+      .toMatch(/Both parts go into `findings`/);
+  });
+
+  it("makes the empty answer conditional on the code table, not a free choice", () => {
+    /*
+     * Two rows of the confidence table offered "no hypotheses", and the rule
+     * that a direct observation from the code table IS the hypothesis sat
+     * thirty lines above them. Three attempts reported a readiness probe
+     * failing and a pod not ready — exactly what that table names — and
+     * returned no hypotheses anyway. A rule that competes loses.
+     */
+    const rc = readPrompt("root-cause")!;
+    expect(rc, "the empty answer must carry its own precondition")
+      .toMatch(/\*\*no\*\* direct observation from the code table/);
+    expect(rc, "and the reader must be sent to the code table first")
+      .toMatch(/Read the code table above FIRST/);
+    // Every row that offers the empty answer says when it does NOT apply.
+    for (const row of rc.split("\n").filter((l) => l.includes("**no hypotheses**"))) {
+      expect(row, `a row offers the empty answer with no condition: ${row}`)
+        .toMatch(/\*\*no\*\* direct observation|nothing supports any cause at all/);
+    }
   });
 
   it("tells the metrics agent where the unit goes, not merely that it must appear", () => {

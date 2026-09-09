@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 // @ts-expect-error — plain .mjs, the same file node runs.
 import { chooseSource } from "../scripts/record-baseline.mjs";
 // @ts-expect-error - plain .mjs script, no types
-import { releaseMayProceed, gateFinished, reportIsFromThisRun, mayCreateWorkflow, DRIFT_CHECK_ID, stepFailed, exitCodeFor, RELEASE_ORDER, RELEASE_RUNNERS } from "../scripts/release.mjs";
+import { releaseMayProceed, gateFinished, reportIsFromThisRun, mayCreateWorkflow, DRIFT_CHECK_ID, DEBT_CHECK_ID, stepFailed, exitCodeFor, RELEASE_ORDER, RELEASE_RUNNERS } from "../scripts/release.mjs";
 
 const SOURCE = readFileSync(new URL("../scripts/release.mjs", import.meta.url).pathname, "utf8");
 const PKG = JSON.parse(readFileSync(new URL("../package.json", import.meta.url).pathname, "utf8"));
@@ -141,12 +141,14 @@ describe("the one gate failure a release is allowed to walk past", () => {
     // the unknown state. "The deployment is behind us" was established; "the
     // probe did not run" was not, and a release is when that difference bites.
     const stop = releaseMayProceed({ results: [ok("tests"), { id: DRIFT_CHECK_ID, state: "unknown" }] });
-    expect(stop).toContain("not fail");
+    // The message now names the check and the state it arrived in, because two
+    // checks may be non-passing and the reader has to know which one stopped it.
+    expect(stop).toContain(`${DRIFT_CHECK_ID} (unknown)`);
   });
 
   it("stops when the drift check appears more than once, since it is then unclear what failed", () => {
     const stop = releaseMayProceed({ results: [ok("tests"), drift, drift] });
-    expect(stop).toContain("2 times");
+    expect(stop).toContain("appears more than once");
   });
 
   it("stops when the gate failed while every check passed, because that disagreement is itself a defect", () => {
@@ -297,5 +299,59 @@ describe("the gate is timed from before it starts", () => {
     // function was tested and called by nothing.
     expect(SOURCE, "deploy() must call mayCreateWorkflow rather than repeat it")
       .toMatch(/mayCreateWorkflow\(listing, generated\.name\)/);
+  });
+});
+
+/*
+ * A second check may be non-passing, and the exception stays narrow.
+ *
+ * Added 2026-09-07, into a real circle: the debt waits on a run recorded with
+ * machine-readable scores; that run happened, came back wrong, and the debt
+ * came due while the items stayed uncovered. Covering them needs another paid
+ * run through the DEPLOYED workflow, which needs a release — so blocking on it
+ * made the debt unclearable by any means.
+ *
+ * Widening an exception to get past a check is the defect this project keeps
+ * catching, so these tests exist to say exactly how far it was widened.
+ */
+describe("the release passes two checks and no more", () => {
+  const pass = (id: string) => ({ id, state: "pass" });
+  const rest = [pass("tests"), pass("typecheck"), pass("mutations-still-caught")];
+
+  it("passes drift failing and the debt due, together", () => {
+    expect(releaseMayProceed({ results: [...rest,
+      { id: DRIFT_CHECK_ID, state: "fail" }, { id: DEBT_CHECK_ID, state: "unknown" }] })).toBeNull();
+  });
+
+  it("passes either of them alone", () => {
+    expect(releaseMayProceed({ results: [...rest, { id: DRIFT_CHECK_ID, state: "fail" }] })).toBeNull();
+    expect(releaseMayProceed({ results: [...rest, { id: DEBT_CHECK_ID, state: "unknown" }] })).toBeNull();
+  });
+
+  it("stops on either of them in the OTHER state", () => {
+    /*
+     * `unknown` on drift means the probe did not run, which is not "the
+     * deployment is behind". `fail` on the debt means promised work is overdue
+     * with its dependency met — a different claim from "due and unwritten".
+     */
+    expect(String(releaseMayProceed({ results: [...rest, { id: DRIFT_CHECK_ID, state: "unknown" }] })))
+      .toMatch(/no-drift-from-baseline \(unknown\)/);
+    expect(String(releaseMayProceed({ results: [...rest, { id: DEBT_CHECK_ID, state: "fail" }] })))
+      .toMatch(/promised-checks-due \(fail\)/);
+  });
+
+  it("stops on any third check, whatever it is", () => {
+    expect(String(releaseMayProceed({ results: [...rest.slice(1),
+      { id: "tests", state: "fail" },
+      { id: DRIFT_CHECK_ID, state: "fail" }, { id: DEBT_CHECK_ID, state: "unknown" }] })))
+      .toMatch(/tests \(fail\)/);
+  });
+
+  it("stops when one of the two appears twice", () => {
+    // A duplicate makes it unclear which result the decision rested on, which
+    // is how an unknown drift check got through before.
+    expect(String(releaseMayProceed({ results: [...rest,
+      { id: DRIFT_CHECK_ID, state: "fail" }, { id: DRIFT_CHECK_ID, state: "fail" }] })))
+      .toMatch(/appears more than once/);
   });
 });

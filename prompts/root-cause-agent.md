@@ -149,13 +149,24 @@ downwards, and a text that only ever says "lower it" is read as "stay low".
 
 So, in both directions:
 
+**Read the code table above FIRST, and this one second.** If a finding you
+reported is one of the direct observations listed there, that code is your
+hypothesis and the last two rows of this table do not apply to you. They are for
+the case where **none** of those observations is in your findings.
+
+Measured on 2026-09-07, three attempts on one scenario: the agent reported a
+readiness probe failing AND a pod not ready — which is exactly what the code
+table says observes `READINESS_PROBE_FAILURE` — and returned no hypotheses
+anyway. Two rows of this table offered the empty answer and the rule that
+forbade it here was thirty lines up. A rule that competes loses.
+
 | What you are looking at | Where the number belongs |
 |---|---|
 | several agents, agreeing, and a direct observation of the cause | **0.8 to 0.95** |
 | one agent with a direct observation, the others silent | 0.6 to 0.8 |
 | agents disagree, or a source could not be read | **below 0.4**, and say why |
-| circumstantial evidence only — nothing observed the cause itself | **no hypotheses**, and `0` |
-| nothing supports any cause | **no hypotheses**, and `0` |
+| **no** direct observation from the code table, only circumstantial findings | **no hypotheses**, and `0` |
+| nothing supports any cause at all | **no hypotheses**, and `0` |
 
 **`INSUFFICIENT_EVIDENCE` is not a code you may write.** It is not in the list
 above and no field in your answer can hold it: `hypotheses[0].code` is checked
