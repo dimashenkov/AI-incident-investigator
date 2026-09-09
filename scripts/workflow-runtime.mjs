@@ -303,34 +303,56 @@ return items.map(function (item, index) {
   // Nothing was asked, because the slot before this one was empty. There is no
   // reply to record; the incident simply travels on.
   if (j.state !== "skipped") {
+    /*
+     * The model's own words, kept whatever happens to them next.
+     *
+     * They were parsed and dropped: only the parsed object was recorded, so a
+     * refused answer left no text to look at and a run already paid for could
+     * not be judged again by a corrected scorer. Both refusals below carry it
+     * now, because a refusal is exactly the case where the words matter.
+     */
+    const raw = typeof j.raw === "string" ? j.raw : null;
     const reply = j.reply;
     if (typeof reply !== "object" || reply === null) {
-      return { json: { index, state: "refused", agent: AGENT,
+      return { json: { index, state: "refused", agent: AGENT, raw,
         reason: AGENT + " returned nothing that could be read as an answer" } };
     }
     // The node knows who it asked, and says so. The schema spells root-cause
     // with an underscore; the node names it with a hyphen.
     const recorded = recordAgentResult(validate, incident, reply, AGENT.replace("-", "_"));
     if (recorded.state !== "recorded") {
-      return { json: { index, state: "refused", agent: AGENT,
+      return { json: { index, state: "refused", agent: AGENT, raw,
         reason: AGENT + ": " + recorded.reason, errors: recorded.errors || [] } };
     }
     j.incident = recorded.incident;
     // Carried out of the run: how many citations the model wrote in a spelling
     // that had to be normalised. Zero and four are different runs.
     j.normalised = (j.normalised || 0) + (recorded.normalised || 0);
+    /*
+     * And the words themselves, accumulated by agent.
+     *
+     * Kept OUTSIDE the incident on purpose: the incident is a schema-checked
+     * document and adding a free-text field to it would mean widening the
+     * schema for something no rule reads. This travels beside it, reaches the
+     * caller with the answer, and is what a later re-judging of an
+     * already-paid-for run has to read.
+     */
+    if (raw !== null) {
+      j.raw_answers = Object.assign({}, j.raw_answers || {});
+      j.raw_answers[AGENT] = raw;
+    }
   }
 
   if (NEXT === null) {
     return { json: { index, state: "recorded", agent: AGENT, scenario: j.scenario,
-      incident: j.incident, normalised: j.normalised || 0 } };
+      incident: j.incident, normalised: j.normalised || 0, raw_answers: j.raw_answers || {} } };
   }
 
   const ctx = buildCheckedContext(NEXT, j.incident, PROMPTS[NEXT]);
   if (ctx.state === "assembled") {
     return { json: { index, state: "asking", agent: NEXT, scenario: j.scenario,
       incident: j.incident, prompt: ctx.prompt, payload: ctx.payload,
-      normalised: j.normalised || 0 } };
+      normalised: j.normalised || 0, raw_answers: j.raw_answers || {} } };
   }
 
   /*
@@ -377,7 +399,7 @@ return items.map(function (item, index) {
   const record = collection[slot] || {};
   if (record.state === "nothing" && ctx.why === "empty-slot") {
     return { json: { index, state: "skipped", agent: NEXT, scenario: j.scenario,
-      incident: j.incident, normalised: j.normalised || 0,
+      incident: j.incident, normalised: j.normalised || 0, raw_answers: j.raw_answers || {},
       skipped_because: NEXT + " had nothing to read: the provider reported an established absence" } };
   }
   return { json: { index, state: "refused", agent: NEXT, reason: NEXT + ": " + ctx.reason } };
@@ -482,6 +504,14 @@ return items.map(function (item, index) {
   const analysis = concluded.incident.analysis || {};
   return { json: { index, state: "concluded", scenario: j.scenario,
     normalised: j.normalised || 0,
+    /*
+     * What each model actually wrote, out with the answer.
+     *
+     * Without it a run already paid for cannot be judged again — and the rule
+     * that a verdict from a corrected scorer must be recomputed before any
+     * dependent spending has nothing to recompute from.
+     */
+    raw_answers: j.raw_answers || {},
     root_cause_code: analysis.root_cause_code,
     root_cause: analysis.root_cause,
     confidence: analysis.confidence,

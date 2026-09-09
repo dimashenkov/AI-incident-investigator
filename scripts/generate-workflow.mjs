@@ -140,7 +140,26 @@ function collectNode(agent, from, position) {
        * agent returning nothing readable. Guessing further would be inventing
        * an answer on the model's behalf.
        */
-      jsonOutput: `={{ JSON.stringify(Object.assign({}, $('${from}').item.json, { reply: (function () {`
+      /*
+       * `raw` beside `reply`, and it survives a reply that could not be read.
+       *
+       * The model's own words were parsed and then dropped: Record stored the
+       * PARSED object and the text disappeared. So a refused answer could not
+       * be looked at afterwards — you knew only that it was refused — and a run
+       * already paid for could not be scored again with a corrected scorer,
+       * which is the one thing the rule about re-judging a run depends on.
+       *
+       * Two separate immediately-invoked functions rather than one that returns
+       * both, because the reply parser has a dozen early returns and threading a
+       * second value through every one of them is how the raw text would come to
+       * be dropped on the path nobody tested. This one has a single return.
+       */
+      jsonOutput: `={{ JSON.stringify(Object.assign({}, $('${from}').item.json, { raw: (function () {`
+        + ` var c = $json && $json.choices;`
+        + ` var m = Array.isArray(c) && c.length > 0 && c[0] ? c[0].message : null;`
+        + ` var t = m ? m.content : null;`
+        + ` return typeof t === 'string' ? t : null; })(),`
+        + ` reply: (function () {`
         /*
          * Four unguarded property accesses used to stand here, with the
          * try/catch wrapped around JSON.parse only. A subagent measured what a

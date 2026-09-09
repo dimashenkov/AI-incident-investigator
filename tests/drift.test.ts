@@ -281,3 +281,44 @@ describe("a baseline is only a baseline if it describes a workflow", () => {
     expect(out.nodes).toHaveLength(1);
   });
 });
+
+/*
+ * A release stopped on `settings.binaryMode` on 2026-09-07: n8n writes it
+ * itself on save, and it decides where binary data is kept during an execution
+ * — this chain passes only JSON, so it can neither change what the workflow
+ * does nor be something anyone here chose.
+ *
+ * The listing is BY NAME, and these two tests are why. Dropping `settings`
+ * wholesale would silence a real change to executionOrder in the same breath.
+ */
+describe("a field the instance writes itself is named, not a whole section dropped", () => {
+  it("does not report a field n8n adds on save as drift", () => {
+    const generated = { settings: { executionOrder: "v1" } };
+    const deployed = { settings: { executionOrder: "v1", binaryMode: "separate" } };
+    expect(differences(normalise(generated), normalise(deployed))).toEqual([]);
+  });
+
+  it("still reports a change to a setting that is ours", () => {
+    const generated = { settings: { executionOrder: "v1" } };
+    const deployed = { settings: { executionOrder: "v0", binaryMode: "separate" } };
+    const d = differences(normalise(generated), normalise(deployed));
+    expect(d, "executionOrder is ours; a change to it is real drift").toHaveLength(1);
+    expect(d[0]!.path).toBe("/settings/executionOrder");
+  });
+
+  it("gives every instance-owned field a reason, so the list cannot grow silently", () => {
+    expect(INSTANCE_FIELDS.length, "no fields; this would pass on an empty set").toBeGreaterThan(10);
+    for (const f of INSTANCE_FIELDS) {
+      expect(f.why, `${f.path} is dropped with no reason given`).toBeTruthy();
+      /*
+       * A reason must name WHO writes the field, not merely assert that it is
+       * theirs. "instance bookkeeping" is a label; "changes on every save" is a
+       * fact somebody can check. The bar is a word from that vocabulary rather
+       * than a character count, which was the first version of this and cut off
+       * a correct entry at exactly twenty.
+       */
+      expect(f.why, `${f.path} does not say who writes it or when`)
+        .toMatch(/instance|save|create|runtime|UI|editor|accumulated|applied|operation|timestamp|counter/i);
+    }
+  });
+});

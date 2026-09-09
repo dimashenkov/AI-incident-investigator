@@ -683,8 +683,8 @@ export const MUTATIONS = [
     // envelope throws a raw TypeError inside n8n and halts the execution.
     id: "collect-node-walks-the-envelope-unguarded",
     file: "scripts/generate-workflow.mjs",
-    from: "        + ` var c = $json && $json.choices;`\n        + ` var m = Array.isArray(c) && c.length > 0 && c[0] ? c[0].message : null;`\n        + ` var t = m ? m.content : null;`",
-    to: "        + ` var t = $json.choices[0].message.content;`",
+    from: "        + ` var c = $json && $json.choices;`\n        + ` var m = Array.isArray(c) && c.length > 0 && c[0] ? c[0].message : null;`\n        + ` var t = m ? m.content : null;`\n        + ` if (typeof t !== 'string') return null;`",
+    to: "        + ` var t = $json.choices[0].message.content;`\n        + ` if (typeof t !== 'string') return null;`",
     mustFail: "turns a 200 that is not the model's envelope into null, not a TypeError",
   },
   {
@@ -1565,8 +1565,13 @@ export const MUTATIONS = [
   {
     id: "drift-blind-to-the-wiring",
     file: "scripts/drift.mjs",
-    from: '  { path: "nodes/*/webhookId", why: "assigned by the instance when a webhook node is created" },\n];',
-    to: '  { path: "connections", why: "instance bookkeeping" },\n];',
+    /*
+     * Anchored on the ONE line, not on the end of the list. It ended with `];`,
+     * so adding an entry to the list broke it — and the gate said UNKNOWN, which
+     * is the right answer and still a mutation nobody could test.
+     */
+    from: '  { path: "nodes/*/webhookId", why: "assigned by the instance when a webhook node is created" },',
+    to: '  { path: "connections", why: "the instance writes it on save" },',
     mustFail: "keeps every field that decides what the deployment does",
   },
   {
@@ -1589,6 +1594,32 @@ export const MUTATIONS = [
     from: "  if (c !== undefined && c !== null && (typeof c !== \"number\" || !Number.isFinite(c))) {",
     to: "  if (false) {",
     mustFail: "refuses a refusal whose confidence is not a number",
+  },
+  {
+    // The model's words dropped again: a run already paid for cannot be judged
+    // a second time, and a refusal leaves nothing to read.
+    id: "the-models-own-words-are-not-kept",
+    file: "scripts/workflow-runtime.mjs",
+    from: "    if (raw !== null) {\n      j.raw_answers = Object.assign({}, j.raw_answers || {});",
+    to: "    if (false) {\n      j.raw_answers = Object.assign({}, j.raw_answers || {});",
+    mustFail: "keeps what each model actually wrote, out with the answer",
+  },
+  {
+    // The refusal path dropping them, which is the path worth reading.
+    id: "a-refused-answer-keeps-no-words",
+    file: "scripts/workflow-runtime.mjs",
+    from: "    const raw = typeof j.raw === \"string\" ? j.raw : null;",
+    to: "    const raw = null;",
+    mustFail: "keeps the words even when the answer is refused, which is when they matter",
+  },
+  {
+    // A whole section dropped instead of one field named, which silences a real
+    // change to executionOrder in the same breath.
+    id: "drift-drops-a-whole-section-instead-of-one-field",
+    file: "scripts/drift.mjs",
+    from: '  { path: "settings/binaryMode", why: "written by the instance on save; this chain passes no binary data" },',
+    to: '  { path: "settings", why: "" },',
+    mustFail: "still reports a change to a setting that is ours",
   },
   {
     // The deployed node running the schemas and nothing else, so "valid" means

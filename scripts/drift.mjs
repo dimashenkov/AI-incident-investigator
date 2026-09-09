@@ -30,22 +30,37 @@ export const INSTANCE_FIELDS = [
   { path: "id", why: "assigned by the instance on create" },
   { path: "versionId", why: "changes on every save" },
   { path: "versionCounter", why: "changes on every save" },
-  { path: "activeVersion", why: "instance bookkeeping" },
-  { path: "activeVersionId", why: "instance bookkeeping" },
+  { path: "activeVersion", why: "the instance records which version is live; not part of the definition" },
+  { path: "activeVersionId", why: "the instance records which version is live; not part of the definition" },
   { path: "createdAt", why: "instance timestamp" },
   { path: "updatedAt", why: "instance timestamp" },
   { path: "triggerCount", why: "runtime counter, not configuration" },
   { path: "isArchived", why: "instance state, set through the UI" },
   { path: "shared", why: "project and ownership, belongs to the instance" },
   { path: "sourceWorkflowId", why: "provenance the instance records" },
-  { path: "meta", why: "instance metadata" },
+  { path: "meta", why: "the instance writes it; nothing here reads it" },
   { path: "pinData", why: "editor state, not deployed behaviour" },
   { path: "staticData", why: "runtime state accumulated by the workflow" },
   { path: "tags", why: "organisational, applied in the instance" },
-  { path: "nodeGroups", why: "canvas grouping, cosmetic" },
+  { path: "nodeGroups", why: "canvas grouping the editor writes; changes nothing the workflow does" },
   { path: "description", why: "editable in the UI without changing behaviour" },
   { path: "active", why: "activation is an operation, not part of the definition" },
   { path: "nodes/*/webhookId", why: "assigned by the instance when a webhook node is created" },
+  /*
+   * Added 2026-09-07, after a release stopped on it.
+   *
+   * n8n writes `settings.binaryMode: "separate"` itself on save. It decides
+   * where binary data is kept during an execution, and this chain passes only
+   * JSON — there is no binary data anywhere in it — so the field can neither
+   * change what the workflow does nor be something anyone here chose.
+   *
+   * It is listed BY NAME rather than by dropping `settings`, and that is the
+   * whole point: `settings.executionOrder` is ours and a change to it would be
+   * real drift. A rule saying "ignore settings" would hide it. The cost of the
+   * named list is that the next instance-written field stops a release once,
+   * loudly, and gets a line here with a reason — which is the right price.
+   */
+  { path: "settings/binaryMode", why: "written by the instance on save; this chain passes no binary data" },
 ];
 
 /**

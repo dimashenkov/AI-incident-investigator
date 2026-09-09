@@ -451,6 +451,47 @@ describe("the Set node that joins the answer back to the incident", () => {
     expect(out.root_cause_code, "the answer the models were paid for is still here").toBeTruthy();
   });
 
+  /*
+   * The model's own words, kept so a run already paid for can be judged again.
+   *
+   * Collect parsed the content and Record stored the PARSED object, so the text
+   * disappeared. A refused answer left nothing to look at — you knew only that
+   * it was refused — and the rule that a verdict from a corrected scorer must
+   * be recomputed before any dependent spending had nothing to recompute from.
+   * Asked for by the owner on 2026-09-07.
+   */
+  it("keeps what each model actually wrote, out with the answer", async () => {
+    const out = await runScenario("container-oom");
+    expect(out.state).toBe("concluded");
+
+    const raw = out.raw_answers as Record<string, string> | undefined;
+    expect(raw, "the chain kept no raw answers at all").toBeDefined();
+    expect(Object.keys(raw!).sort(), "every agent that answered must have left its words")
+      .toEqual(["kubernetes", "logs", "metrics", "root-cause"]);
+    for (const [agent, text] of Object.entries(raw!)) {
+      expect(typeof text, `${agent} kept something that is not text`).toBe("string");
+      // It is the model's own JSON, not our parse of it.
+      expect(JSON.parse(text)).toHaveProperty("agent");
+    }
+  });
+
+  it("keeps the words even when the answer is refused, which is when they matter", async () => {
+    /*
+     * The refusal path is the one worth reading afterwards, and it was the one
+     * that dropped the text. Exercised by running the Record node against a
+     * reply that cannot be read, with the raw beside it.
+     */
+    const { workflow } = await generate();
+    const node = workflow.nodes.find((n: { name: string }) => n.name === "Record kubernetes")!;
+    const jsCode = (node.parameters as { jsCode: string }).jsCode;
+
+    const out = runCode(jsCode, [{ json: { index: 0, state: "asking", scenario: "container-oom",
+      incident: {}, reply: null, raw: "sorry, no JSON today" } }])[0]!.json as Record<string, unknown>;
+    expect(out.state).toBe("refused");
+    expect(out.raw, "a refusal with no words is a refusal nobody can review")
+      .toBe("sorry, no JSON today");
+  });
+
   it("refuses, in the deployed chain, an answer from an agent it did not ask", async () => {
     const lying: Record<string, Stub> = {
       ...STUB_AGENTS,
