@@ -492,6 +492,32 @@ describe("the Set node that joins the answer back to the incident", () => {
       .toBe("sorry, no JSON today");
   });
 
+  it("keeps what the earlier agents were paid for when a later one refuses", async () => {
+    /*
+     * The refusal built a FRESH object, so the answers of every agent already
+     * paid for were dropped the moment one agent failed — along with the
+     * incident they had been recorded into. Grok found it on 2026-09-07 while
+     * attacking the runner before the run was bought: agents one and two
+     * answer, agent three refuses, and a corrected scorer later has only agent
+     * three's words to read.
+     *
+     * Exercised on the Record node for `metrics`, entered with two agents'
+     * words already accumulated and a reply that cannot be read.
+     */
+    const { workflow } = await generate();
+    const node = workflow.nodes.find((n: { name: string }) => n.name === "Record metrics")!;
+    const jsCode = (node.parameters as { jsCode: string }).jsCode;
+
+    const already = { kubernetes: '{"agent":"kubernetes"}', logs: '{"agent":"logs"}' };
+    const out = runCode(jsCode, [{ json: { index: 0, state: "asking", scenario: "container-oom",
+      incident: {}, raw_answers: already, reply: null, raw: "not an answer" } }])[0]!.json as Record<string, unknown>;
+
+    expect(out.state).toBe("refused");
+    expect(out.raw_answers, "a refusal must not discard what the money already bought")
+      .toEqual({ ...already, metrics: "not an answer" });
+    expect(out.raw, "and the refusing agent's own words are there too").toBe("not an answer");
+  });
+
   it("refuses, in the deployed chain, an answer from an agent it did not ask", async () => {
     const lying: Record<string, Stub> = {
       ...STUB_AGENTS,

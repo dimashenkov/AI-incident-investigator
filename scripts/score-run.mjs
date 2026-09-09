@@ -73,7 +73,12 @@ export function expectedFor(scenario, root = SCENARIOS) {
     const maxConfidence = typeof e.max_confidence === "number" && Number.isFinite(e.max_confidence)
       ? e.max_confidence : null;
     const requiresDissent = e.requires_dissent === true;
+    // The comparable scenario, when this one's honesty is a COMPARISON rather
+    // than a threshold. Absent means no comparison is asked for.
+    const lessConfidentThan = typeof e.must_be_less_confident_than === "string"
+      && e.must_be_less_confident_than.length > 0 ? e.must_be_less_confident_than : null;
     return { state: "known", code: e.root_cause_code, alsoAcceptable, maxConfidence, requiresDissent,
+      lessConfidentThan,
       mustCite: Array.isArray(e.must_cite) ? e.must_cite : [] };
   } catch (err) {
     return { state: "unknown", why: `${scenario}/expected.json is unreadable: ${err instanceof Error ? err.message : String(err)}` };
@@ -547,7 +552,56 @@ export function scoreAll(answers, root = SCENARIOS) {
   const bare = scenarios
     .filter((s) => Object.prototype.hasOwnProperty.call(answers ?? {}, s) || !attempted.has(s))
     .map((s) => score(s, answers?.[s] ?? null, root));
-  return [...bare, ...extra];
+  return compareConfidences([...bare, ...extra], answers ?? {}, root);
+}
+
+/**
+ * The comparison Definition-of-Done item 3 actually asks for.
+ *
+ * A scenario may declare `must_be_less_confident_than: "<other scenario>"`.
+ * The ceiling alone does not establish a reduction: 55% here and 55% on the
+ * comparable case satisfies `max_confidence` and is not a lowering of anything.
+ * Grok showed on 2026-09-07 that this comparison lived only in the protocol's
+ * prose, so the run could have come back green under an outcome the protocol
+ * says does not close the item.
+ *
+ * A missing comparable answer makes the result UNQUALIFIED rather than correct:
+ * a comparison nobody could make has not been made, and reporting it as clean
+ * is the flattering reading.
+ */
+export function compareConfidences(results, answers, root = SCENARIOS) {
+  const confidenceOf = (name) => {
+    const a = answers?.[name];
+    const c = a?.incident?.analysis?.confidence;
+    return typeof c === "number" && Number.isFinite(c) ? c : null;
+  };
+
+  return results.map((r) => {
+    if (r.state !== "correct") return r;
+    const want = expectedFor(scenarioOf(r.scenario), root);
+    const other = want.state === "known" ? want.lessConfidentThan : null;
+    if (other === null || other === undefined) return r;
+
+    const mine = confidenceOf(r.scenario);
+    const theirs = confidenceOf(other);
+    /*
+     * A refusal has no confidence to compare, and it is an accepted answer for
+     * exactly this scenario — so the comparison does not apply to it.
+     */
+    if (r.code === "INSUFFICIENT_EVIDENCE") return r;
+
+    if (mine === null || theirs === null) {
+      return { ...r, state: "correct-but-unqualified",
+        why: [`the confidence here cannot be compared with ${other}: `
+          + `${mine === null ? "this run states none" : `${other} was not answered in this run`}`] };
+    }
+    if (!(mine < theirs)) {
+      return { ...r, state: "correct-but-unqualified",
+        why: [`confidence ${mine} is not lower than ${other}'s ${theirs}; `
+          + "the same number on a contradicted case and a clean one is not a reduction"] };
+    }
+    return r;
+  });
 }
 
 export function format(results) {

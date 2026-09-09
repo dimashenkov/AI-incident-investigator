@@ -11,7 +11,7 @@ import { readdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 // @ts-expect-error - plain .mjs script, no types
-import { score, scoreAll, expectedFor, format, citationCovers, recordInto, scenarioOf, attemptOf, resolvesInSomeSlot, refusalCeiling, exitCodeFor } from "../scripts/score-run.mjs";
+import { score, scoreAll, expectedFor, format, citationCovers, recordInto, scenarioOf, attemptOf, compareConfidences, resolvesInSomeSlot, refusalCeiling, exitCodeFor } from "../scripts/score-run.mjs";
 
 const SCENARIOS = new URL("../scenarios/", import.meta.url).pathname;
 /**
@@ -803,5 +803,74 @@ describe("a run bought in parts is recorded in one record", () => {
         .toThrow(/scores alpha differently/);
       expect(JSON.parse(readFileSync(f, "utf8")).scored.alpha).toBe("correct");
     } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+});
+
+/*
+ * Definition-of-Done item 3 says confidence FALLS when findings conflict. That
+ * is a comparison, and it lived only in the protocol's prose until 2026-09-07:
+ * `max_confidence` alone is satisfied by 55% on the contradicted scenario and
+ * 55% on the clean one, which is not a reduction of anything. Grok found it
+ * while attacking the protocol, before the run was bought.
+ */
+describe("a scenario whose honesty is a comparison is scored against its pair", () => {
+  const answer = (code: string, confidence: number | null) => ({
+    state: "concluded", root_cause_code: code,
+    incident: { analysis: { confidence, evidence: [
+      { source: "kubernetes", fact: "OOMKilled", supports: "for" },
+      { source: "metrics", fact: "memory never approached the limit", supports: "against" },
+    ], agents: [{ agent: "kubernetes", findings: mustCiteOf("conflicting-evidence").map((r) => ({ fact: "f", source_ref: r })) }] } },
+  });
+  const correctPair = (mine: number | null, theirs: number | null) => compareConfidences(
+    [{ scenario: "conflicting-evidence", state: "correct", code: "CONTAINER_OOM", missingCitations: [] }],
+    { "conflicting-evidence": answer("CONTAINER_OOM", mine), "container-oom": answer("CONTAINER_OOM", theirs) },
+    SCENARIOS,
+  )[0]!;
+
+  it("refuses the same confidence on the contradicted case and the clean one", () => {
+    const r = correctPair(0.55, 0.55);
+    expect(r.state, "equal numbers are not a reduction").toBe("correct-but-unqualified");
+    expect(r.why.join(" ")).toMatch(/not lower than/);
+  });
+
+  it("refuses a HIGHER confidence on the contradicted case", () => {
+    expect(correctPair(0.8, 0.4).state).toBe("correct-but-unqualified");
+  });
+
+  it("accepts a genuinely lower confidence, or this refuses everything", () => {
+    expect(correctPair(0.4, 0.8).state).toBe("correct");
+  });
+
+  it("refuses when the comparable scenario was not answered in this run", () => {
+    /*
+     * A comparison nobody could make has not been made. Reporting it clean is
+     * the flattering reading, and it is the one a run that bought only half the
+     * scenarios would have produced.
+     */
+    const r = compareConfidences(
+      [{ scenario: "conflicting-evidence", state: "correct", code: "CONTAINER_OOM", missingCitations: [] }],
+      { "conflicting-evidence": answer("CONTAINER_OOM", 0.4) },
+      SCENARIOS,
+    )[0]!;
+    expect(r.state).toBe("correct-but-unqualified");
+    expect(r.why.join(" ")).toMatch(/was not answered in this run/);
+  });
+
+  it("leaves a refusal alone, since it has no confidence to compare", () => {
+    const r = compareConfidences(
+      [{ scenario: "conflicting-evidence", state: "correct", code: "INSUFFICIENT_EVIDENCE", missingCitations: [] }],
+      { "conflicting-evidence": answer("INSUFFICIENT_EVIDENCE", 0) },
+      SCENARIOS,
+    )[0]!;
+    expect(r.state, "refusing IS the accepted answer here").toBe("correct");
+  });
+
+  it("leaves alone a scenario that declares no comparison", () => {
+    const r = compareConfidences(
+      [{ scenario: "container-oom", state: "correct", code: "CONTAINER_OOM", missingCitations: [] }],
+      { "container-oom": answer("CONTAINER_OOM", 0.9) },
+      SCENARIOS,
+    )[0]!;
+    expect(r.state).toBe("correct");
   });
 });

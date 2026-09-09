@@ -312,17 +312,43 @@ return items.map(function (item, index) {
      * now, because a refusal is exactly the case where the words matter.
      */
     const raw = typeof j.raw === "string" ? j.raw : null;
+    /*
+     * The refusing agent's words go in with everyone else's.
+     *
+     * They were carried in a separate raw field, so a later reader had to know
+     * to look in two places — and the one answer worth re-reading is the one
+     * that failed. Whether the text parsed is a different fact, already carried
+     * by state and reason. The raw field stays as well, because the refusal
+     * names one agent and the map names all of them.
+     */
+    const wordsSoFar = Object.assign({}, j.raw_answers || {});
+    if (raw !== null) wordsSoFar[AGENT] = raw;
     const reply = j.reply;
     if (typeof reply !== "object" || reply === null) {
-      return { json: { index, state: "refused", agent: AGENT, raw,
-        reason: AGENT + " returned nothing that could be read as an answer" } };
+      /*
+       * ON TOP of what came in, not instead of it.
+       *
+       * A refusal built a fresh object, so the answers of every agent that had
+       * already been PAID FOR were dropped at the moment one agent failed —
+       * along with the incident they were recorded into. Grok found it on
+       * 2026-09-07 while attacking the runner before the run was bought: agents
+       * one and two answer, agent three refuses, and a corrected scorer later
+       * has only agent three's words to read.
+       *
+       * The refusal is still a refusal; it just does not throw away what the
+       * money already bought.
+       */
+      return { json: Object.assign({}, j, { index, state: "refused", agent: AGENT, raw,
+        raw_answers: wordsSoFar,
+        reason: AGENT + " returned nothing that could be read as an answer" }) };
     }
     // The node knows who it asked, and says so. The schema spells root-cause
     // with an underscore; the node names it with a hyphen.
     const recorded = recordAgentResult(validate, incident, reply, AGENT.replace("-", "_"));
     if (recorded.state !== "recorded") {
-      return { json: { index, state: "refused", agent: AGENT, raw,
-        reason: AGENT + ": " + recorded.reason, errors: recorded.errors || [] } };
+      return { json: Object.assign({}, j, { index, state: "refused", agent: AGENT, raw,
+        raw_answers: wordsSoFar,
+        reason: AGENT + ": " + recorded.reason, errors: recorded.errors || [] }) };
     }
     j.incident = recorded.incident;
     // Carried out of the run: how many citations the model wrote in a spelling
@@ -382,8 +408,11 @@ return items.map(function (item, index) {
    */
   const slot = AGENT_SLOT[NEXT];
   if (slot === null || slot === undefined) {
-    return { json: { index, state: "refused", agent: NEXT,
-      reason: NEXT + " reads no observation slot, so its context failing is a refusal and never a skip: " + ctx.reason } };
+    // On top of what came in, for the same reason as the two refusals above:
+    // these two run AFTER a result was recorded, so they discard more.
+    return { json: Object.assign({}, j, { index, state: "refused", agent: NEXT,
+      raw_answers: j.raw_answers || {},
+      reason: NEXT + " reads no observation slot, so its context failing is a refusal and never a skip: " + ctx.reason }) };
   }
   /*
    * A skip is only honest when the context failed BECAUSE the slot is empty.
@@ -402,7 +431,8 @@ return items.map(function (item, index) {
       incident: j.incident, normalised: j.normalised || 0, raw_answers: j.raw_answers || {},
       skipped_because: NEXT + " had nothing to read: the provider reported an established absence" } };
   }
-  return { json: { index, state: "refused", agent: NEXT, reason: NEXT + ": " + ctx.reason } };
+  return { json: Object.assign({}, j, { index, state: "refused", agent: NEXT,
+    raw_answers: j.raw_answers || {}, reason: NEXT + ": " + ctx.reason }) };
 });
 `;
 }

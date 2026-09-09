@@ -1631,6 +1631,32 @@ export const MUTATIONS = [
     mustFail: "carries the validator's errors out, not only its sentence",
   },
   {
+    // The comparison item 3 actually asks for, living only in prose: the same
+    // confidence on the contradicted case and the clean one is not a reduction.
+    id: "the-confidence-comparison-is-never-made",
+    file: "scripts/score-run.mjs",
+    from: "    if (!(mine < theirs)) {",
+    to: "    if (false) {",
+    mustFail: "refuses the same confidence on the contradicted case and the clean one",
+  },
+  {
+    // A comparison nobody could make, reported as clean.
+    id: "a-missing-comparable-answer-read-as-clean",
+    file: "scripts/score-run.mjs",
+    from: "    if (mine === null || theirs === null) {",
+    to: "    if (false) {",
+    mustFail: "refuses when the comparable scenario was not answered in this run",
+  },
+  {
+    // A refusal discarding every answer already paid for, so a corrected scorer
+    // has only the failing agent's words to read.
+    id: "a-refusal-discards-what-was-already-paid-for",
+    file: "scripts/workflow-runtime.mjs",
+    from: "      return { json: Object.assign({}, j, { index, state: \"refused\", agent: AGENT, raw,\n        raw_answers: wordsSoFar,\n        reason: AGENT + \" returned nothing that could be read as an answer\" }) };",
+    to: "      return { json: { index, state: \"refused\", agent: AGENT, raw,\n        reason: AGENT + \" returned nothing that could be read as an answer\" } };",
+    mustFail: "keeps what the earlier agents were paid for when a later one refuses",
+  },
+  {
     // The deployed node running the schemas and nothing else, so "valid" means
     // one thing in a unit test and another in production — which is exactly the
     // promise the top of src/schema/validate.ts makes.

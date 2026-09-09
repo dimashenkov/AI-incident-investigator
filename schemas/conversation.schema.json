@@ -85,7 +85,7 @@
               ],
               "properties": {
                 "source": {
-                  "$ref": "https://ai-sre-mvp/schemas/gone.schema.json#/$defs/evidenceSource"
+                  "$ref": "https://ai-sre-mvp/schemas/common.schema.json#/$defs/evidenceSource"
                 },
                 "fact": {
                   "type": "string",
