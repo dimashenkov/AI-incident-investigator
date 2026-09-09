@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { normaliseRef, withResolvedRefs, assembleIncident, checkProvenance, concludeIncident, incidentIdFor, readRegistry, recordAgentResult, resultBelongsHere, resolveRef, runnableAgents, serviceFromTags } from "../src/core/assemble.js";
-import { listScenarios } from "../src/providers/fixtures.js";
+import { listScenarios, fixtureProvider} from "../src/providers/fixtures.js";
 import { validate } from "../src/schema/validate.js";
 import { assembleObservingContext, checkPayloadIsExactlyTheSlice } from "../src/agents/context.js";
 
@@ -911,5 +911,71 @@ describe("a path spelled with the wrapper it came in", () => {
     const h = (r.result.hypotheses as Array<Record<string, unknown>>)[0]!;
     expect(h.supported_by).toEqual(["events[0].message"]);
     expect(h.contradicted_by, "contradicted_by must travel too").toEqual(["events[0].message"]);
+  });
+});
+
+/*
+ * Collection goes through the Provider contract, and that is what makes
+ * checkProvenance's refusals reachable at all.
+ *
+ * assembleIncident called readScenario from the fixture implementation
+ * directly, so every collected observation arriving at checkProvenance had just
+ * been stamped from that exact request — its five disagreement refusals could
+ * not fire from this entry point under any fixture on disk. The comment above
+ * that call said so. A check that is written and unreachable from the entry
+ * point that matters is the shape this project keeps finding elsewhere.
+ *
+ * A subagent costed the change on 2026-09-07 and its verdict is what these
+ * tests spend: the deployed workflow gains nothing — incidents are assembled at
+ * generate time and inlined — so what is bought is exactly this reachability.
+ */
+describe("observations are collected through the provider contract", () => {
+  const request = { collection_id: "aaaaaaaa-0000-4000-8000-000000000000" };
+  void request;
+
+  it("builds the same incident through the contract as it did through the implementation", () => {
+    // The default path is a fixtureProvider, so nothing changed for any caller.
+    const a = assembleIncident("container-oom", 1, { root: SCENARIOS });
+    expect(a.state).toBe("assembled");
+    if (a.state !== "assembled") return;
+    const b = assembleIncident("container-oom", 1, { root: SCENARIOS, provider: fixtureProvider(SCENARIOS) });
+    expect(b.state).toBe("assembled");
+    if (b.state !== "assembled") return;
+    expect(JSON.stringify(b.incident)).toBe(JSON.stringify(a.incident));
+  });
+
+  it("refuses a provider that returns an observation with no provenance", () => {
+    /*
+     * The refusal that could not fire. This provider does what a real one
+     * would if it built its own Observation instead of going through readSlot:
+     * it hands back data with no stamp at all.
+     */
+    const unstamped = {
+      name: "no-stamp", exercised: true, unexercisedBecause: "",
+      read: (_scenario: string, slot: "kubernetes" | "logs" | "metrics") =>
+        ({ state: "collected" as const, slot, data: { pods: [], events: [], deployment: {} } }),
+    };
+    const r = assembleIncident("container-oom", 1, { root: SCENARIOS, provider: unstamped });
+    expect(r.state, "an unstamped observation must not become an incident").toBe("refused");
+    if (r.state !== "refused") return;
+    expect(r.reason).toMatch(/provenance/i);
+  });
+
+  it("refuses a provider that answers about a different slot than the one asked for", () => {
+    /*
+     * One line away from real: kubernetesProvider is declared `read():
+     * Observation` and returns slot "kubernetes" whatever it is asked about.
+     * Filing that under the slot we asked for would make one provider's
+     * confusion look like three collections.
+     */
+    const confused = {
+      name: "always-kubernetes", exercised: true, unexercisedBecause: "",
+      read: (_scenario: string, _slot: "kubernetes" | "logs" | "metrics") =>
+        ({ state: "nothing" as const, slot: "kubernetes" as const }),
+    };
+    const r = assembleIncident("container-oom", 1, { root: SCENARIOS, provider: confused });
+    expect(r.state).toBe("refused");
+    if (r.state !== "refused") return;
+    expect(r.reason).toMatch(/answered about kubernetes when asked for logs/);
   });
 });

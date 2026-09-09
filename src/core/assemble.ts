@@ -10,7 +10,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 
-import { newCollectionRequest, readAlert, readScenario, toObservations, SLOTS, type CollectionRequest, type FailureKind, type Slot, type Observation } from "../providers/fixtures.js";
+import { newCollectionRequest, readAlert, fixtureProvider, toObservations, SLOTS, type CollectionRequest, type FailureKind, type Slot, type Observation } from "../providers/fixtures.js";
+import type { Provider } from "../providers/provider.js";
 import { validate } from "../schema/validate.js";
 import { recordAgentResult as mergeRecordAgentResult, concludeIncident as mergeConcludeIncident, type Validate } from "./merge.js";
 
@@ -80,7 +81,27 @@ export function incidentIdFor(scenario: string, sequence: number, registry: Regi
 export function assembleIncident(
   scenario: string,
   sequence: number,
-  opts: { service?: string; namespace?: string; cluster?: string; root?: string; collectionId?: string } = {},
+  /*
+   * `provider` is how the observations are collected, and it is optional so no
+   * existing caller changes.
+   *
+   * This function called `readScenario` from the fixture implementation
+   * directly, and the comment below checkProvenance says what that cost: every
+   * collected observation reaching it had just been stamped from this exact
+   * request, so its five disagreement refusals could not fire from here at all.
+   * A check that is written and unreachable from the entry point that matters
+   * is the shape this project keeps finding elsewhere.
+   *
+   * Injection is the only thing that makes them reachable. It buys nothing in
+   * the deployed workflow — incidents are assembled at generate time and
+   * inlined, and this file cannot be transpiled into a Code node anyway — so
+   * the claim it supports is about the collection path, not about n8n.
+   *
+   * What it does NOT buy, said before somebody reads more into it: the alert
+   * and the scenario registry are still read straight off the disk here.
+   */
+  opts: { service?: string; namespace?: string; cluster?: string; root?: string;
+    collectionId?: string; provider?: Provider } = {},
 ): Assembly {
   let incidentId: string;
   try {
@@ -103,9 +124,24 @@ export function assembleIncident(
     return { state: "refused", reason: e instanceof Error ? e.message : String(e) };
   }
 
-  const obs = opts.root === undefined
-    ? readScenario(scenario, undefined, request)
-    : readScenario(scenario, opts.root, request);
+  const provider = opts.provider ?? (opts.root === undefined ? fixtureProvider() : fixtureProvider(opts.root));
+  const collected = SLOTS.map((slot) => ({ slot, o: provider.read(scenario, slot, request) }));
+
+  /*
+   * A provider that answers about a different slot than the one asked for.
+   *
+   * It cannot happen with the fixture provider, which echoes the slot back —
+   * and it is one line away from happening with any other: kubernetesProvider
+   * is declared `read(): Observation` and hands back `slot: "kubernetes"` for
+   * every slot it is asked about. Filing that answer under the slot we asked
+   * for would make one provider's confusion look like three collections.
+   */
+  const misfiled = collected.filter(({ slot, o }) => o.slot !== slot);
+  if (misfiled.length > 0) {
+    return { state: "refused",
+      reason: `${provider.name} answered about ${misfiled.map((m) => `${m.o.slot} when asked for ${m.slot}`).join("; ")}` };
+  }
+  const obs = Object.fromEntries(collected.map(({ slot, o }) => [slot, o])) as Record<Slot, Observation>;
   const { observations, failures } = toObservations(obs);
 
   // Every slot failing is not an incident with three empty observations — it is

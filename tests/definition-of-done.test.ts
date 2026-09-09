@@ -65,19 +65,24 @@ describe("the ten Definition-of-Done items", () => {
     }
   });
 
-  it("reports five of ten covered, and names the five that are not", () => {
-    // The number is asserted so that quietly reclassifying an item as covered
-    // fails here rather than improving a statistic nobody checks. It went from
-    // seven to six when Codex pointed out that item 2 was claiming more than
-    // its tests establish.
+  it("reports six of ten covered, and names the four that are not", () => {
+    /*
+     * The numbers are asserted so that quietly reclassifying an item fails here
+     * rather than improving a statistic nobody checks.
+     *
+     * Five on 2026-09-05, seven the same day when a second and third provider
+     * implementation arrived, back to six when Codex showed item 2 claimed more
+     * than its tests establish, back to five when the same was true of item 8,
+     * and six again on 2026-09-07 — this time because assembleIncident collects
+     * through the Provider contract, which makes checkProvenance's refusals
+     * reachable from it at all. Item 8's wording was narrowed in the same
+     * change: it says OBSERVATIONS, because the alert and the registry are
+     * still read straight off the disk.
+     */
     const covered = DEFINITION_OF_DONE.filter((i) => i.covered).map((i) => i.n);
     const outstanding = DEFINITION_OF_DONE.filter((i) => !i.covered).map((i) => i.n);
-    // Was five on 2026-09-05 and became seven the same day, when a second and
-    // third provider implementation made items 6 and 8 answerable without a
-    // cluster. The number is asserted so that reclassifying an item fails here
-    // rather than improving a statistic nobody checks.
-    expect(covered).toEqual([1, 4, 5, 7, 9]);
-    expect(outstanding).toEqual([2, 3, 6, 8, 10]);
+    expect(covered).toEqual([1, 4, 5, 7, 8, 9]);
+    expect(outstanding).toEqual([2, 3, 6, 10]);
   });
 
   it("names only dependencies that provably do not exist yet", () => {
@@ -100,11 +105,7 @@ describe("the ten Definition-of-Done items", () => {
         // ordinary work — which is exactly what this check is for.
         readFileSync(new URL("./fixtures/another-tenant/container-oom/kubernetes.json", import.meta.url).pathname, "utf8")
           .includes("acme-bank"),
-      "the assembler to collect through the provider contract rather than through one implementation": () =>
-        // assembleIncident still calls readScenario directly. When it takes a
-        // Provider instead, this stops being a reason.
-        !readFileSync(new URL("../src/core/assemble.ts", import.meta.url).pathname, "utf8")
-          .includes("Provider"),
+
       "a model call": () =>
         // No model key anywhere the project reads. If one appears, this stops
         // being a reason and the items waiting on it become ordinary work.

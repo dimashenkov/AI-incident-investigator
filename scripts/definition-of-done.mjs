@@ -94,8 +94,30 @@ export const DEFINITION_OF_DONE = [
     ],
   },
   {
-    n: 8, claim: "Provider substitutability.", covered: false,
-    needs: "the assembler to collect through the provider contract rather than through one implementation",
+    n: 8, claim: "Provider substitutability: observations are collected through the contract, and a substitute is held to it.",
+    covered: true,
+    by: [
+      "refuses a provider that returns an observation with no provenance",
+      "refuses a provider that answers about a different slot than the one asked for",
+      "builds the same incident through the contract as it did through the implementation",
+    ],
+    /*
+     * Closed on 2026-09-07, and worded narrowly on purpose.
+     *
+     * It says OBSERVATIONS. The alert and the scenario registry are still read
+     * straight off the disk inside assembleIncident, so a claim that the
+     * assembler collects EVERYTHING through the contract would be larger than
+     * the code. This item has been reversed twice already for claiming more
+     * than its evidence; a third time would be my own doing.
+     *
+     * What actually changed: checkProvenance's disagreement refusals could not
+     * fire from assembleIncident at all, because every collected observation
+     * arriving there had just been stamped from that same request. Injection is
+     * the only thing that makes them reachable, and the tests named above reach
+     * them. The deployed workflow is unaffected — incidents are assembled at
+     * generate time and inlined, and this file cannot be transpiled into a Code
+     * node in any case.
+     */
     /*
      * Also reversed on 2026-09-05, and for the sharper reason: "production,
      * assembly and workflow code never consume Provider. Enumeration plus

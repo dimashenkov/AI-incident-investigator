@@ -450,7 +450,13 @@ return items.map(function (item, index) {
 
   const reported = reportIncident(validate, inc, at);
   if (reported.state !== "reported") {
-    return { json: Object.assign({}, j, { report_refused: reported.reason }) };
+    /*
+     * The errors too. Storing only the sentence left an operator in n8n reading
+     * "the message would make the conversation invalid" with nothing saying
+     * WHICH rule refused it — while the reporter had the list in hand.
+     */
+    return { json: Object.assign({}, j, { report_refused: reported.reason,
+      report_errors: reported.errors || [] }) };
   }
   const next = Object.assign({}, inc, { conversation: reported.conversation });
   return { json: Object.assign({}, j, { incident: next,

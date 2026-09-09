@@ -910,7 +910,7 @@ export const MUTATIONS = [
     // were already paid for.
     id: "report-refusal-discards-the-conclusion",
     file: "scripts/workflow-runtime.mjs",
-    from: "    return { json: Object.assign({}, j, { report_refused: reported.reason }) };",
+    from: "    return { json: Object.assign({}, j, { report_refused: reported.reason,\n      report_errors: reported.errors || [] }) };",
     to: '    return { json: { index, state: "refused", reason: "report: " + reported.reason } };',
     mustFail: "keeps the conclusion when the thread cannot be written, rather than losing both",
   },
@@ -1620,6 +1620,15 @@ export const MUTATIONS = [
     from: '  { path: "settings/binaryMode", why: "written by the instance on save; this chain passes no binary data" },',
     to: '  { path: "settings", why: "" },',
     mustFail: "still reports a change to a setting that is ours",
+  },
+  {
+    // The reason kept and the errors dropped, so a validator that said WHY and
+    // one that could not run at all produce identical output.
+    id: "a-refused-report-drops-the-errors",
+    file: "src/core/thread.ts",
+    from: "    if (r.state === \"refused\") return r.errors === undefined ? { reason: r.reason } : { reason: r.reason, errors: r.errors };",
+    to: "    if (r.state === \"refused\") return { reason: r.reason };",
+    mustFail: "carries the validator's errors out, not only its sentence",
   },
   {
     // The deployed node running the schemas and nothing else, so "valid" means

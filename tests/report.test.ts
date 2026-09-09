@@ -305,3 +305,49 @@ describe("the thread does not say more, or less, than the incident holds", () =>
       .toEqual(["kubernetes"]);
   });
 });
+
+/*
+ * A refusal that says which rule refused it.
+ *
+ * `say` returned a bare string, so every refusal came out with
+ * `errors: undefined` — although `Reported` declares the field and
+ * `appendMessage` fills it in. A validator that said WHY and a validator that
+ * could not run at all produced byte-identical output. It is the defect
+ * src/core/merge.ts lists in its own header as one of four it fixed, alive in
+ * the other carrier, and reachable through the real validator with no stub.
+ * Found by a subagent on 2026-09-07.
+ */
+describe("a refused report says which rule refused it", () => {
+  it("carries the validator's errors out, not only its sentence", () => {
+    const incident = {
+      incident_id: "INC-2026-0001", service: "payment-api", namespace: "production",
+      analysis: { agents: [], evidence: [], root_cause_code: null },
+      // One key the conversation schema forbids: enough to make appending fail,
+      // and the reason is a rule with a name.
+      conversation: { provider: "fake-slack", channel_id: "c", thread_id: "thread-INC-2026-0001",
+        incident_id: "INC-2026-0001", messages: [], invented: "x" },
+    };
+    const r = reportIncident(incident, AT);
+    expect(r.state).toBe("refused");
+    if (r.state !== "refused") return;
+    expect(r.reason).toContain("would make the conversation invalid");
+    expect(r.errors, "the sentence alone does not say which rule refused it").toBeDefined();
+    expect(r.errors!.join("; ")).toMatch(/must NOT have additional properties/);
+  });
+
+  it("leaves errors absent when the refusal has none to give", () => {
+    // A conversation belonging to another incident is refused before anything
+    // is validated, so there is no error list — and an empty array would be a
+    // claim that the validator ran and found nothing.
+    const incident = {
+      incident_id: "INC-2026-0001", service: "s", namespace: "n",
+      analysis: { agents: [], evidence: [], root_cause_code: null },
+      conversation: { provider: "fake-slack", channel_id: "c", thread_id: "thread-INC-2026-9999",
+        incident_id: "INC-2026-9999", messages: [] },
+    };
+    const r = reportIncident(incident, AT);
+    expect(r.state).toBe("refused");
+    if (r.state !== "refused") return;
+    expect(r.errors, "no validator ran, so there is nothing to list").toBeUndefined();
+  });
+});

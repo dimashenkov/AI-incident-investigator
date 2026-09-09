@@ -86,9 +86,25 @@ export function reportIncident(validate: Validate, incident: Record<string, unkn
   const code = analysis["root_cause_code"];
 
   let current = conversation as Record<string, unknown>;
-  const say = (message: Message): string | null => {
+  /*
+   * Carries the reason AND the errors, because dropping the second is the
+   * defect this file's sibling lists in its own header as one of four it fixed.
+   *
+   * `say` returned a bare string, so every refusal below came out with
+   * `errors: undefined` — although `Reported` declares the field and
+   * `appendMessage` fills it in. A validator that said WHY, and a validator that
+   * could not run at all, produced byte-identical output: same sentence, no
+   * detail either time. The deployed node makes it worse, storing only
+   * `report_refused: reported.reason`, so an operator in n8n reads "the message
+   * would make the conversation invalid" and nothing more. Found by a subagent
+   * on 2026-09-07, reachable through the real validator with no stub at all.
+   */
+  const say = (message: Message): { reason: string; errors?: string[] } | null => {
     const r = appendMessage(validate, current, message);
-    if (r.state === "refused") return r.reason;
+    // The key is present only when there are errors: `exactOptionalPropertyTypes`
+    // treats "the field is there and holds undefined" as different from "the
+    // field is absent", and it is right to.
+    if (r.state === "refused") return r.errors === undefined ? { reason: r.reason } : { reason: r.reason, errors: r.errors };
     current = r.conversation;
     return null;
   };
@@ -97,11 +113,11 @@ export function reportIncident(validate: Validate, incident: Record<string, unkn
     role: "system", text: `${incidentId}: ${String(incident["service"])} in ${String(incident["namespace"])} — investigating.`,
     ts: at, incident_id: incidentId,
   });
-  if (opened !== null) return { state: "refused", reason: opened };
+  if (opened !== null) return { state: "refused", ...opened };
 
   for (const a of agents) {
     const failed = say(agentMessage(a, incidentId, at, agents));
-    if (failed !== null) return { state: "refused", reason: `${a.agent}: ${failed}` };
+    if (failed !== null) return { state: "refused", ...failed, reason: `${a.agent}: ${failed.reason}` };
   }
 
   // The verdict, and only what stands behind it.
@@ -129,7 +145,7 @@ export function reportIncident(validate: Validate, incident: Record<string, unkn
       text: `No cause was established from the recorded analysis.` +
         (readable === 0 ? "" : ` ${readable} agent(s) could not read their source, so less was collected than the thread above suggests.`),
     });
-    if (failed !== null) return { state: "refused", reason: `verdict: ${failed}` };
+    if (failed !== null) return { state: "refused", ...failed, reason: `verdict: ${failed.reason}` };
   } else if (typeof code === "string") {
     const forIt = evidence.filter((e) => e.supports === "for");
     const against = evidence.filter((e) => e.supports === "against");
@@ -175,7 +191,7 @@ export function reportIncident(validate: Validate, incident: Record<string, unkn
         : ` Against it: ${against.map((e) => `${e.source} says ${e.fact}`).join("; ")}.`);
     const failed = say({ role: "agent", incident_id: incidentId, ts: at, text,
       cited_evidence: forIt.map((e) => ({ source: e.source, fact: e.fact })) });
-    if (failed !== null) return { state: "refused", reason: `verdict: ${failed}` };
+    if (failed !== null) return { state: "refused", ...failed, reason: `verdict: ${failed.reason}` };
   } else {
     /*
      * The branch that was not there.
@@ -202,7 +218,7 @@ export function reportIncident(validate: Validate, incident: Record<string, unkn
         + (errored === 0 ? "" : ` ${errored} agent(s) could not read their source.`)
         + " Nothing above is a verdict.",
     });
-    if (failed !== null) return { state: "refused", reason: `verdict: ${failed}` };
+    if (failed !== null) return { state: "refused", ...failed, reason: `verdict: ${failed.reason}` };
   }
 
   return { state: "reported", conversation: current };
