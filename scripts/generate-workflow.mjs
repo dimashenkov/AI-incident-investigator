@@ -225,7 +225,7 @@ function collectNode(agent, from, position) {
 }
 
 /** The model every agent is asked with, named once. */
-export const MODEL = "gpt-4o-mini";
+export const MODEL = "gpt-4o";
 
 /**
  * Which stored credential the HTTP nodes use.

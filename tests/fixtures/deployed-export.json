@@ -3,12 +3,12 @@
   "name": "AI SRE — incident investigation",
   "description": null,
   "active": true,
-  "activeVersionId": "82a316de-4749-4490-91cb-19b1028564b8",
+  "activeVersionId": "c6460d3b-a3ab-4b6d-9d73-a1eb8a90d17e",
   "createdAt": "2026-09-04T13:44:43.103Z",
-  "updatedAt": "2026-09-10T15:34:00.229Z",
+  "updatedAt": "2026-09-10T16:27:58.025Z",
   "isArchived": false,
-  "versionId": "82a316de-4749-4490-91cb-19b1028564b8",
-  "versionCounter": 65,
+  "versionId": "c6460d3b-a3ab-4b6d-9d73-a1eb8a90d17e",
+  "versionCounter": 66,
   "sourceWorkflowId": null,
   "triggerCount": 1,
   "nodes": [
@@ -26,7 +26,7 @@
         "httpMethod": "POST",
         "responseMode": "lastNode"
       },
-      "webhookId": "20c8bc88-6d9b-4f3d-b1b2-574b32cf0185"
+      "webhookId": "9fe7eb5c-a898-4905-9a86-7cb65a73ec07"
     },
     {
       "id": "assemble",
@@ -101,7 +101,7 @@
         "nodeCredentialType": "openAiApi",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: \"gpt-4o-mini\", temperature: 0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
+        "jsonBody": "={{ JSON.stringify({ model: \"gpt-4o\", temperature: 0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
         "options": {}
       }
     },
@@ -193,7 +193,7 @@
         "nodeCredentialType": "openAiApi",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: \"gpt-4o-mini\", temperature: 0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
+        "jsonBody": "={{ JSON.stringify({ model: \"gpt-4o\", temperature: 0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
         "options": {}
       }
     },
@@ -285,7 +285,7 @@
         "nodeCredentialType": "openAiApi",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: \"gpt-4o-mini\", temperature: 0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
+        "jsonBody": "={{ JSON.stringify({ model: \"gpt-4o\", temperature: 0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
         "options": {}
       }
     },
@@ -377,7 +377,7 @@
         "nodeCredentialType": "openAiApi",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: \"gpt-4o-mini\", temperature: 0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
+        "jsonBody": "={{ JSON.stringify({ model: \"gpt-4o\", temperature: 0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
         "options": {}
       }
     },
@@ -700,7 +700,7 @@
   "meta": null,
   "tags": [],
   "activeVersion": {
-    "versionId": "82a316de-4749-4490-91cb-19b1028564b8",
+    "versionId": "c6460d3b-a3ab-4b6d-9d73-a1eb8a90d17e",
     "workflowId": "49T3pwFvfumqTdo7",
     "nodes": [
       {
@@ -717,7 +717,7 @@
           "httpMethod": "POST",
           "responseMode": "lastNode"
         },
-        "webhookId": "20c8bc88-6d9b-4f3d-b1b2-574b32cf0185"
+        "webhookId": "9fe7eb5c-a898-4905-9a86-7cb65a73ec07"
       },
       {
         "id": "assemble",
@@ -789,7 +789,7 @@
           "nodeCredentialType": "openAiApi",
           "sendBody": true,
           "specifyBody": "json",
-          "jsonBody": "={{ JSON.stringify({ model: \"gpt-4o-mini\", temperature: 0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
+          "jsonBody": "={{ JSON.stringify({ model: \"gpt-4o\", temperature: 0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
           "options": {}
         }
       },
@@ -878,7 +878,7 @@
           "nodeCredentialType": "openAiApi",
           "sendBody": true,
           "specifyBody": "json",
-          "jsonBody": "={{ JSON.stringify({ model: \"gpt-4o-mini\", temperature: 0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
+          "jsonBody": "={{ JSON.stringify({ model: \"gpt-4o\", temperature: 0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
           "options": {}
         }
       },
@@ -967,7 +967,7 @@
           "nodeCredentialType": "openAiApi",
           "sendBody": true,
           "specifyBody": "json",
-          "jsonBody": "={{ JSON.stringify({ model: \"gpt-4o-mini\", temperature: 0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
+          "jsonBody": "={{ JSON.stringify({ model: \"gpt-4o\", temperature: 0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
           "options": {}
         }
       },
@@ -1056,7 +1056,7 @@
           "nodeCredentialType": "openAiApi",
           "sendBody": true,
           "specifyBody": "json",
-          "jsonBody": "={{ JSON.stringify({ model: \"gpt-4o-mini\", temperature: 0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
+          "jsonBody": "={{ JSON.stringify({ model: \"gpt-4o\", temperature: 0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
           "options": {}
         }
       },
@@ -1365,16 +1365,16 @@
     "name": null,
     "description": null,
     "autosaved": false,
-    "createdAt": "2026-09-10T15:34:00.310Z",
-    "updatedAt": "2026-09-10T15:34:00.310Z",
+    "createdAt": "2026-09-10T16:27:58.107Z",
+    "updatedAt": "2026-09-10T16:27:58.107Z",
     "workflowPublishHistory": [
       {
-        "id": 123,
+        "id": 125,
         "workflowId": "49T3pwFvfumqTdo7",
-        "versionId": "82a316de-4749-4490-91cb-19b1028564b8",
+        "versionId": "c6460d3b-a3ab-4b6d-9d73-a1eb8a90d17e",
         "event": "activated",
         "userId": "6e8e3eb9-d8db-4e7f-bdb3-3318d80dee5a",
-        "createdAt": "2026-09-10T15:34:00.916Z"
+        "createdAt": "2026-09-10T16:27:58.817Z"
       }
     ]
   },

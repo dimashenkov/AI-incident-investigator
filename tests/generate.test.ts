@@ -206,14 +206,28 @@ describe("the shape of the deployed chain", () => {
      * If the model is deliberately changed, this line changes with it, and the
      * change is then visible in the diff rather than only in the bill.
      */
+    /*
+     * CHANGED FOR AN EXPERIMENT IN FLIGHT, 2026-09-10.
+     *
+     * Everything measured until today is the behaviour of `gpt-4o-mini`, and
+     * the owner's local n8n agent established that the same credential reaches
+     * `gpt-4o` and larger. That is the one explanation for three identical
+     * results that nobody had excluded, so six scenarios are being bought on
+     * each model, on this frozen revision, changing only this string.
+     *
+     * The line changed with the model, which is what the paragraph above asks
+     * for: the change is in the diff, not only in the bill. It goes back to
+     * `gpt-4o-mini` unless the comparison earns the switch — and „earns" means a
+     * recorded result, not a preference.
+     */
     expect(MODEL, "the model this project measures against, spelled out once")
-      .toBe("gpt-4o-mini");
+      .toBe("gpt-4o");
     const ask = node("Ask kubernetes");
-    expect(ask.parameters.jsonBody).toContain("gpt-4o-mini");
+    expect(ask.parameters.jsonBody).toContain(MODEL);
     expect(ask.parameters.jsonBody).toContain("temperature: 0");
     // Every agent call is the same model, or the runs are not comparable.
     for (const name of ["Ask kubernetes", "Ask logs", "Ask metrics", "Ask root-cause"]) {
-      expect(node(name).parameters.jsonBody, `${name} asks the same model`).toContain("gpt-4o-mini");
+      expect(node(name).parameters.jsonBody, `${name} asks the same model`).toContain(MODEL);
     }
   });
 
