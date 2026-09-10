@@ -159,6 +159,25 @@ function collectNode(agent, from, position) {
         + ` var m = Array.isArray(c) && c.length > 0 && c[0] ? c[0].message : null;`
         + ` var t = m ? m.content : null;`
         + ` return typeof t === 'string' ? t : null; })(),`
+        /*
+         * What the call cost, from the reply that carries it.
+         *
+         * The webhook answer carries no usage, so `node scripts/spend.mjs`
+         * reports sixteen runs it could not price — the number is a floor and
+         * says so. The reply from the model DOES carry it, and nothing read it
+         * until 2026-09-10, when the owner's local n8n agent read execution 260
+         * node by node and found 11 249 input tokens where this project had
+         * been counting 4 213.
+         *
+         * Its own function, for the reason the one above has: threading a value
+         * through a parser with a dozen early returns is how it comes to be
+         * dropped on the path nobody tested.
+         */
+        + ` usage: (function () {`
+        + ` var u = $json && $json.usage;`
+        + ` if (!u || typeof u !== 'object') return null;`
+        + ` return { prompt_tokens: u.prompt_tokens, completion_tokens: u.completion_tokens,`
+        + ` cached_tokens: (u.prompt_tokens_details && u.prompt_tokens_details.cached_tokens) || 0 }; })(),`
         + ` reply: (function () {`
         /*
          * Four unguarded property accesses used to stand here, with the

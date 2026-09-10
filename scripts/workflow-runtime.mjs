@@ -344,6 +344,15 @@ return items.map(function (item, index) {
      */
     const wordsSoFar = Object.assign({}, j.raw_answers || {});
     if (raw !== null) wordsSoFar[AGENT] = raw;
+    /*
+     * What each call cost, carried like the words themselves.
+     *
+     * The webhook reply carries no usage, which is why the spend counter has
+     * been reporting a floor and a count of runs it could not price. The
+     * model's reply carries it; nothing read it until 2026-09-10.
+     */
+    const costSoFar = Object.assign({}, j.usage_by_agent || {});
+    if (j.usage && typeof j.usage === "object") costSoFar[AGENT] = j.usage;
     const reply = j.reply;
     if (typeof reply !== "object" || reply === null) {
       /*
@@ -360,7 +369,7 @@ return items.map(function (item, index) {
        * money already bought.
        */
       return { json: Object.assign({}, j, { index, state: "refused", agent: AGENT, raw,
-        raw_answers: wordsSoFar,
+        raw_answers: wordsSoFar, usage_by_agent: costSoFar,
         reason: AGENT + " returned nothing that could be read as an answer" }) };
     }
     // The node knows who it asked, and says so. The schema spells root-cause
@@ -368,7 +377,7 @@ return items.map(function (item, index) {
     const recorded = recordAgentResult(validate, incident, reply, AGENT.replace("-", "_"));
     if (recorded.state !== "recorded") {
       return { json: Object.assign({}, j, { index, state: "refused", agent: AGENT, raw,
-        raw_answers: wordsSoFar,
+        raw_answers: wordsSoFar, usage_by_agent: costSoFar,
         reason: AGENT + ": " + recorded.reason, errors: recorded.errors || [] }) };
     }
     j.incident = recorded.incident;
@@ -392,7 +401,7 @@ return items.map(function (item, index) {
 
   if (NEXT === null) {
     return { json: { index, state: "recorded", agent: AGENT, scenario: j.scenario,
-      incident: j.incident, normalised: j.normalised || 0, raw_answers: j.raw_answers || {},
+      incident: j.incident, normalised: j.normalised || 0, raw_answers: j.raw_answers || {}, usage_by_agent: j.usage_by_agent || {},
       payloads_sent: j.payloads_sent || {} } };
   }
 
@@ -424,7 +433,7 @@ return items.map(function (item, index) {
       : (j.payloads_sent || {});
     return { json: { index, state: "asking", agent: NEXT, scenario: j.scenario,
       incident: j.incident, prompt: ctx.prompt, payload: ctx.payload,
-      normalised: j.normalised || 0, raw_answers: j.raw_answers || {},
+      normalised: j.normalised || 0, raw_answers: j.raw_answers || {}, usage_by_agent: j.usage_by_agent || {},
       payloads_sent: sent } };
   }
 
@@ -475,7 +484,7 @@ return items.map(function (item, index) {
   const record = collection[slot] || {};
   if (record.state === "nothing" && ctx.why === "empty-slot") {
     return { json: { index, state: "skipped", agent: NEXT, scenario: j.scenario,
-      incident: j.incident, normalised: j.normalised || 0, raw_answers: j.raw_answers || {},
+      incident: j.incident, normalised: j.normalised || 0, raw_answers: j.raw_answers || {}, usage_by_agent: j.usage_by_agent || {},
       payloads_sent: j.payloads_sent || {},
       skipped_because: NEXT + " had nothing to read: the provider reported an established absence" } };
   }
@@ -595,7 +604,7 @@ return items.map(function (item, index) {
      * that a verdict from a corrected scorer must be recomputed before any
      * dependent spending has nothing to recompute from.
      */
-    raw_answers: j.raw_answers || {},
+    raw_answers: j.raw_answers || {}, usage_by_agent: j.usage_by_agent || {},
     /*
      * Carried to the caller for the same reason the raw answers are: a run that
      * has been paid for must be re-judgeable from what came back, and "what was

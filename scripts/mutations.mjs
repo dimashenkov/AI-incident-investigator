@@ -1816,7 +1816,7 @@ export const MUTATIONS = [
     // has only the failing agent's words to read.
     id: "a-refusal-discards-what-was-already-paid-for",
     file: "scripts/workflow-runtime.mjs",
-    from: "      return { json: Object.assign({}, j, { index, state: \"refused\", agent: AGENT, raw,\n        raw_answers: wordsSoFar,\n        reason: AGENT + \" returned nothing that could be read as an answer\" }) };",
+    from: "      return { json: Object.assign({}, j, { index, state: \"refused\", agent: AGENT, raw,\n        raw_answers: wordsSoFar, usage_by_agent: costSoFar,\n        reason: AGENT + \" returned nothing that could be read as an answer\" }) };",
     to: "      return { json: { index, state: \"refused\", agent: AGENT, raw,\n        reason: AGENT + \" returned nothing that could be read as an answer\" } };",
     mustFail: "keeps what the earlier agents were paid for when a later one refuses",
   },
