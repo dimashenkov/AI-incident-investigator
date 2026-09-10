@@ -157,6 +157,36 @@ describe("the verdict's evidence names the agent that reported it", () => {
     }
   });
 
+  it("does not pick the first of two agents that reported the same path", () => {
+    /*
+     * A source_ref is relative to ONE observation, so two agents can report the
+     * same path with different values: `collected_at` is in the logs slot and
+     * in the metrics slot. The loop returned the FIRST match, so a metrics fact
+     * came out attributed to logs — in the conclusion and in the thread a
+     * person reads. Astra reproduced it end to end on 2026-09-10.
+     *
+     * The fact the verdict carries is what disambiguates: same ref AND same
+     * fact is one agent. Here the verdict carries the metrics fact, so metrics
+     * must be named, although logs comes first in the list.
+     */
+    const withFact = (agent: string, ref: string, fact: string) => ({
+      agent, status: "ok", findings: [{ fact, source_ref: ref }], hypotheses: [], confidence: 0.5 });
+    const rcWithFact = (ref: string, fact: string) => ({
+      agent: "root_cause", status: "ok", findings: [{ fact, source_ref: ref }],
+      hypotheses: [{ code: "CPU_THROTTLING", statement: "s", supported_by: [ref] }], confidence: 0.5 });
+
+    const r = concludeIncident(accepts, incidentWith([
+      withFact("logs", "collected_at", "Logs collected at 10:30:14Z"),
+      withFact("metrics", "collected_at", "Metrics collected at 10:30:16Z"),
+      rcWithFact("collected_at", "Metrics collected at 10:30:16Z"),
+    ]));
+    expect(r.state).toBe("concluded");
+    if (r.state !== "concluded") return;
+    const ev = (r.incident.analysis as { evidence: Array<{ source: string; fact: string }> }).evidence;
+    expect(ev[0]!.source, "the metrics fact belongs to metrics, though logs reported the same path first")
+      .toBe("metrics");
+  });
+
   it("never attributes a slot's fact to the alerting provider", () => {
     // `collected_at` is in every observation and matched no prefix, so it fell
     // to `datadog` — the one evidenceSource value no slot can ever produce.

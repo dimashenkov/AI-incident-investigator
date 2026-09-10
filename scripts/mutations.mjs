@@ -15,6 +15,36 @@
  */
 export const MUTATIONS = [
   {
+    // The empty-slot sentence is emitted for an incident where nothing is
+    // empty. Astra verified on 2026-09-10 that the silence tests as written
+    // then — a relative line count — passed with exactly this in place.
+    id: "an-empty-slot-sentence-for-an-incident-with-none",
+    file: "src/core/thread.ts",
+    from: "    if (empty.length > 0) {",
+    to: "    if (true) {\n      empty.push(\"logs\");",
+    mustFail: "adds not one message when every slot was collected",
+  },
+  {
+    // An established absence is filed under "could not be gathered" again: the
+    // reader of a healthy empty slot is told the source was not gathered, and
+    // treats the absence as unreliable. Grok found this in the fix itself.
+    id: "an-established-absence-announced-as-a-failure",
+    file: "src/core/thread.ts",
+    from: "        empty.push(slot);",
+    to: "        unread.push(`${slot} was read and held nothing`);",
+    mustFail: "does not call an established absence a gathering failure",
+  },
+  {
+    // The thread stops saying what could not be gathered: an incident where a
+    // slot FAILED reads exactly like one where a provider looked and found
+    // nothing. Live from the day `collection` was written until 2026-09-10.
+    id: "a-thread-that-hides-how-the-incident-was-gathered",
+    file: "src/core/thread.ts",
+    from: "      if (state === \"collected\") continue;",
+    to: "      continue;",
+    mustFail: "says which slot could not be read, and why",
+  },
+  {
     // Could-not-narrow becomes checked-less: a title the report does not carry
     // returns a file list anyway, and the mutation run then exercises the wrong
     // file instead of the whole suite.
@@ -1198,9 +1228,9 @@ export const MUTATIONS = [
     // contracts share is attributed to whichever the prefix hits first.
     id: "evidence-source-guessed-from-the-path",
     file: "src/core/merge.ts",
-    from: "    if (reported) return { source: who, fact: String(finding[\"fact\"] ?? \"\") };",
-    to: "    if (false) return { source: who, fact: String(finding[\"fact\"] ?? \"\") };",
-    mustFail: "traces a path two contracts share to the agent that actually cited it",
+    from: "    if (hits.some((f) => String((f as Record<string, unknown>)[\"fact\"] ?? \"\") === fact)) {\n      return { source: who, fact };\n    }",
+    to: "    return { source: who, fact };",
+    mustFail: "does not pick the first of two agents that reported the same path",
   },
   {
     // A slot's fact attributed to the alerting provider, which holds no

@@ -351,3 +351,133 @@ describe("a refused report says which rule refused it", () => {
     expect(r.errors, "no validator ran, so there is nothing to list").toBeUndefined();
   });
 });
+
+describe("two incidents gathered differently do not read the same", () => {
+  /*
+   * `collection` records, per slot, whether it was collected, held nothing, or
+   * failed and why. Nothing in the thread read it — so an incident where a
+   * provider LOOKED and found nothing produced byte-identical text to one where
+   * a slot could not be read at all. That is the exact distinction the field
+   * exists to carry, and the person reading the thread could not see it.
+   * Found by a subagent on 2026-09-08, still live on 2026-09-10.
+   */
+  const withCollection = (collection: Record<string, unknown>) => {
+    const inc = incidentWith(K8S_REPLY, {
+      agent: "root_cause", status: "ok",
+      findings: [{ fact: "container terminated OOMKilled",
+                   source_ref: "pods[0].containers[0].last_state.terminated.reason" }],
+      hypotheses: [{ code: "CONTAINER_OOM", statement: "the container exceeded its memory limit",
+                     supported_by: ["pods[0].containers[0].last_state.terminated.reason"] }],
+      confidence: 0.9,
+    });
+    const done = concludeIncident(inc);
+    if (done.state !== "concluded") throw new Error(done.reason);
+    return { ...done.incident, collection } as Record<string, unknown>;
+  };
+
+  const read = (inc: Record<string, unknown>) => {
+    const r = reportIncident(inc, AT);
+    if (r.state !== "reported") throw new Error(r.reason);
+    return texts(r.conversation).join("\n");
+  };
+
+  it("says which slot could not be read, and why", () => {
+    const t = read(withCollection({
+      kubernetes: { state: "collected" },
+      logs: { state: "failed", kind: "unreadable", reason: "the logs slot is not valid JSON" },
+      metrics: { state: "collected" },
+    }));
+    expect(t, "the reason travels to the person reading").toContain("the logs slot is not valid JSON");
+    expect(t).toContain("logs could not be read");
+  });
+
+  it("does not call an established absence a gathering failure", () => {
+    /*
+     * The first version of this code put both under one header — "Not
+     * everything could be gathered" — and then said underneath that logs had
+     * been read and held nothing. Grok, 2026-09-10: a reader of a healthy empty
+     * slot is told the source was not gathered, and will treat the absence as
+     * unreliable. That is the conflation `collection` exists to prevent,
+     * committed by the code written to surface it.
+     */
+    const nothing = read(withCollection({
+      kubernetes: { state: "collected" }, logs: { state: "nothing" }, metrics: { state: "collected" },
+    }));
+    expect(nothing, "a slot that was read and held nothing is not a failure to gather")
+      .not.toContain("Not everything could be gathered");
+    expect(nothing, "and it is still said, in its own words").toContain("Read and found nothing: logs");
+
+    const failed = read(withCollection({
+      kubernetes: { state: "collected" },
+      logs: { state: "failed", kind: "unreadable", reason: "unreadable" },
+      metrics: { state: "collected" },
+    }));
+    expect(failed).toContain("Not everything could be gathered");
+    expect(failed, "and a failure is not reported as an absence").not.toContain("Read and found nothing");
+    expect(nothing, "these two used to be byte-identical").not.toBe(failed);
+  });
+
+  it("says both, separately, when one slot failed and another held nothing", () => {
+    const t = read(withCollection({
+      kubernetes: { state: "collected" },
+      logs: { state: "failed", kind: "unreadable", reason: "not valid JSON" },
+      metrics: { state: "nothing" },
+    }));
+    expect(t).toContain("logs could not be read: not valid JSON");
+    expect(t).toContain("Read and found nothing: metrics");
+  });
+
+  /*
+   * Silence is asserted against a BASELINE, not by counting or by the absence
+   * of one phrase. Two rounds of review were needed to get here:
+   *
+   *   Grok, 2026-09-10: the first version was `not.toContain("Not everything
+   *   could be gathered")`, which passes with the whole block deleted.
+   *   Astra, the same day, on the rewrite: a relative line count passes too —
+   *   it verified in memory that a block unconditionally emitting "Read and
+   *   found nothing: logs." satisfies both assertions while lying about a
+   *   healthy incident.
+   *
+   * The baseline is the same incident with no `collection` field at all. Any
+   * message the block adds shows up as a difference against it.
+   */
+  const baseline = () => {
+    const inc = withCollection({});
+    delete (inc as Record<string, unknown>)["collection"];
+    const r = reportIncident(inc, AT);
+    if (r.state !== "reported") throw new Error(r.reason);
+    return texts(r.conversation);
+  };
+
+  const messagesFor = (collection: Record<string, unknown>) => {
+    const r = reportIncident(withCollection(collection), AT);
+    if (r.state !== "reported") throw new Error(r.reason);
+    return texts(r.conversation);
+  };
+
+  it("adds not one message when every slot was collected", () => {
+    expect(messagesFor({
+      kubernetes: { state: "collected" }, logs: { state: "collected" }, metrics: { state: "collected" },
+    }), "a healthy incident reads exactly like one that carries no collection at all")
+      .toEqual(baseline());
+  });
+
+  it("adds exactly one message for one empty slot, and it is that message", () => {
+    const said = messagesFor({
+      kubernetes: { state: "collected" }, logs: { state: "nothing" }, metrics: { state: "collected" },
+    });
+    const extra = said.filter((t) => !baseline().includes(t));
+    expect(extra, "one slot held nothing, so one sentence and no other")
+      .toEqual(["Read and found nothing: logs."]);
+  });
+
+  it("adds not one message when the incident carries no collection at all", () => {
+    const inc = withCollection({});
+    delete (inc as Record<string, unknown>)["collection"];
+    const r = reportIncident(inc, AT);
+    expect(r.state, "a missing collection is not a reason to refuse the report").toBe("reported");
+    if (r.state !== "reported") return;
+    expect(texts(r.conversation), "and it adds nothing, which is what this test is named for")
+      .toEqual(baseline());
+  });
+});

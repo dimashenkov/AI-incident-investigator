@@ -115,6 +115,78 @@ export function reportIncident(validate: Validate, incident: Record<string, unkn
   });
   if (opened !== null) return { state: "refused", ...opened };
 
+  /*
+   * What was actually collected, said in the thread a person reads.
+   *
+   * `collection` is written onto every incident — for each slot, whether it was
+   * collected, reported an established absence, or failed and why — and nothing
+   * here read it. Two incidents assembled DIFFERENTLY produced byte-identical
+   * text: one where a provider looked and found nothing, one where a slot could
+   * not be read at all. That is exactly the difference the field exists to
+   * carry, and the reader could not see it. Found by a subagent on 2026-09-08
+   * and still live on 2026-09-10.
+   *
+   * Only the slots that are not `collected` are said. A line per healthy slot
+   * would bury the one line that matters under two that never vary.
+   */
+  const collection = incident["collection"];
+  if (typeof collection === "object" && collection !== null && !Array.isArray(collection)) {
+    /*
+     * TWO sentences, because these are two different facts.
+     *
+     * The first version put both under one header — "Not everything could be
+     * gathered" — and then said, underneath it, that logs had been read and
+     * held nothing. Grok, 2026-09-10: "an established absence is announced as a
+     * gathering failure. A reader of a healthy empty logs slot is told the
+     * source was not gathered, and will treat the absence as unreliable."
+     *
+     * That is the exact conflation `collection` exists to prevent, committed by
+     * the code written to surface it.
+     */
+    const unread: string[] = [];
+    const empty: string[] = [];
+    const unknown: string[] = [];
+    for (const [slot, raw] of Object.entries(collection as Record<string, unknown>)) {
+      if (typeof raw !== "object" || raw === null) continue;
+      const c = raw as Record<string, unknown>;
+      const state = c["state"];
+      if (state === "collected") continue;
+      if (state === "failed") {
+        const why = typeof c["reason"] === "string" ? c["reason"] : "no reason recorded";
+        unread.push(`${slot} could not be read: ${why}`);
+      } else if (state === "nothing") {
+        empty.push(slot);
+      } else {
+        // An unknown state is not an absence and not a failure, so it goes in
+        // neither sentence. It used to be pushed onto `unread`, which put it
+        // under "Not everything could be gathered" — the comment said one thing
+        // and the line did another. Astra, 2026-09-10.
+        unknown.push(`${slot} is in state ${String(state)}, which this reader does not know`);
+      }
+    }
+    if (unread.length > 0) {
+      const said = say({
+        role: "system", text: `Not everything could be gathered: ${unread.join("; ")}.`,
+        ts: at, incident_id: incidentId,
+      });
+      if (said !== null) return { state: "refused", ...said };
+    }
+    if (empty.length > 0) {
+      const said = say({
+        role: "system", text: `Read and found nothing: ${empty.join(", ")}.`,
+        ts: at, incident_id: incidentId,
+      });
+      if (said !== null) return { state: "refused", ...said };
+    }
+    if (unknown.length > 0) {
+      const said = say({
+        role: "system", text: `Recorded in a state this report does not understand: ${unknown.join("; ")}.`,
+        ts: at, incident_id: incidentId,
+      });
+      if (said !== null) return { state: "refused", ...said };
+    }
+  }
+
   for (const a of agents) {
     const failed = say(agentMessage(a, incidentId, at, agents));
     if (failed !== null) return { state: "refused", ...failed, reason: `${a.agent}: ${failed.reason}` };
@@ -325,13 +397,22 @@ function agentMessage(a: AgentResult, incidentId: string, at: string, all: Agent
 function sourceOf(agent: string, ref: string | undefined, agents: AgentResult[]): string {
   if (agent === "kubernetes" || agent === "logs" || agent === "metrics") return agent;
   if (typeof ref === "string") {
-    for (const other of agents) {
-      if (other.agent === agent) continue;
-      const reported = (other.findings ?? []).some((f) => f.source_ref === ref);
-      if (reported && (other.agent === "kubernetes" || other.agent === "logs" || other.agent === "metrics")) {
-        return other.agent;
-      }
-    }
+    /*
+     * The same defect as `asEvidence` in merge.ts, one reader over: a path is
+     * relative to ONE observation, so `collected_at` is reported by logs and by
+     * metrics with different values. Returning the first match printed a
+     * metrics fact as coming from logs, in the thread a person reads. Astra
+     * reproduced it on 2026-09-10.
+     *
+     * Only an unambiguous answer is given. If two specialists reported the same
+     * ref, the citation stays with the agent that made the claim, which is what
+     * `agent` already is — not with whichever of the two the loop reached first.
+     */
+    const reporters = agents
+      .filter((other) => other.agent !== agent)
+      .filter((other) => (other.findings ?? []).some((f) => f.source_ref === ref))
+      .filter((other) => other.agent === "kubernetes" || other.agent === "logs" || other.agent === "metrics");
+    if (reporters.length === 1) return reporters[0]!.agent;
   }
   return agent;
 }

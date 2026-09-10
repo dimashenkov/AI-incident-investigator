@@ -604,16 +604,45 @@ function asEvidence(
 ): { source: string; fact: string } {
   const ref = String(finding["source_ref"] ?? "");
 
+  /*
+   * EVERY specialist that reported this ref, not the first one found.
+   *
+   * A path is relative to one observation, so the same `source_ref` can be
+   * reported by two different agents — `collected_at` is in the logs slot and
+   * in the metrics slot, holding different values. This loop returned the
+   * first match, so a metrics fact came out attributed to logs, in the
+   * conclusion and in the thread a person reads. Astra reproduced it end to end
+   * on 2026-09-10, through assembly, recording, conclusion and reporting.
+   *
+   * The comment fifteen lines down already said `collected_at` and `window`
+   * belong to more than one contract and that guessing between them is what
+   * produced the wrong attribution. The fallback was fixed then; this loop, the
+   * one that runs first, kept guessing.
+   */
+  const fact = String(finding["fact"] ?? "");
+  const reporters: string[] = [];
   for (const a of agents) {
     if (typeof a !== "object" || a === null) continue;
     const who = (a as Record<string, unknown>)["agent"];
     if (who !== "kubernetes" && who !== "logs" && who !== "metrics") continue;
     const fs = (a as Record<string, unknown>)["findings"];
     if (!Array.isArray(fs)) continue;
-    const reported = fs.some((f) =>
+    const hits = fs.filter((f) =>
       typeof f === "object" && f !== null && (f as Record<string, unknown>)["source_ref"] === ref);
-    if (reported) return { source: who, fact: String(finding["fact"] ?? "") };
+    if (hits.length === 0) continue;
+    // The ref alone is ambiguous; the fact it was reported with is not, when
+    // the two agents saw different things. Same ref AND same fact is one agent.
+    if (hits.some((f) => String((f as Record<string, unknown>)["fact"] ?? "") === fact)) {
+      return { source: who, fact };
+    }
+    reporters.push(who);
   }
+  if (reporters.length === 1) return { source: reporters[0] as string, fact };
+  /*
+   * Two or more reported it and none of their facts match this one. Naming
+   * either would be a coin toss recorded as provenance, so it falls through to
+   * the shape below — which deliberately does not know `collected_at`.
+   */
 
   /*
    * Nobody reported it. Fall back to the shape, and NOT to `datadog`: an
