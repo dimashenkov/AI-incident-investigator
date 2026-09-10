@@ -66,8 +66,10 @@ export function rogueProvider(behaviour: RogueBehaviour, root: string): Provider
         // The uncomfortable one, and the only one that gets through. Nothing in
         // the payload says it is foreign, so it is accepted and stamped as
         // ours. That is not a hole in the check — it is the boundary of what
-        // provenance can answer, and the gate prints it as a limitation every
-        // run. This behaviour is what makes that sentence a demonstration
+        // provenance can answer, and the gate DOES print that boundary as a
+        // limitation every run — that one is real, and it is a line in
+        // LIMITATIONS, not a provider list. This behaviour is what makes that
+        // sentence a demonstration
         // rather than a guess about our own code.
         return readSlot(scenario, slot, FOREIGN_ROOT, request);
       }

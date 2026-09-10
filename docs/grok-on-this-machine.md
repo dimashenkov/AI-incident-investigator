@@ -35,6 +35,90 @@ Authentication is interactive and already done. Do **not** run `grok login`,
 `grok logout`, or anything that touches `~/.grok`. There is no API key and none
 is to be created: the owner decided on 2026-08-30 that an API key is never used.
 
+## Corrected on 2026-09-10 — `read` is ALLOWED, and paths are given
+
+The owner, seeing a review whose prompt carried pasted code: *„искаш да кажеш,
+че не подаваш на Grok files path — това не е ок."* He is right, and the reason
+is the same one §6 gives for a hostile mandate: **when I paste excerpts, I am
+choosing what the reviewer sees, and that is a map of what I already know.**
+
+`read` was in `--disallowed-tools` below. Nothing measured required it — it was
+written to make the answer come from the supplied text. The cost is a review of
+my selection rather than of the code.
+
+**The call now keeps `--sandbox read-only` and drops `read` from the deny list,
+adds `--cwd <repo>`, and the prompt gives FILE PATHS instead of file contents:**
+
+```bash
+grok -p "<prompt naming the paths>" \
+     --model grok-4.6 \
+     --cwd /Users/dimitar/PROJECTS/AI-incident-investigator \
+     --sandbox read-only \
+     --disallowed-tools bash,edit,write,web_search,web_fetch \
+     --no-plan --no-subagents --output-format json
+```
+
+`bash`, `edit` and `write` stay denied: the review must not run anything or
+change anything. `read` is the only one that came back.
+
+### The trap that costs a whole run, measured the same hour
+
+Allowing `read` is **not enough**. The first attempt returned after one turn
+with `"stopReason": "cancelled"` and this as its entire answer:
+
+> Ще прочета самите файлове и diff-а, без да приемам резюмето за вярно.
+
+Its `thought` field showed it had decided to read the files and had drafted a
+verdict; the tool call itself was never approved, because headless mode has
+nobody to approve it, so the run was cancelled mid-answer. It still billed
+weight: `total_cost_usd` **$0.0133** for an intention.
+
+**A cancelled run does not look like a failure.** It prints a sentence in the
+right language, on the right subject, and exits 0. Read `stopReason` before
+reading the answer.
+
+**Three runs were cancelled before the working shape was found, and the two
+wrong guesses are worth as much as the answer:**
+
+| Attempt | Flags | Result |
+|---|---|---|
+| 1 | the old shape — `read` in the deny list, code pasted into the prompt | `cancelled`, 6 turns, **$0.088** — it tried tools anyway |
+| 2 | `--allowed-tools read` | **not a flag**; the name is `--allow`. Exit before any model call, $0 |
+| 3 | `--allow read --permission-mode dontAsk` | `cancelled`, 2 turns, **$0.024** |
+| 4 | `--permission-mode bypassPermissions` | `end_turn` — it read the file and answered |
+
+`--permission-mode` takes `default`, `acceptEdits`, `auto`, `dontAsk`,
+`bypassPermissions`, `plan`. **`dontAsk` does not mean "allow without asking" —
+it denies**, and the run is cancelled mid-answer. `bypassPermissions` is the one
+that lets the read through.
+
+Nothing is loosened by that: `--sandbox read-only` and the deny list still make
+writing and running impossible. What `bypassPermissions` removes is the prompt
+that nobody is there to answer.
+
+**The working shape:**
+
+```bash
+grok -p "<prompt naming the paths>" \
+     --model grok-4.6 \
+     --cwd /Users/dimitar/PROJECTS/AI-incident-investigator \
+     --sandbox read-only \
+     --disallowed-tools bash,edit,write,web_search,web_fetch \
+     --permission-mode bypassPermissions \
+     --no-plan --no-subagents --output-format json
+```
+
+**Verify it with a probe before spending a review on it.** One line — read
+`package.json`, return the `name` — costs $0.016 of weight and tells you whether
+reading works at all. Three cancelled reviews cost $0.125 and told nobody
+anything.
+
+**Ask for English.** Left alone it answered in Bulgarian, because the prompt
+around it was. Not wrong, but the repository's reviews are in English.
+
+The section below is the older shape, kept because its failure modes still
+apply.
+
 ## The only call shape used here
 
 One process per question. No session, no resume, no retry.

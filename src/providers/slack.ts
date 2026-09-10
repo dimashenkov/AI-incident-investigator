@@ -20,10 +20,20 @@ export type ThreadResult =
   | { state: "ok"; conversation: Record<string, unknown> }
   | { state: "refused"; reason: string; errors?: string[] };
 
+/*
+ * Two states, and there were three.
+ *
+ * `ambiguous` was declared and nothing ever built one: `ThreadIndex` holds one
+ * incident per thread and refuses a collision when the thread is registered, so
+ * `resolve` returns only `found` or `unknown`. Nothing narrowed on the third
+ * either — no consumer imports `Lookup`, and no exhaustiveness check covered
+ * it. A declared state that no input produces is the appearance of a
+ * capability, which is the defect this repository keeps finding.
+ * Codex agreed on 2026-09-10: delete, it changes no behaviour.
+ */
 export type Lookup =
   | { state: "found"; incidentId: string }
-  | { state: "unknown"; reason: string }
-  | { state: "ambiguous"; incidentIds: string[] };
+  | { state: "unknown"; reason: string };
 
 /** thread_id is derived from incident_id and nothing else. */
 export function threadIdFor(incidentId: string): string {

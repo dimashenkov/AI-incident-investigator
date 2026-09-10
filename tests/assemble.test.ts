@@ -9,6 +9,8 @@
 import { describe, it, expect } from "vitest";
 import { normaliseRef, withResolvedRefs, assembleIncident, checkProvenance, concludeIncident, incidentIdFor, readRegistry, recordAgentResult, resultBelongsHere, resolveRef, runnableAgents, serviceFromTags } from "../src/core/assemble.js";
 import { listScenarios, fixtureProvider} from "../src/providers/fixtures.js";
+import type { Provider } from "../src/providers/provider.js";
+import type { CollectionRequest } from "../src/providers/fixtures.js";
 import { validate } from "../src/schema/validate.js";
 import { assembleObservingContext, checkPayloadIsExactlyTheSlice } from "../src/agents/context.js";
 
@@ -930,9 +932,6 @@ describe("a path spelled with the wrapper it came in", () => {
  * generate time and inlined — so what is bought is exactly this reachability.
  */
 describe("observations are collected through the provider contract", () => {
-  const request = { collection_id: "aaaaaaaa-0000-4000-8000-000000000000" };
-  void request;
-
   it("builds the same incident through the contract as it did through the implementation", () => {
     // The default path is a fixtureProvider, so nothing changed for any caller.
     const a = assembleIncident("container-oom", 1, { root: SCENARIOS });
@@ -977,5 +976,118 @@ describe("observations are collected through the provider contract", () => {
     expect(r.state).toBe("refused");
     if (r.state !== "refused") return;
     expect(r.reason).toMatch(/answered about kubernetes when asked for logs/);
+  });
+});
+
+describe("the isolation refusals, through the entry point that actually assembles", () => {
+  /*
+   * `assembleIncident` takes `cluster`, `namespace` and `service`, and all 37
+   * call sites passed none of them — so `cluster` was always "prod-eu" and
+   * `namespace` always "production", on BOTH sides of every comparison.
+   *
+   * The first attempt at this test injected `rogueProvider`, and Grok showed on
+   * 2026-09-10 that it proves nothing: rogue goes through `stampOrRefuse`, so
+   * every slot comes back `failed`, and assembly returns at the
+   * "every observation failed" line long before `checkProvenance` is reached.
+   * Both tests stayed green with the isolation check deleted. The code says so
+   * itself, in the comment above `checkProvenance`: with the fixture provider
+   * that line cannot fire.
+   *
+   * So the provider here does what that comment names as the reachable case: it
+   * returns `collected` WITHOUT going through `readSlot`, carrying a stamp of
+   * its own. That is the only shape that arrives at `checkProvenance`.
+   */
+  const foreignStamped = (over: Record<string, unknown>): Provider => ({
+    name: "foreign-stamped",
+    exercised: true,
+    unexercisedBecause: "",
+    read(_scenario: string, slot: string, request: CollectionRequest) {
+      return {
+        // `slot` echoed back, because assembly refuses a provider that answers
+        // about a different slot than the one asked for — an earlier line, and
+        // one this test must get past rather than trip over.
+        slot,
+        state: "collected",
+        data: {
+          provenance: {
+            collection_id: request.collection_id,
+            requested_for: request.incident_id,
+            cluster: request.cluster,
+            namespace: request.namespace,
+            slot,
+            ...over,
+          },
+        },
+      } as unknown as ReturnType<Provider["read"]>;
+    },
+  });
+
+  it("refuses a collected observation stamped with another namespace", () => {
+    const a = assembleIncident("cpu-throttling", 1, {
+      root: SCENARIOS,
+      provider: foreignStamped({ namespace: "another-tenant" }),
+    });
+    expect(a.state, "a foreign namespace must not assemble into an incident").toBe("refused");
+    if (a.state !== "refused") return;
+    expect(a.reason, "and the refusal is the provenance one, not an earlier failure")
+      .toMatch(/provenance|namespace|gathered/i);
+    expect(a.reason, "the earlier line would have said this instead")
+      .not.toContain("every observation failed");
+  });
+
+  it("refuses a collected observation gathered under another collection", () => {
+    const a = assembleIncident("cpu-throttling", 1, {
+      root: SCENARIOS,
+      provider: foreignStamped({ collection_id: "COL-someone-else" }),
+    });
+    expect(a.state).toBe("refused");
+    if (a.state !== "refused") return;
+    expect(a.reason).toContain("COL-someone-else");
+    expect(a.reason).not.toContain("every observation failed");
+  });
+
+  it("carries the namespace the caller asked for into the stamp, not just into the incident", () => {
+    /*
+     * The first version of this asserted `"staging"` appeared anywhere in the
+     * incident. `assembleIncident` writes `namespace` on the incident itself,
+     * so it passed whether or not the request ever reached a provider. Grok,
+     * 2026-09-10. The stamp is what the isolation check compares, so the stamp
+     * is what this reads — and `cluster` too, which nothing read before.
+     */
+    let sawCluster: string | undefined;
+    let sawNamespace: string | undefined;
+    const watcher: Provider = {
+      name: "watcher", exercised: true, unexercisedBecause: "",
+      read(scenario: string, slot: string, request: CollectionRequest) {
+        sawCluster = request.cluster;
+        sawNamespace = request.namespace;
+        return fixtureProvider(SCENARIOS).read(scenario, slot as never, request);
+      },
+    } as unknown as Provider;
+    const a = assembleIncident("cpu-throttling", 1, {
+      root: SCENARIOS, namespace: "staging", cluster: "test-eu", provider: watcher,
+    });
+    expect(sawNamespace, "the request the caller made is the request the provider is given").toBe("staging");
+    expect(sawCluster, "cluster is read too, and nothing read it before").toBe("test-eu");
+    expect(a.state).toBe("assembled");
+    if (a.state !== "assembled") return;
+    /*
+     * And the STAMP, which is what the isolation check compares against.
+     *
+     * This test used to assert only what the provider was handed. Grok,
+     * 2026-09-10: "Test 3 never opens a.incident. If the document still wrote
+     * namespace production while the request carried staging, all three expects
+     * would pass." A test whose comment claims more than its assertions is the
+     * defect this file exists to refuse.
+     */
+    const inc = a.incident as Record<string, unknown>;
+    expect(inc["namespace"], "the incident is about the namespace that was asked for").toBe("staging");
+    expect(inc["cluster"]).toBe("test-eu");
+    const obs = inc["observations"] as Record<string, { provenance?: Record<string, unknown> }>;
+    for (const [slot, o] of Object.entries(obs)) {
+      if (o?.provenance === undefined) continue;
+      expect(o.provenance["namespace"], `the ${slot} stamp carries the namespace of the request`)
+        .toBe("staging");
+    }
   });
 });

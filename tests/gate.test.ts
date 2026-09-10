@@ -39,7 +39,7 @@ function collectTests(dir: string): string[] {
 }
 // Plain .mjs — the same file node runs in production, so there are no types.
 // @ts-expect-error
-import { dueFrom, runGate, format, restoreInterruptedMutation, CHECKS, CHILD_MARKER, LIMITATIONS, DEBT, SECRET_SHAPED, readFreshReport, interpretVitestReport, interpretScripts, findSecretShaped, parsePorcelainZ, readCurrentChunk, namedTestFailed, coverageGaps, someRunWasScored, withRepair, reportIsFromThisRun, splitDebt} from "../scripts/acceptance-gate.mjs";
+import { artifactDisagreesWithManifest, dueFrom, runGate, format, restoreInterruptedMutation, CHECKS, CHILD_MARKER, LIMITATIONS, DEBT, SECRET_SHAPED, readFreshReport, interpretVitestReport, interpretScripts, findSecretShaped, parsePorcelainZ, readCurrentChunk, namedTestFailed, coverageGaps, someRunWasScored, withRepair, reportIsFromThisRun, splitDebt} from "../scripts/acceptance-gate.mjs";
 // @ts-expect-error
 import { MUTATIONS } from "../scripts/mutations.mjs";
 
@@ -1144,5 +1144,35 @@ describe("the chunk a promised check falls due from", () => {
   it("refuses a non-number rather than printing it", () => {
     expect(dueFrom({ claim: "x", dueFromChunk: "6" } as any),
       "a string is not a chunk number, and printing it raw is how undefined got out").toBe(0);
+  });
+});
+
+describe("what the artifact says against what the manifest claims about it", () => {
+  /*
+   * The manifest carried the literal 0 and the gate read it back, so the line
+   * printing "0 requires" reported a number the builder had asserted about
+   * itself. Weaken the builder's detector and the artifact ships a live
+   * require while every reader still says zero. A subagent found it on
+   * 2026-09-09; this is the comparison that now decides.
+   */
+  it("says nothing when both counted none", () => {
+    expect(artifactDisagreesWithManifest([], 0)).toBe(null);
+  });
+
+  it("fails on a require the manifest did not admit", () => {
+    const why = artifactDisagreesWithManifest(["ajv-formats"], 0);
+    expect(why, "the artifact is the evidence, and it disagrees").toContain("ajv-formats");
+    expect(why).toContain("the manifest claims 0");
+  });
+
+  it("fails when the manifest claims a require the artifact does not have", () => {
+    expect(artifactDisagreesWithManifest([], 2),
+      "the two counted different things, and neither is trusted over the other")
+      .toMatch(/one of the two counted something the other did not/);
+  });
+
+  it("treats a missing count as none found, not as agreement", () => {
+    expect(artifactDisagreesWithManifest(undefined as any, undefined as any),
+      "an absent manifest number is not zero").not.toBe(null);
   });
 });

@@ -127,13 +127,12 @@ export function validate(name: SchemaName, data: unknown): ValidationResult {
   return { state: "valid" };
 }
 
-/**
- * For call sites that must stop on anything other than a clean pass.
- * `unchecked` throws too — an unverified object is not an approved one.
+/*
+ * `assertValid` used to live here: a throwing boundary "for call sites that
+ * must stop on anything other than a clean pass". It had no call site — not in
+ * src, not in tests, not in the code transpiled into the n8n node — so the
+ * promise it made was never kept by anything, and its rejection behaviour was
+ * never exercised. Removed on 2026-09-10 on Codex's verdict. Callers here read
+ * the three states and decide; nothing needs a throw, and if something ever
+ * does, it will be written against a caller that exists.
  */
-export function assertValid(name: SchemaName, data: unknown): void {
-  const r = validate(name, data);
-  if (r.state === "valid") return;
-  const detail = r.state === "invalid" ? r.errors.join("; ") : r.reason;
-  throw new Error(`${name} ${r.state}: ${detail}`);
-}

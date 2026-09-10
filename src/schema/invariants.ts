@@ -24,9 +24,16 @@
  * NOTHING may be imported here. scripts/workflow-runtime.mjs refuses an import,
  * a require, a re-export and `import.meta` before it will compile this.
  */
+/*
+ * The five names a caller can actually pass.
+ *
+ * `common` and `observations` were listed here too, and `invariantErrors` has
+ * no branch for either — the two callers are typed to the five, so nothing
+ * could reach them. Declaring them said cross-field rules exist for those
+ * schemas. None do. A subagent found it on 2026-09-10.
+ */
 export type InvariantSchemaName =
-  | "incident" | "agent-result" | "conversation" | "remediation" | "verdict-review"
-  | "common" | "observations";
+  | "incident" | "agent-result" | "conversation" | "remediation" | "verdict-review";
 
 export function invariantErrors(name: InvariantSchemaName, data: unknown): string[] {
   if (typeof data !== "object" || data === null) return [];
@@ -206,7 +213,6 @@ export function invariantErrors(name: InvariantSchemaName, data: unknown): strin
             errs.push(`/observations/${slot}/provenance/${field} is ${v}, `
               + `but ${already[0]} was gathered with ${already[1]}`);
           }
-          void key;
         }
       }
       // And the incident's own cluster and namespace are what was asked for.

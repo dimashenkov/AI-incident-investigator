@@ -15,6 +15,36 @@
  */
 export const MUTATIONS = [
   {
+    // The provenance check stops refusing. Until 2026-09-10 no test noticed:
+    // the ones named after it injected rogueProvider, which fails every slot in
+    // `stampOrRefuse`, so assembly refused at "every observation failed" and the
+    // named tests stayed green with the check deleted. Grok found it.
+    id: "provenance-checked-and-never-refusing",
+    file: "src/core/assemble.ts",
+    from: "  const provenance = checkProvenance(obs, request);",
+    to: "  const provenance = null;",
+    mustFail: "refuses a collected observation stamped with another namespace",
+  },
+  {
+    // The six refusals stop being distinguishable: an inherited slot reports the
+    // same `why` as a slot the incident carries but never filled. Six tests
+    // reached six branches and asserted only the shared `state` until 2026-09-10.
+    id: "an-inherited-slot-reported-as-an-empty-one",
+    file: "src/agents/slice.ts",
+    from: 'return { state: "unavailable", agent, why: "no-such-slot", reason: `the incident has no ${slot} observation slot` };',
+    to: 'return { state: "unavailable", agent, why: "empty-slot", reason: `the incident has no ${slot} observation slot` };',
+    mustFail: "ignores an inherited slot, which no one put in the incident",
+  },
+  {
+    // The manifest is believed again: a require found in the artifact stops
+    // being a failure as long as the manifest says zero.
+    id: "the-artifact-losing-to-the-manifest-about-itself",
+    file: "scripts/acceptance-gate.mjs",
+    from: "  const found = Array.isArray(left) ? left : [];",
+    to: "  const found = [];",
+    mustFail: "fails on a require the manifest did not admit",
+  },
+  {
     // Any non-empty string is taken as a date again: "unknown" sorts ahead of
     // every real date and its record claims the scenario.
     id: "any-string-taken-as-a-date",

@@ -516,6 +516,30 @@ import("./scripts/generate-workflow.mjs").then(async (g) => {
  * zero remaining requires, unchanged format semantics — are the ones measured
  * to fail silently otherwise.
  */
+/**
+ * What the ARTIFACT says against what the manifest claims about it.
+ *
+ * Split out so it can be tested: the check around it runs the builder in a
+ * child process and reads two files, and the thing worth pinning is this
+ * comparison. Returns null when they agree, or the sentence to fail with.
+ *
+ * The manifest used to carry the literal 0 and the gate read it back, so the
+ * one line claiming "no dependency left behind" rested on a constant the
+ * builder had written about itself.
+ */
+export function artifactDisagreesWithManifest(left, claimed) {
+  const found = Array.isArray(left) ? left : [];
+  if (found.length > 0) {
+    return `the artifact still calls require: ${[...new Set(found)].join(", ")} `
+      + `(the manifest claims ${claimed})`;
+  }
+  if (claimed !== 0) {
+    return `the manifest claims ${claimed} require call(s) while the artifact has none — `
+      + "one of the two counted something the other did not";
+  }
+  return null;
+}
+
 function checkCoreBuild() {
   const script = resolve(ROOT, "scripts/build-core.mjs");
   if (!existsSync(script)) return unknown("scripts/build-core.mjs is missing", "build core");
@@ -535,7 +559,6 @@ function checkCoreBuild() {
   } catch (e) {
     return unknown(`manifest unreadable: ${e instanceof Error ? e.message : String(e)}`, r.line);
   }
-  if (m.requiresRemaining !== 0) return fail(`${m.requiresRemaining} require call(s) remain in the artifact`, r.line);
   /*
    * The manifest is the builder's word about its own output. This recounts from
    * the ARTIFACT, so weakening the builder's detector no longer buys a passing
@@ -547,10 +570,8 @@ function checkCoreBuild() {
   } catch (e) {
     return unknown(`artifact unreadable: ${e instanceof Error ? e.message : String(e)}`, r.line);
   }
-  if (left.length > 0) {
-    return fail(`the artifact still calls require: ${[...new Set(left)].join(", ")} `
-      + `(the manifest claims ${m.requiresRemaining})`, r.line);
-  }
+  const disagreement = artifactDisagreesWithManifest(left, m.requiresRemaining);
+  if (disagreement !== null) return fail(disagreement, r.line);
   if (!Array.isArray(m.exports) || m.exports.length === 0) return fail("artifact exports no validators", r.line);
   return pass(`${m.bytes} bytes, ${m.exports.length} validators, ${left.length} requires counted in the artifact`, r.line);
 }
@@ -808,6 +829,17 @@ export const LIMITATIONS = [
   // into a rule nobody agreed, and scripts/score-run.mjs already reports the
   // omission as its own verdict rather than hiding it inside "correct".
   "that an agent cites what a scenario was built around — the prompt asks, nothing enforces, and the scorer reports the miss rather than refusing the answer",
+  /*
+   * `src/core/review.ts` builds and reads a human review log, and its own
+   * header calls itself "the only signal in the project that can tell a right
+   * answer from a well-formed one". Nothing writes one: the module has no
+   * caller outside its test, no script produces a log, and `docs/` holds none.
+   * A subagent found it on 2026-09-10. Said out loud, because a reader takes
+   * the file's existence as evidence the prototype HAS human ground truth — it
+   * has a library for it and no path to it.
+   */
+  "that anyone has recorded a human verdict — src/core/review.ts can build and "
+    + "read a review log, and nothing in the project writes one",
   "that every diff went through external review before commit",
   "that each review objection was recorded verbatim rather than paraphrased",
   "that memory was written after each step",

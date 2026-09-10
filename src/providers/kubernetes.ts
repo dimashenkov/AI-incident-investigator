@@ -6,9 +6,14 @@
  *
  * That makes it the most dangerous file in the repository, because an
  * unexercised implementation looks exactly like a working one. So it says what
- * it is in `exercised: false`, the gate prints every unexercised provider on
- * every run, and a test holds that the list is not empty for as long as this
- * file exists. Nobody has to remember.
+ * it is in `exercised: false`, and `tests/providers-substitutable.test.ts`
+ * holds that the unexercised list is not empty for as long as this file exists.
+ *
+ * It used to say the gate prints every unexercised provider on every run. The
+ * gate does not: it is a plain .mjs program and cannot import TypeScript, which
+ * is why the wiring never existed. The sentence was found on 2026-09-10 by a
+ * subagent hunting claims nothing exercises — and the safety story for the most
+ * dangerous file in the repository rested on a print that does not happen.
  *
  * What it does NOT claim: that it works. Nothing here has been executed against
  * an API server, the response shapes are taken from the Kubernetes API

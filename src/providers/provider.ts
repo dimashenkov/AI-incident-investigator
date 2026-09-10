@@ -39,8 +39,13 @@ export type Provider = {
    * Kubernetes API, with no cluster to point it at — is not a tested provider,
    * and counting it as one would be the defect this repository keeps finding:
    * the appearance of a thing with nothing exercising it. So each says which it
-   * is, the gate prints the unexercised ones every run, and nobody has to
-   * remember.
+   * is, in a field, rather than in a comment somebody has to remember.
+   *
+   * This used to say "the gate prints the unexercised ones every run". It does
+   * not: `unexercised()` in registry.ts is called by its own test and by
+   * nothing else. Codex caught the overstatement on 2026-09-10 — a sentence
+   * describing a check that was never wired is the same defect the paragraph
+   * above is about, committed by the paragraph itself.
    */
   readonly exercised: boolean;
 

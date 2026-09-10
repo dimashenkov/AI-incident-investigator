@@ -6,7 +6,9 @@
  * make every test that iterates the list pass on fewer things, which is the
  * "test that passes on an empty set" defect written at repository scale.
  *
- * The list is what the gate reads to print which providers have never been run.
+ * The list is what `tests/providers-substitutable.test.ts` reads to hold that
+ * the unexercised set is not empty. It is NOT read by the gate, which is a
+ * plain .mjs program and cannot import TypeScript.
  */
 import type { Provider } from "./provider.js";
 import { fixtureProvider } from "./fixtures.js";
@@ -30,7 +32,7 @@ export function allProviders(root: string): Provider[] {
   ];
 }
 
-/** The ones nobody has run, with the reason each gives. Printed by the gate. */
+/** The ones nobody has run, with the reason each gives. Read by a test, not the gate. */
 export function unexercised(root: string): Array<{ name: string; because: string }> {
   return allProviders(root)
     .filter((p) => !p.exercised)

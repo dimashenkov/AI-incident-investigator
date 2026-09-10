@@ -771,6 +771,14 @@ describe("an agent receives one incident and one slot", () => {
     const { incident_id, ...rest } = incident("INC-2026-0101");
     const r = assembleObservingContext("logs", rest as Record<string, unknown>);
     expect(r.state).toBe("unavailable");
+    if (r.state !== "unavailable") return;
+    /*
+     * `unavailable` is shared by six different refusals, so asserting it alone
+     * distinguishes none of them: the discriminant is `why`. Codex named the
+     * fields on 2026-09-10, after a subagent found six tests reaching six
+     * branches and telling them apart in none.
+     */
+    expect(r.why, "a missing id is not an empty slot").toBe("no-incident-id");
   });
 
   it("gives the root cause agent the agent results and NOT the observations", () => {
@@ -1073,12 +1081,23 @@ describe("nothing reaches a model except through the checked path", () => {
     const contaminated = incident("INC-2026-0101", {
       analysis: { agents: [{ ...AGENT_RESULT, findings: [{ fact: "from INC-2026-0909", source_ref: "r" }] }] },
     });
-    expect(assembleCheckedContext("root-cause", contaminated).state).toBe("unavailable");
+    const rc = assembleCheckedContext("root-cause", contaminated);
+    expect(rc.state).toBe("unavailable");
+    if (rc.state !== "unavailable") return;
+    expect(rc.why, "contamination, not an empty slot").toBe("contaminated");
+    expect(rc.agent, "and it is the root-cause context that was refused").toBe("root-cause");
+    expect(rc.reason, "naming the foreign incident it saw").toContain("INC-2026-0909");
   });
 
   it("refuses when the source cannot be checked at all", () => {
     // No id means nothing can be compared against anything. Not clean.
-    expect(assembleCheckedContext("logs", { observations: { logs: LOGS } }).state).toBe("unavailable");
+    const nc = assembleCheckedContext("logs", { observations: { logs: LOGS } });
+    expect(nc.state).toBe("unavailable");
+    if (nc.state !== "unavailable") return;
+    expect(nc.why, "the check could not be made, which is still contamination unproven")
+      .toBe("contaminated");
+    expect(nc.reason, "and it says WHY it could not be checked")
+      .toContain("no incident_id");
   });
 });
 
@@ -1243,6 +1262,8 @@ describe("two separate questions: did the assembler add anything, and is the sou
     inc.incident_id = "INC-2026-0101";
     const r = assembleObservingContext("kubernetes", inc);
     expect(r.state).toBe("unavailable");
+    if (r.state !== "unavailable") return;
+    expect(r.why, "an inherited slot is not a slot the incident has").toBe("no-such-slot");
   });
 
   it("keeps the id scan as a separate, weaker check that says what it is", () => {
