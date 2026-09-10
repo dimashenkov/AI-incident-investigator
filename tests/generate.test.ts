@@ -207,18 +207,26 @@ describe("the shape of the deployed chain", () => {
      * change is then visible in the diff rather than only in the bill.
      */
     /*
-     * CHANGED FOR AN EXPERIMENT IN FLIGHT, 2026-09-10.
+     * `gpt-4o` since 2026-09-10, by the owner's decision after a comparison.
      *
-     * Everything measured until today is the behaviour of `gpt-4o-mini`, and
-     * the owner's local n8n agent established that the same credential reaches
-     * `gpt-4o` and larger. That is the one explanation for three identical
-     * results that nobody had excluded, so six scenarios are being bought on
-     * each model, on this frozen revision, changing only this string.
+     * Everything measured before that day was the behaviour of `gpt-4o-mini`.
+     * The owner's local n8n agent established that the same credential reaches
+     * `gpt-4o`, which made the model the one explanation for three identical
+     * results that nobody had excluded. Six scenarios were bought on each, on
+     * one frozen revision, changing only this string:
      *
-     * The line changed with the model, which is what the paragraph above asks
-     * for: the change is in the diff, not only in the bill. It goes back to
-     * `gpt-4o-mini` unless the comparison earns the switch — and „earns" means a
-     * recorded result, not a preference.
+     *   gpt-4o-mini   2 correct, 2 right code without its evidence, 1 wrong
+     *   gpt-4o        5 correct, 0, 0
+     *   citation recall  7 of 11 against 10 of 11
+     *
+     * The owner decided to keep it. Recorded in
+     * docs/runs/2026-09-10-model-comparison.json, which also says what the
+     * comparison does NOT establish: reliability, from one execution each.
+     *
+     * And what this test does NOT establish, because Astra pointed out that
+     * the first version of this comment claimed it: a pinning test ENFORCES a
+     * decision. It cannot establish that the decision was earned. The evidence
+     * for that is the recorded comparison, not this assertion.
      */
     expect(MODEL, "the model this project measures against, spelled out once")
       .toBe("gpt-4o");

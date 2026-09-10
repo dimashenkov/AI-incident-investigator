@@ -374,7 +374,17 @@ return items.map(function (item, index) {
     }
     // The node knows who it asked, and says so. The schema spells root-cause
     // with an underscore; the node names it with a hyphen.
-    const recorded = recordAgentResult(validate, incident, reply, AGENT.replace("-", "_"));
+    /*
+     * What the code reads is a legitimate source for a citation.
+     *
+     * The extractor hands those fields to root-cause before it concludes, and
+     * until 2026-09-10 the citation check knew only about agent findings — so
+     * conflicting-evidence was refused on BOTH models for citing the terminated
+     * reason, which is in the observation and is one of the paths that scenario
+     * requires.
+     */
+    const readsByCode = configurationForIncidentInNode(incident).map(function (f) { return f.ref; });
+    const recorded = recordAgentResult(validate, incident, reply, AGENT.replace("-", "_"), readsByCode);
     if (recorded.state !== "recorded") {
       return { json: Object.assign({}, j, { index, state: "refused", agent: AGENT, raw,
         raw_answers: wordsSoFar, usage_by_agent: costSoFar,

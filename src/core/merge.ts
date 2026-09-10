@@ -61,6 +61,11 @@ export function recordAgentResult(
    * not know — but a caller that knows and stays silent is the hole.
    */
   expected?: string,
+  /**
+   * Refs the code reads from the observations by frozen rule, passed through to
+   * the citation check. Empty by default: nothing is permitted by omission.
+   */
+  readsByCode: readonly string[] = [],
 ): { state: "recorded"; incident: Record<string, unknown>; normalised: number }
   | { state: "refused"; reason: string; errors?: string[] } {
   if (expected !== undefined) {
@@ -92,7 +97,7 @@ export function recordAgentResult(
   }
 
   const checked: { observation?: unknown } = {};
-  const bound = resultBelongsHere(incident, result as Record<string, unknown>, checked);
+  const bound = resultBelongsHere(incident, result as Record<string, unknown>, checked, readsByCode);
   if (bound !== null) return { state: "refused", reason: bound };
   const checkedAgainst = checked.observation;
 
@@ -210,7 +215,14 @@ export function resultBelongsHere(
    * concurrent calls would share.
    */
   out: { observation?: unknown } = {},
-): string | null {
+  /**
+   * Refs the code reads from this incident's observations, by frozen rule.
+   *
+   * Passed in rather than imported: this file is transpiled into an n8n Code
+   * node. Empty by default, so a caller that does not supply it gets the rule
+   * as it stood — nothing is permitted by omission.
+   */
+  readsByCode: readonly string[] = []): string | null {
   let checkedAgainst: unknown;
   const agent = result["agent"];
   if (typeof agent !== "string") return "the result names no agent";
@@ -253,11 +265,29 @@ export function resultBelongsHere(
      */
     const findings = result["findings"];
     if (!Array.isArray(findings)) return "the result carries no findings list";
+    /*
+     * What the CODE read counts too, and until 2026-09-10 it did not.
+     *
+     * The configuration extractor reads fields by frozen rule and hands them to
+     * this agent before it concludes. `conflicting-evidence` then failed on both
+     * models for the same reason: the conclusion cited
+     * `last_state.terminated.reason`, which IS in the observation and IS one of
+     * the paths the scenario requires — and which the kubernetes agent had not
+     * restated. Handing an observation over while forbidding its citation is the
+     * same half-built mechanism as the prompt that did not declare the input,
+     * one layer deeper.
+     *
+     * The refs come from a reader passed IN, for the reason `validate` is: this
+     * file is transpiled into an n8n Code node and may not import. When no
+     * reader is given the old rule stands — an unchecked citation is not the
+     * same as a permitted one.
+     */
+    for (const r of readsByCode) already.add(r);
     for (const f of findings) {
       const ref = typeof f === "object" && f !== null ? (f as Record<string, unknown>)["source_ref"] : undefined;
       if (typeof ref !== "string") return "a finding carries no source_ref";
       if (!already.has(ref)) {
-        return `a root cause finding cites ${ref}, which no agent reported`;
+        return `a root cause finding cites ${ref}, which no agent reported and no rule reads`;
       }
     }
     return null;

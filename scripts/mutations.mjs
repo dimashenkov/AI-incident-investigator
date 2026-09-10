@@ -898,7 +898,7 @@ export const MUTATIONS = [
     // the binding above becomes dead code in the only place it matters.
     id: "record-node-does-not-say-who-it-asked",
     file: "scripts/workflow-runtime.mjs",
-    from: 'recordAgentResult(validate, incident, reply, AGENT.replace("-", "_"));',
+    from: 'recordAgentResult(validate, incident, reply, AGENT.replace("-", "_"), readsByCode);',
     to: "recordAgentResult(validate, incident, reply);",
     mustFail: "refuses, in the deployed chain, an answer from an agent it did not ask",
   },
@@ -2359,7 +2359,7 @@ export const MUTATIONS = [
     // resolves to nothing, was recorded as a completed agent turn.
     id: "reply-recorded-without-belonging-to-the-incident",
     file: "src/core/merge.ts",
-    from: "  const bound = resultBelongsHere(incident, result as Record<string, unknown>, checked);",
+    from: "  const bound = resultBelongsHere(incident, result as Record<string, unknown>, checked, readsByCode);",
     to: "  const bound = null;",
     mustFail: "refuses a finding citing a path that resolves to nothing in that observation",
   },
