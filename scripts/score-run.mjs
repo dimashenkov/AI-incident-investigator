@@ -367,13 +367,24 @@ export function score(scenario, answer, root = SCENARIOS) {
    * which state is returned.
    */
   const citationMiss = citationsMissing(want, answer);
-  if (citationMiss.unresolvable !== null) {
-    return { scenario, state: "unestablished", expected: want.code, why: citationMiss.unresolvable };
-  }
 
   if (unqualified.length > 0) {
     return { scenario, state: "correct-but-unqualified", code: got, why: unqualified,
       missingCitations: citationMiss.missing };
+  }
+
+  /*
+   * The unresolvable case stays BELOW the ranked verdicts, where it was.
+   *
+   * Computing the citations early is right; returning their unresolvable state
+   * early was not. Grok, 2026-09-10, round two: an answer with no observations
+   * and a ceiling miss would have come back `unestablished`, dropping the
+   * qualification — a ranking change while the comment above claimed the
+   * ranking was untouched. Live purchases carry observations; hand-built answer
+   * files do not, and the scorer is read by both.
+   */
+  if (citationMiss.unresolvable !== null) {
+    return { scenario, state: "unestablished", expected: want.code, why: citationMiss.unresolvable };
   }
 
   /*

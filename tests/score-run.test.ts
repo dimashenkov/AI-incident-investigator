@@ -929,9 +929,31 @@ describe("the citation axis is read for every verdict, not only the last one", (
                    { source: "metrics", fact: "b", supports: "against" }] } } });
 
   it("carries the missing citation on an unqualified verdict", () => {
+    /*
+     * The paths are NAMED, not merely „not empty".
+     *
+     * Grok, round two on 2026-09-10: `not.toEqual([])` passes when the field is
+     * `undefined`, which is exactly what the unfixed scorer left — absence
+     * reading as a miss, and a test that would have passed before the fix.
+     */
     const r = score("conflicting-evidence", overCeilingCitingNothing(), SCENARIOS);
     expect(r.state, "the ceiling still decides the state").toBe("correct-but-unqualified");
-    expect(r.missingCitations, "and the citations are no longer skipped").not.toEqual([]);
+    expect(r.missingCitations, "the citations are scored, and these are the ones missing")
+      .toEqual(needed);
+  });
+
+  it("does not turn a ceiling miss into unestablished when there is nothing to resolve", () => {
+    /*
+     * Computing the citations early was right; returning their unresolvable
+     * state early was not. An answer with no observations and a ceiling miss
+     * came back `unestablished`, dropping the qualification — a ranking change
+     * while the comment claimed the ranking was untouched. Grok, round two.
+     */
+    const noObservations = { state: "concluded", root_cause_code: "CONTAINER_OOM",
+      incident: { analysis: { confidence: 0.9, agents: [], evidence: [] } } };
+    const r = score("conflicting-evidence", noObservations, SCENARIOS);
+    expect(r.state, "the ceiling is still what this answer failed")
+      .toBe("correct-but-unqualified");
   });
 
   it("prints the miss beside the unqualified reason", () => {

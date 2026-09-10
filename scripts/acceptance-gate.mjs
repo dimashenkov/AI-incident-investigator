@@ -903,7 +903,7 @@ export const LIMITATIONS = [
    * was never emitted by anybody.
    */
   "that a required citation was USED by the conclusion — it is matched by path against "
-    + "any specialist finding, and presence is not use",
+    + "ANY agent's finding, the synthesiser's included, and presence is not use",
   /*
    * `src/core/review.ts` builds and reads a human review log, and its own
    * header calls itself "the only signal in the project that can tell a right

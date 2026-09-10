@@ -275,17 +275,31 @@ describe("the times deployment-regression needed", () => {
       .toBe("2026-09-07T09:36:50Z");
   });
 
-  it("does not order them, and does not say one caused the other", () => {
+  it("does not order them, and adds no field that compares them", () => {
     /*
-     * Two times are two observations. The relation between them is the
-     * judgement being measured; supplying it would be supplying the answer.
+     * The first version banned the words before, after, caused and rollout.
+     * Grok, round two on 2026-09-10: that holds nothing — a chronological sort,
+     * a `delta`, or `aligned: true` all pass it, and those words were never
+     * going to appear in ISO timestamps.
+     *
+     * What actually holds it: the times come out in the order the observation
+     * lists them, NOT sorted by time, and a fact carries no field beyond the
+     * seven a fact may have — so there is nowhere to put a comparison.
      */
-    const all = [...configurationOf("kubernetes", slice("deployment-regression", "kubernetes")),
-                 ...configurationOf("logs", slice("deployment-regression", "logs"))];
-    const text = JSON.stringify(all);
-    for (const word of ["before", "after", "caused", "because", "rollout"]) {
-      expect(text, `the extractor must not say "${word}"`).not.toContain(word);
-    }
+    const logs = configurationOf("logs", slice("deployment-regression", "logs"));
+    const asFound = (JSON.parse(readFileSync("scenarios/deployment-regression/logs.json", "utf8"))
+      .lines as Array<{ ts: string }>).map((l) => l.ts);
+    expect(logs.map((f) => f.value), "the order is the observation's, not the clock's")
+      .toEqual(asFound);
+
+    const shuffled = { lines: [{ ts: "2026-01-02T00:00:00Z" }, { ts: "2026-01-01T00:00:00Z" }] };
+    expect(configurationOf("logs", shuffled).map((f) => f.value),
+      "an out-of-order slice comes back out of order, because sorting IS a comparison")
+      .toEqual(["2026-01-02T00:00:00Z", "2026-01-01T00:00:00Z"]);
+
+    const keys = new Set(logs.flatMap((f) => Object.keys(f)));
+    expect([...keys].sort(), "no delta, no aligned, nowhere to put a relation")
+      .toEqual(["kind", "ref", "slot", "value"]);
   });
 
   it("reads every line's time, not only the interesting ones", () => {

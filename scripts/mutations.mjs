@@ -15,6 +15,24 @@
  */
 export const MUTATIONS = [
   {
+    // The times come out sorted, which is a comparison the extractor is not
+    // allowed to make: the ordering is the judgement being measured.
+    id: "the-times-sorted-by-the-extractor",
+    file: "src/core/configuration.ts",
+    from: "  return facts;\n}\n\n/**\n * The configuration one observation carries.",
+    to: "  return facts.slice().sort(function (a, b) { return a.value < b.value ? -1 : 1; });\n}\n\n/**\n * The configuration one observation carries.",
+    mustFail: "does not order them, and adds no field that compares them",
+  },
+  {
+    // An unqualified verdict stops carrying its citation miss, which is the
+    // state conflicting-evidence was measured in three times.
+    id: "an-unqualified-verdict-dropping-its-citation-miss",
+    file: "scripts/score-run.mjs",
+    from: "    return { scenario, state: \"correct-but-unqualified\", code: got, why: unqualified,\n      missingCitations: citationMiss.missing };",
+    to: "    return { scenario, state: \"correct-but-unqualified\", code: got, why: unqualified };",
+    mustFail: "carries the missing citation on an unqualified verdict",
+  },
+  {
     // The times stop being read, which is the state deployment-regression was
     // measured in three times: the texts in front of the agent, the ordering
     // the code table asks for nowhere to be found.
