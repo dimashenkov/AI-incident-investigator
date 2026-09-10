@@ -824,13 +824,20 @@ describe("an agent receives one incident and one slot", () => {
       .not.toContain('"points"');
     expect(JSON.stringify(r.payload), "nor is any log line")
       .not.toContain('"lines"');
-    const config = (r.payload as { configuration_read_by_code: Array<{ ref: string }> })
+    const config = (r.payload as { configuration_read_by_code: Array<{ ref: string; kind: string }> })
       .configuration_read_by_code;
     expect(config.some((f) => f.ref === "pods[0].containers[0].limits.memory"),
       "the memory limit that no collection agent reported on 2026-09-10").toBe(true);
-    expect(config.every((f) => !f.ref.startsWith("lines")),
-      "a log line is a symptom, not configuration, and extracting it would be extracting the answer")
+    /*
+     * A log line's TIME is carried since 2026-09-10; its text is not. The
+     * distinction is the point: deployment-regression was wrong three times
+     * because the agent had the texts and not the times, while the code table
+     * asks for a change lining up in time with the failure.
+     */
+    expect(config.every((f) => !f.ref.endsWith(".message")),
+      "a log line's text is a symptom, and extracting it would be extracting the answer")
       .toBe(true);
+    expect(config.some((f) => f.kind === "observed-at"), "and the times are there").toBe(true);
   });
 
   it("refuses to ask for a conclusion when no agent ran", () => {

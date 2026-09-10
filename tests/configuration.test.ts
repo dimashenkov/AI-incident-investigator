@@ -81,11 +81,23 @@ describe("configuration read by rule, not by a model", () => {
      * this code therefore does NOT supply. That is the boundary working, not a
      * gap: the scenario's own expectations must not steer what gets read.
      */
-    expect(configurationOf("logs", slice("deployment-regression", "logs")), "logs carry no configuration")
-      .toEqual([]);
+    /*
+     * Widened on 2026-09-10: the TIMES are read, the texts are not.
+     *
+     * deployment-regression was wrong in all three purchases, and the recorded
+     * answers say why: the agents report events[0].message and lines[3].message
+     * with no timestamps, while the code table asks for a change lining up in
+     * time with the failure. A timestamp is not the line.
+     */
+    const logs = configurationOf("logs", slice("deployment-regression", "logs"));
+    expect(logs.every((f) => f.kind === "observed-at"), "logs carry times and nothing else").toBe(true);
+    expect(logs.every((f) => f.ref.endsWith(".ts")), "and the ref names the time field").toBe(true);
+    expect(JSON.stringify(logs), "no message text is ever extracted").not.toContain("discount_code");
+
     const k = configurationOf("kubernetes", slice("deployment-regression", "kubernetes"));
-    expect(refsRead(k).filter((r) => r.startsWith("events")), "an event message is not configuration")
-      .toEqual([]);
+    expect(refsRead(k).filter((r) => r.startsWith("events") && r.endsWith(".message")),
+      "an event message is not configuration").toEqual([]);
+    expect(refsRead(k), "but the time it was last seen is").toContain("events[0].last_seen");
   });
 
   it("reads nothing from an observation that is not an object", () => {
@@ -98,7 +110,8 @@ describe("configuration read by rule, not by a model", () => {
     const facts = configurationOf("kubernetes", slice("container-oom", "kubernetes"));
     const kinds = [...new Set(facts.map((f) => f.kind))].sort();
     expect(kinds, "every fact says which frozen rule read it").toEqual(
-      ["container-readiness", "deployment-image", "last-termination", "resource-limit", "resource-request"]);
+      ["container-readiness", "deployment-image", "last-termination", "observed-at",
+       "resource-limit", "resource-request"]);
   });
 });
 
@@ -240,5 +253,45 @@ describe("keys the extractor must read, and keys it cannot spell", () => {
       checked += facts.length;
     }
     expect(checked, "and it walked some facts").toBeGreaterThan(50);
+  });
+});
+
+describe("the times deployment-regression needed", () => {
+  /*
+   * The only scenario wrong in all three purchases. The recorded answers say
+   * why: the agents reported the event text and the log text, and the code
+   * table asks for a change LINING UP IN TIME with the failure.
+   */
+  it("carries the rollout time and the first error time, from the slices", () => {
+    const k = configurationOf("kubernetes", slice("deployment-regression", "kubernetes"));
+    const l = configurationOf("logs", slice("deployment-regression", "logs"));
+    const at = (fs: ReturnType<typeof configurationOf>, ref: string) =>
+      fs.find((f) => f.ref === ref)?.value;
+    expect(at(k, "events[0].last_seen"), "when the new replica set was scaled up")
+      .toBe("2026-09-07T09:38:02Z");
+    expect(at(l, "lines[3].ts"), "when the first 500 was logged")
+      .toBe("2026-09-07T09:38:31Z");
+    expect(at(l, "lines[1].ts"), "and a healthy request before it")
+      .toBe("2026-09-07T09:36:50Z");
+  });
+
+  it("does not order them, and does not say one caused the other", () => {
+    /*
+     * Two times are two observations. The relation between them is the
+     * judgement being measured; supplying it would be supplying the answer.
+     */
+    const all = [...configurationOf("kubernetes", slice("deployment-regression", "kubernetes")),
+                 ...configurationOf("logs", slice("deployment-regression", "logs"))];
+    const text = JSON.stringify(all);
+    for (const word of ["before", "after", "caused", "because", "rollout"]) {
+      expect(text, `the extractor must not say "${word}"`).not.toContain(word);
+    }
+  });
+
+  it("reads every line's time, not only the interesting ones", () => {
+    const l = configurationOf("logs", slice("deployment-regression", "logs"));
+    const lines = JSON.parse(readFileSync("scenarios/deployment-regression/logs.json", "utf8"));
+    expect(l.length, "one per line, or the extractor is choosing which matter")
+      .toBe((lines.lines as unknown[]).length);
   });
 });

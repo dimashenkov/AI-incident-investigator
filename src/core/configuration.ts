@@ -58,7 +58,8 @@ export type ConfigKind =
   | "deployment-image"
   | "container-readiness"
   | "last-termination"
-  | "series-endpoint";
+  | "series-endpoint"
+  | "observed-at";
 
 function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -216,6 +217,41 @@ function fromMetrics(o: Record<string, unknown>): ConfigFact[] {
 }
 
 /**
+ * WHEN each event and each log line was observed. The time, never the text.
+ *
+ * `deployment-regression` is the only scenario that has been WRONG in all three
+ * purchases, and the reason is readable in the recorded answers: the kubernetes
+ * agent reports `events[0].message` and the logs agent reports
+ * `lines[3].message` — the texts, with no timestamps. The code table asks for
+ * "a change in the deployment lining up in time with the failure", and the
+ * times were never in front of the concluding agent.
+ *
+ * This reads the times and nothing else. The rule "a line is a symptom, not a
+ * setting" stays intact: the message is not extracted, only when it happened.
+ * Uniform, like every other kind — every event, every line, in every scenario,
+ * whether anything interesting happened or not.
+ *
+ * What it does NOT do: order them, or say that one caused another. Two times
+ * are two observations; the relation between them is the judgement being
+ * measured, and supplying it would be supplying the answer.
+ */
+function observedAt(slot: string, o: Record<string, unknown>): ConfigFact[] {
+  const facts: ConfigFact[] = [];
+  for (const [field, when] of [["events", "last_seen"], ["lines", "ts"]] as const) {
+    const list = o[field];
+    if (!Array.isArray(list)) continue;
+    for (let i = 0; i < list.length; i += 1) {
+      const entry = list[i];
+      if (!isObject(entry)) continue;
+      const at = scalar(entry[when]);
+      if (at === null) continue;
+      facts.push({ slot, ref: `${field}[${i}].${when}`, value: at, kind: "observed-at" });
+    }
+  }
+  return facts;
+}
+
+/**
  * The configuration one observation carries.
  *
  * An observation that was not collected yields nothing: there is nothing to
@@ -224,8 +260,12 @@ function fromMetrics(o: Record<string, unknown>): ConfigFact[] {
  */
 export function configurationOf(slot: string, observation: unknown): ConfigFact[] {
   if (!isObject(observation)) return [];
-  if (slot === "kubernetes") return fromKubernetes(observation);
-  if (slot === "metrics") return fromMetrics(observation);
+  // The times come from every slot that has any, including logs: a timestamp is
+  // not the line, and the ordering it makes possible is the model's to judge.
+  const times = observedAt(slot, observation);
+  if (slot === "kubernetes") return fromKubernetes(observation).concat(times);
+  if (slot === "metrics") return fromMetrics(observation).concat(times);
+  if (slot === "logs") return times;
   // The logs contract carries no configuration: a line is a symptom, not a
   // setting, and extracting lines would be extracting the answer.
   return [];

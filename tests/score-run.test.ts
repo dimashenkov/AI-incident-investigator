@@ -903,3 +903,40 @@ describe("the list of slots exists four times", () => {
       .toEqual([...SLOTS, "root-cause"]);
   });
 });
+
+describe("the citation axis is read for every verdict, not only the last one", () => {
+  /*
+   * `score()` returned `correct-but-unqualified` and never looked at the
+   * citations. So `conflicting-evidence`, which fails its confidence ceiling in
+   * every purchase, has never had its citations scored in any of them — and
+   * three runs were reported as a four-axis result while one axis was never
+   * read for that scenario. Grok found it on 2026-09-10 by reading the code
+   * rather than the write-up.
+   *
+   * The verdict is unchanged: unqualified stays unqualified. What changes is
+   * that the miss travels with it instead of being skipped.
+   */
+  /*
+   * Over the ceiling AND citing nothing: the state comes from the ceiling, and
+   * the citation miss must still be recorded.
+   */
+  const needed = mustCiteOf("conflicting-evidence");
+  const overCeilingCitingNothing = () => ({
+    state: "concluded", root_cause_code: "CONTAINER_OOM",
+    incident: { observations: materialise(needed),
+      analysis: { confidence: 0.9, agents: agentsFor([]),
+        evidence: [{ source: "kubernetes", fact: "a", supports: "for" },
+                   { source: "metrics", fact: "b", supports: "against" }] } } });
+
+  it("carries the missing citation on an unqualified verdict", () => {
+    const r = score("conflicting-evidence", overCeilingCitingNothing(), SCENARIOS);
+    expect(r.state, "the ceiling still decides the state").toBe("correct-but-unqualified");
+    expect(r.missingCitations, "and the citations are no longer skipped").not.toEqual([]);
+  });
+
+  it("prints the miss beside the unqualified reason", () => {
+    const r = score("conflicting-evidence", overCeilingCitingNothing(), SCENARIOS);
+    expect(format([r]), "scored and never shown is the same as not scored")
+      .toMatch(/AND MISSING/);
+  });
+});

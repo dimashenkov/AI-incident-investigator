@@ -15,6 +15,16 @@
  */
 export const MUTATIONS = [
   {
+    // The times stop being read, which is the state deployment-regression was
+    // measured in three times: the texts in front of the agent, the ordering
+    // the code table asks for nowhere to be found.
+    id: "the-times-no-longer-read-from-any-slice",
+    file: "src/core/configuration.ts",
+    from: "  const times = observedAt(slot, observation);",
+    to: "  const times = [];",
+    mustFail: "carries the rollout time and the first error time, from the slices",
+  },
+  {
     // Only the first container is read, so a healthy first container hides the
     // configuration of the one that failed — and the extractor starts choosing
     // which container is interesting, which is the question, not an input.
@@ -37,8 +47,8 @@ export const MUTATIONS = [
     // A log line becomes configuration, which is extracting the answer.
     id: "a-log-line-extracted-as-configuration",
     file: "src/core/configuration.ts",
-    from: "  // The logs contract carries no configuration: a line is a symptom, not a",
-    to: '  if (slot === "logs") return [{ slot: "logs", ref: "lines[0].message", value: "x", kind: "deployment-image" }];\n  // a line is a symptom, not a',
+    from: '  if (slot === "logs") return times;',
+    to: '  if (slot === "logs") return times.concat([{ slot: "logs", ref: "lines[0].message", value: "x", kind: "observed-at" }]);',
     mustFail: "reads no log line and no event message, ever",
   },
   {
@@ -1978,7 +1988,7 @@ export const MUTATIONS = [
     // A field that cannot fail the run is a comment.
     id: "missing-citations-hidden-inside-correct",
     file: "scripts/score-run.mjs",
-    from: "  if (missing.length > 0) {",
+    from: "  if (citationMiss.missing.length > 0) {",
     to: "  if (false) {",
     mustFail: "keeps the right code on other ground apart from the right code on its own",
   },

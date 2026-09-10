@@ -352,8 +352,28 @@ export function score(scenario, answer, root = SCENARIOS) {
       }
     }
   }
+  /*
+   * The citation axis is scored FIRST, and its result travels with the verdict.
+   *
+   * This returned `correct-but-unqualified` here and never looked at the
+   * citations at all — so `conflicting-evidence`, which fails the confidence
+   * ceiling in every purchase, has never had its citations scored in any of
+   * them. Three runs were reported as a four-axis result and one axis was never
+   * read for that scenario. Grok found it on 2026-09-10, reading the code
+   * rather than the write-up.
+   *
+   * Verdicts stay ranked as they were: unqualified is still unqualified, and
+   * the citation miss rides along in `missingCitations` rather than changing
+   * which state is returned.
+   */
+  const citationMiss = citationsMissing(want, answer);
+  if (citationMiss.unresolvable !== null) {
+    return { scenario, state: "unestablished", expected: want.code, why: citationMiss.unresolvable };
+  }
+
   if (unqualified.length > 0) {
-    return { scenario, state: "correct-but-unqualified", code: got, why: unqualified };
+    return { scenario, state: "correct-but-unqualified", code: got, why: unqualified,
+      missingCitations: citationMiss.missing };
   }
 
   /*
@@ -386,16 +406,27 @@ export function score(scenario, answer, root = SCENARIOS) {
    * a green result moves. A scenario that requires no citation is unaffected:
    * there is nothing to resolve, so nothing is claimed.
    */
-  if (want.mustCite.length > 0 && !hasObservations(answer)) {
-    return { scenario, state: "unestablished", expected: want.code,
-      why: "it answered without carrying any observation, so no citation of it could be resolved" };
-  }
-  const cited = citedRefs(answer).filter((c) => resolvesForAgent(answer, c)).map((c) => c.ref);
-  const missing = want.mustCite.filter((c) => !cited.some((got) => citationCovers(c, got)));
-  if (missing.length > 0) {
-    return { scenario, state: "correct-without-its-evidence", code: got, missingCitations: missing };
+  if (citationMiss.missing.length > 0) {
+    return { scenario, state: "correct-without-its-evidence", code: got,
+      missingCitations: citationMiss.missing };
   }
   return { scenario, state: "correct", code: got, missingCitations: [] };
+}
+
+/**
+ * Which required citations are missing, and whether they could be checked.
+ *
+ * Split out so the citation axis can be read for EVERY verdict, not only for
+ * the ones that got as far as the end of `score`.
+ */
+function citationsMissing(want, answer) {
+  if (want.mustCite.length > 0 && !hasObservations(answer)) {
+    return { missing: [], unresolvable:
+      "it answered without carrying any observation, so no citation of it could be resolved" };
+  }
+  const cited = citedRefs(answer).filter((c) => resolvesForAgent(answer, c)).map((c) => c.ref);
+  return { missing: want.mustCite.filter((c) => !cited.some((got) => citationCovers(c, got))),
+    unresolvable: null };
 }
 
 /**
@@ -646,6 +677,14 @@ export function format(results) {
     } else if (r.state === "correct-but-unqualified") {
       lines.push(`  RIGHT CODE,    ${r.scenario} → ${r.code}`);
       for (const w of r.why) lines.push(`  UNQUALIFIED      ${w}`);
+      /*
+       * The citation axis, printed for THIS verdict too. It was scored and
+       * never shown here, so a scenario that fails the ceiling looked as though
+       * its citations had been checked and found clean.
+       */
+      if (Array.isArray(r.missingCitations) && r.missingCitations.length > 0) {
+        lines.push(`  AND MISSING      ${r.missingCitations.join(", ")}`);
+      }
     } else if (r.state === "wrong") {
       lines.push(`  WRONG          ${r.scenario} → ${r.got}, expected ${r.expected}`);
     } else if (r.state === "unasked") {

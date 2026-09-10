@@ -883,8 +883,27 @@ export const LIMITATIONS = [
    * container's configured limit.
    */
   "that an agent cites what a scenario was built around — the prompt asks, nothing enforces, and the scorer reports the miss rather than refusing the answer",
-  "that a required citation could be satisfied from anywhere but its one canonical path — "
-    + "an answer reading the same value elsewhere is recorded as a miss, and the misses are reviewed by hand",
+  /*
+   * Rewritten the same day it was written, and the test came from Grok:
+   *
+   *   Name the observation that would make you delete the sentence. If it is
+   *   "kubernetes cited limits.memory", you parked a bug. If it is "must_cite
+   *   now matches properties, not paths", you stated an instrument bound. A
+   *   true bound still prints when this miss goes away.
+   *
+   * The first version would have stopped printing the moment one agent emitted
+   * one field: a parked bug wearing the word limitation. Worse, it promised the
+   * misses were reviewed by hand while another limitation says nothing records
+   * a review — measurement replaced by a caption.
+   *
+   * What is left is the bound that survives any answer: a required citation is
+   * matched by PATH against every specialist finding, so it says nothing about
+   * whether the conclusion used it. Measured on 2026-09-10: for container-oom
+   * the hypothesis was supported by terminated.reason alone, and limits.memory
+   * was never emitted by anybody.
+   */
+  "that a required citation was USED by the conclusion — it is matched by path against "
+    + "any specialist finding, and presence is not use",
   /*
    * `src/core/review.ts` builds and reads a human review log, and its own
    * header calls itself "the only signal in the project that can tell a right
