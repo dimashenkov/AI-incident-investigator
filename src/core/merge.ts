@@ -357,8 +357,23 @@ export function withResolvedRefs(
 
 /** Follow a path like `pods[0].containers[0].limits.memory` into an observation. */
 export function resolveRef(root: unknown, path: string): unknown {
+  /*
+   * A path made only of separators names nothing, and used to name everything.
+   *
+   * `filter(Boolean)` below drops empty segments, so `"..."` walked zero
+   * segments and returned the WHOLE observation — which the paragraph above
+   * says is refused, because a citation naming everything names nothing. The
+   * refusal was written and the code did the opposite. Astra found it on
+   * 2026-09-10, in a resolver nobody had touched.
+   *
+   * Empty segments are still dropped for a path that HAS real segments, so
+   * `deployment..image` keeps resolving: this repair closes the hole it was
+   * named for and does not quietly narrow what a citation may spell.
+   */
+  const segments = path.replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean);
+  if (segments.length === 0) return undefined;
   let cur: unknown = root;
-  for (const seg of path.replace(/\[(\d+)\]/g, ".$1").split(".").filter(Boolean)) {
+  for (const seg of segments) {
     if (cur === null || typeof cur !== "object") return undefined;
     /*
      * OWN properties only.
@@ -414,7 +429,16 @@ export function normaliseRef(observation: unknown, ref: string): string | null {
   const prefix = "observation.";
   if (!ref.startsWith(prefix)) return null;
   const rest = ref.slice(prefix.length);
-  if (rest.length === 0) return null;
+  /*
+   * `if (rest.length === 0) return null;` stood here, and since 2026-09-10 it
+   * decides nothing: `resolveRef` refuses a path with no real segments, so the
+   * wrapper alone already resolves to undefined and falls out below. Two guards
+   * for one rule meant neither could be broken alone, and the gate reported the
+   * mutation on this line as surviving — correctly, because it had stopped
+   * guarding anything.
+   *
+   * One carrier now, the deeper one, and the mutation points at it.
+   */
   return resolveRef(observation, rest) !== undefined ? rest : null;
 }
 

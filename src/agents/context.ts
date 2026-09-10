@@ -17,6 +17,7 @@ import { join } from "node:path";
 
 const PROMPT_ROOT = new URL("../../prompts/", import.meta.url).pathname;
 
+import { configurationOf, factProblems } from "../core/configuration.js";
 import {
   buildObservingContext, buildRootCauseContext, buildCheckedContext,
   type AgentName, type ContextResult,
@@ -49,14 +50,35 @@ export function assembleObservingContext(
   return buildObservingContext(agent, incident, readPrompt(agent, root));
 }
 
+/**
+ * The configuration every observation carries, by rule, for one incident.
+ *
+ * Read here and handed to the concluding agent, because the measurement of
+ * 2026-09-10 showed that four of five failures came from a field NO specialist
+ * extracted — not from a field lost between agents.
+ */
+export function configurationForIncident(
+  incident: Record<string, unknown>,
+): Array<{ ref: string; value: string; kind: string }> {
+  const obs = incident["observations"];
+  if (typeof obs !== "object" || obs === null || Array.isArray(obs)) return [];
+  const out: Array<{ ref: string; value: string; kind: string }> = [];
+  for (const [slot, observation] of Object.entries(obs as Record<string, unknown>)) {
+    for (const f of configurationOf(slot, observation)) out.push({ ...f });
+  }
+  return out;
+}
+
 export function assembleRootCauseContext(
   incident: Record<string, unknown>, root: string = PROMPT_ROOT,
 ): ContextResult {
-  return buildRootCauseContext(incident, readPrompt("root-cause", root));
+  return buildRootCauseContext(incident, readPrompt("root-cause", root),
+    configurationForIncident(incident));
 }
 
 export function assembleCheckedContext(
   agent: AgentName, incident: Record<string, unknown>, root: string = PROMPT_ROOT,
 ): ContextResult {
-  return buildCheckedContext(agent, incident, readPrompt(agent, root));
+  return buildCheckedContext(agent, incident, readPrompt(agent, root),
+    agent === "root-cause" ? configurationForIncident(incident) : [], factProblems);
 }

@@ -15,6 +15,33 @@
  */
 export const MUTATIONS = [
   {
+    // Only the first container is read, so a healthy first container hides the
+    // configuration of the one that failed — and the extractor starts choosing
+    // which container is interesting, which is the question, not an input.
+    id: "configuration-read-from-one-container-only",
+    file: "src/core/configuration.ts",
+    from: "      for (let c = 0; c < containers.length; c += 1) {",
+    to: "      for (let c = 0; c < 1; c += 1) {",
+    mustFail: "reads EVERY container, including the healthy one nobody asked about",
+  },
+  {
+    // Only the last point of a series is read, which is exactly what the
+    // metrics agent did on 2026-09-10: a value with no before.
+    id: "a-series-read-without-its-first-point",
+    file: "src/core/configuration.ts",
+    from: "    const indices = points.length === 1 ? [0] : [0, points.length - 1];",
+    to: "    const indices = [points.length - 1];",
+    mustFail: "reads both ends of every series, with the timestamp attached",
+  },
+  {
+    // A log line becomes configuration, which is extracting the answer.
+    id: "a-log-line-extracted-as-configuration",
+    file: "src/core/configuration.ts",
+    from: "  // The logs contract carries no configuration: a line is a symptom, not a",
+    to: '  if (slot === "logs") return [{ slot: "logs", ref: "lines[0].message", value: "x", kind: "deployment-image" }];\n  // a line is a symptom, not a',
+    mustFail: "reads no log line and no event message, ever",
+  },
+  {
     // The empty-slot sentence is emitted for an incident where nothing is
     // empty. Astra verified on 2026-09-10 that the silence tests as written
     // then — a relative line count — passed with exactly this in place.
@@ -2009,8 +2036,8 @@ export const MUTATIONS = [
   {
     id: "the-wrapper-alone-accepted-as-a-citation",
     file: "src/core/merge.ts",
-    from: "  if (rest.length === 0) return null;",
-    to: "  if (false) return null;",
+    from: "  if (segments.length === 0) return undefined;",
+    to: "  if (false) return undefined;",
     mustFail: "refuses the wrapper on its own, which names everything and so names nothing",
   },
   {
@@ -2358,7 +2385,7 @@ export const MUTATIONS = [
   {
     id: "provenance-check-becomes-a-pattern-match",
     file: "src/agents/slice.ts",
-    from: "  const paths = deepDiffPaths(expected, result.payload);",
+    from: "  const paths = deepDiffPaths(expected, rest);",
     to: "  const paths = [];",
     mustFail: "catches content added to the payload after assembly",
   },

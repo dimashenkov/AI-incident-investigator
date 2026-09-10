@@ -787,8 +787,40 @@ describe("an agent receives one incident and one slot", () => {
     const r = assembleRootCauseContext(incident("INC-2026-0101"));
     expect(r.state).toBe("assembled");
     if (r.state !== "assembled") return;
-    expect(Object.keys(r.payload).sort()).toEqual(["agent_results", "incident_id"]);
-    expect(JSON.stringify(r.payload)).not.toContain("container_memory_working_set_bytes");
+    /*
+     * THREE keys since 2026-09-10, and the third is a deliberate contract
+     * change, not a leak.
+     *
+     * The six-scenario measurement showed four of five failures came from a
+     * field no collection agent extracted — never from a field lost between
+     * agents. So the code reads configuration by frozen rule and hands it to
+     * the concluding agent BEFORE it concludes, labelled as read-by-code.
+     * Nothing is endorsed as support: the agent must select it or it supports
+     * nothing.
+     *
+     * The observations themselves are still withheld, which is what this test
+     * is named for, and the assertion below still holds that.
+     */
+    expect(Object.keys(r.payload).sort())
+      .toEqual(["agent_results", "configuration_read_by_code", "incident_id"]);
+    /*
+     * The series NAME is carried on purpose since 2026-09-10 — Astra asked for
+     * identity and units on an endpoint, because a number with neither is not
+     * an observation anybody can check. So this no longer asserts the absence
+     * of a name; it asserts the absence of the raw READINGS, which is what
+     * "not the observations" was always about.
+     */
+    expect(JSON.stringify(r.payload), "the raw points are still not handed over")
+      .not.toContain('"points"');
+    expect(JSON.stringify(r.payload), "nor is any log line")
+      .not.toContain('"lines"');
+    const config = (r.payload as { configuration_read_by_code: Array<{ ref: string }> })
+      .configuration_read_by_code;
+    expect(config.some((f) => f.ref === "pods[0].containers[0].limits.memory"),
+      "the memory limit that no collection agent reported on 2026-09-10").toBe(true);
+    expect(config.every((f) => !f.ref.startsWith("lines")),
+      "a log line is a symptom, not configuration, and extracting it would be extracting the answer")
+      .toBe(true);
   });
 
   it("refuses to ask for a conclusion when no agent ran", () => {

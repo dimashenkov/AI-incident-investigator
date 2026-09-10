@@ -127,6 +127,18 @@ export function buildObservingContext(
 export function buildRootCauseContext(
   incident: Record<string, unknown>,
   prompt: string | null,
+  /*
+   * What the CODE read from the observations, by frozen rule.
+   *
+   * Passed in rather than imported, for the same reason `validate` is: this
+   * file is transpiled into an n8n Code node and may not import anything.
+   *
+   * It reaches the concluding agent BEFORE it concludes, and it is labelled as
+   * read-by-code. Appending these facts to the evidence AFTER a conclusion
+   * would be a document asserting support that nobody weighed — Astra,
+   * 2026-09-10. The agent must select them itself, or they support nothing.
+   */
+  configuration: ReadonlyArray<Record<string, unknown>> = [],
 ): ContextResult {
   if (typeof prompt !== "string" || prompt.length === 0) {
     return { state: "unavailable", agent: "root-cause", why: "no-prompt", reason: "no prompt for root-cause" };
@@ -151,7 +163,9 @@ export function buildRootCauseContext(
     return { state: "unavailable", agent: "root-cause", why: "empty-slot", reason: "no agent results to weigh" };
   }
 
-  return { state: "assembled", agent: "root-cause", prompt, payload: { incident_id: incidentId, agent_results: snapshot(agents) } };
+  return { state: "assembled", agent: "root-cause", prompt,
+    payload: { incident_id: incidentId, agent_results: snapshot(agents),
+      configuration_read_by_code: snapshot(configuration) } };
 }
 
 /**
@@ -180,14 +194,58 @@ export function buildRootCauseContext(
 export function checkPayloadIsExactlyTheSlice(
   result: ContextResult,
   incident: Record<string, unknown>,
+  /** Everything wrong with the declared configuration, or an empty list. */
+  checkFacts: ((facts: unknown, observations: unknown) => string[]) | null = null,
 ): { state: "clean" } | { state: "foreign"; paths: string[] } | { state: "unchecked"; reason: string } {
   if (result.state !== "assembled") return { state: "unchecked", reason: result.reason };
 
   const expected = expectedPayload(result.agent, incident);
   if (expected === null) return { state: "unchecked", reason: `cannot derive the expected payload for ${result.agent}` };
 
-  const paths = deepDiffPaths(expected, result.payload);
+  /*
+   * `configuration_read_by_code` is answered SEPARATELY, and by a checker that
+   * is passed in.
+   *
+   * Deriving the field a second time in `expectedPayload` and comparing the two
+   * would prove self-consistency and be named isolation — the defect Grok found
+   * in the version this check replaced, on 2026-09-05.
+   *
+   * The first attempt at the alternative was a grounding check written here, by
+   * hand, and Astra reproduced five ways past it on 2026-09-10: text glued
+   * after a checked prefix, a second path grammar disagreeing with the citation
+   * resolver, a fact with no slot resolving in someone else's observation,
+   * unknown properties carrying text nobody read, and invented kinds. So the
+   * rules live with the extractor in src/core/configuration.ts, and this file —
+   * which may not import — takes the checker as an argument.
+   *
+   * If the field is present and no checker was given, the answer is
+   * `unchecked`. Not clean: "I could not look" is its own state here as
+   * everywhere else in this project.
+   */
+  const payload = result.payload as Record<string, unknown>;
+  const declared = payload["configuration_read_by_code"];
+  const rest: Record<string, unknown> = {};
+  for (const key of Object.keys(payload)) {
+    if (key !== "configuration_read_by_code") rest[key] = payload[key];
+  }
+
+  const paths = deepDiffPaths(expected, rest);
   if (paths.length > 0) return { state: "foreign", paths };
+
+  if (declared !== undefined) {
+    // A collection agent reads its own slice and nothing else. The field on its
+    // payload is foreign whatever it contains — Astra, 2026-09-10: the guard
+    // removed the key for EVERY agent, so a grounded log fact injected into a
+    // metrics payload came back clean.
+    if (result.agent !== "root-cause") {
+      return { state: "foreign", paths: [`configuration_read_by_code on the ${result.agent} payload`] };
+    }
+    if (checkFacts === null) {
+      return { state: "unchecked", reason: "the payload declares configuration and no checker was given" };
+    }
+    const wrong = checkFacts(declared, own(incident, "observations"));
+    if (wrong.length > 0) return { state: "foreign", paths: wrong };
+  }
   return { state: "clean" };
 }
 
@@ -336,6 +394,10 @@ export function buildCheckedContext(
   agent: AgentName,
   incident: Record<string, unknown>,
   prompt: string | null,
+  /** What the code read by rule; passed in, because this file may not import. */
+  configuration: ReadonlyArray<Record<string, unknown>> = [],
+  /** The checker for that field, from src/core/configuration.ts. */
+  checkFacts: ((facts: unknown, observations: unknown) => string[]) | null = null,
 ): ContextResult {
   const source = checkSourceForForeignIncidents(incident);
   if (source.state === "contaminated") {
@@ -346,11 +408,11 @@ export function buildCheckedContext(
   }
 
   const built = agent === "root-cause"
-    ? buildRootCauseContext(incident, prompt)
+    ? buildRootCauseContext(incident, prompt, configuration)
     : buildObservingContext(agent, incident, prompt);
   if (built.state !== "assembled") return built;
 
-  const slice = checkPayloadIsExactlyTheSlice(built, incident);
+  const slice = checkPayloadIsExactlyTheSlice(built, incident, checkFacts);
   if (slice.state === "foreign") {
     return { state: "unavailable", agent, why: "contaminated", reason: `the payload holds something the slice does not: ${slice.paths.slice(0, 3).join(", ")}` };
   }

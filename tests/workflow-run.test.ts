@@ -70,8 +70,21 @@ describe("the generated workflow investigates, not merely validates", () => {
     const k = seen.kubernetes as Record<string, unknown>;
     expect(Object.keys(k).sort()).toEqual(["incident_id", "observation"]);
     const rc = seen.rootCause as Record<string, unknown>;
-    expect(Object.keys(rc).sort()).toEqual(["agent_results", "incident_id"]);
-    expect(JSON.stringify(rc), "the root cause agent must not receive observations").not.toContain("collected_at");
+    /*
+     * THREE keys through the generated chain since 2026-09-10, and the third is
+     * the deliberate change: the code reads configuration by frozen rule and
+     * hands it to the concluding agent before it concludes. This test runs the
+     * chain the n8n node runs, so it is where that change is proven to have
+     * reached the deployed shape and not only the local one.
+     */
+    expect(Object.keys(rc).sort())
+      .toEqual(["agent_results", "configuration_read_by_code", "incident_id"]);
+    expect(JSON.stringify(rc), "the root cause agent must not receive observations")
+      .not.toContain("collected_at");
+    const config = rc["configuration_read_by_code"] as Array<{ ref: string; kind: string }>;
+    expect(config.some((f) => f.ref === "pods[0].containers[0].limits.memory"),
+      "the field no collection agent reported on 2026-09-10, now read through the chain").toBe(true);
+    expect(config.every((f) => f.kind !== "log-line"), "logs carry no configuration").toBe(true);
   });
 
   it("skips an agent whose slot holds an established absence, rather than refusing the incident", async () => {

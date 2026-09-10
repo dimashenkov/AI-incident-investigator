@@ -155,6 +155,12 @@ export async function buildRuntime() {
    * none of them: the chain ended at Conclude, and every caveat that file
    * produces was absent from what a live run emitted.
    */
+  /*
+   * Configuration read by rule, carried into the node because the concluding
+   * agent is given it BEFORE it concludes. The measurement of 2026-09-10 showed
+   * four of five failures came from a field no collection agent extracted.
+   */
+  const configuration = transpile("src/core/configuration.ts");
   const thread = transpile("src/core/thread.ts");
   const prompts = readPrompts();
   const incidents = await assembledIncidents();
@@ -172,6 +178,21 @@ const validators = module.exports;
 
 // ---- src/schema/invariants.ts, transpiled in memory ----
 ${invariants}
+
+// ---- src/core/configuration.ts, transpiled in memory ----
+${configuration}
+
+// The one caller of it inside the node, written here because src/agents/slice.ts
+// may not import and the extractor lives in its own file.
+function configurationForIncidentInNode(incident) {
+  const obs = incident && incident.observations;
+  if (obs === null || typeof obs !== "object" || Array.isArray(obs)) return [];
+  const out = [];
+  for (const slot of Object.keys(obs)) {
+    for (const f of configurationOf(slot, obs[slot])) out.push(f);
+  }
+  return out;
+}
 
 // ---- the three-state validator merge.ts expects ----
 function validate(name, data) {
@@ -374,7 +395,13 @@ return items.map(function (item, index) {
       incident: j.incident, normalised: j.normalised || 0, raw_answers: j.raw_answers || {} } };
   }
 
-  const ctx = buildCheckedContext(NEXT, j.incident, PROMPTS[NEXT]);
+  /*
+   * The concluding agent is handed what the code read by rule. Collection
+   * agents are not: they read their own slice, and handing them configuration
+   * would be telling them what to find.
+   */
+  const configRead = NEXT === "root-cause" ? configurationForIncidentInNode(j.incident) : [];
+  const ctx = buildCheckedContext(NEXT, j.incident, PROMPTS[NEXT], configRead, factProblems);
   if (ctx.state === "assembled") {
     return { json: { index, state: "asking", agent: NEXT, scenario: j.scenario,
       incident: j.incident, prompt: ctx.prompt, payload: ctx.payload,
