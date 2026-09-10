@@ -1,0 +1,2585 @@
+{
+  "conflicting-evidence": {
+    "index": 0,
+    "state": "concluded",
+    "scenario": "conflicting-evidence",
+    "normalised": 0,
+    "raw_answers": {
+      "kubernetes": "{\n  \"agent\": \"kubernetes\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"the event says: Container ledger-writer exceeded its memory limit and was killed\",\n      \"source_ref\": \"events[0].message\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"the container was terminated due to OOMKilled\",\n      \"source_ref\": \"pods[0].containers[0].last_state.terminated.reason\",\n      \"severity\": \"warning\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "logs": "{\n  \"agent\": \"logs\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"flush cycle complete, 1204 entries, heap 148Mi\",\n      \"source_ref\": \"lines[0].message\"\n    },\n    {\n      \"fact\": \"flush cycle complete, 1187 entries, heap 151Mi\",\n      \"source_ref\": \"lines[1].message\"\n    },\n    {\n      \"fact\": \"flush cycle complete, 1230 entries, heap 149Mi\",\n      \"source_ref\": \"lines[2].message\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "metrics": "{\n  \"agent\": \"metrics\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"memory working set reached 163577856 bytes by 11:18\",\n      \"source_ref\": \"series[0].points[2].value\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "root-cause": "{\n  \"agent\": \"root_cause\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"the event says: Container ledger-writer exceeded its memory limit and was killed\",\n      \"source_ref\": \"events[0].message\"\n    },\n    {\n      \"fact\": \"the container was terminated due to OOMKilled\",\n      \"source_ref\": \"pods[0].containers[0].last_state.terminated.reason\"\n    }\n  ],\n  \"hypotheses\": [\n    {\n      \"code\": \"CONTAINER_OOM\",\n      \"statement\": \"The container was terminated due to exceeding its memory limit, resulting in an OOMKilled state.\",\n      \"supported_by\": [\n        \"events[0].message\",\n        \"pods[0].containers[0].last_state.terminated.reason\"\n      ]\n    }\n  ],\n  \"confidence\": 0.8\n}"
+    },
+    "payloads_sent": {
+      "root-cause": {
+        "incident_id": "INC-2026-0801",
+        "agent_results": [
+          {
+            "agent": "kubernetes",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the event says: Container ledger-writer exceeded its memory limit and was killed",
+                "source_ref": "events[0].message",
+                "severity": "warning"
+              },
+              {
+                "fact": "the container was terminated due to OOMKilled",
+                "source_ref": "pods[0].containers[0].last_state.terminated.reason",
+                "severity": "warning"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "logs",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "flush cycle complete, 1204 entries, heap 148Mi",
+                "source_ref": "lines[0].message"
+              },
+              {
+                "fact": "flush cycle complete, 1187 entries, heap 151Mi",
+                "source_ref": "lines[1].message"
+              },
+              {
+                "fact": "flush cycle complete, 1230 entries, heap 149Mi",
+                "source_ref": "lines[2].message"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "metrics",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "memory working set reached 163577856 bytes by 11:18",
+                "source_ref": "series[0].points[2].value"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          }
+        ],
+        "configuration_read_by_code": [
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].limits.memory",
+            "value": "512Mi",
+            "kind": "resource-limit"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].limits.cpu",
+            "value": "500m",
+            "kind": "resource-limit"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].requests.memory",
+            "value": "256Mi",
+            "kind": "resource-request"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].requests.cpu",
+            "value": "250m",
+            "kind": "resource-request"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].ready",
+            "value": "false",
+            "kind": "container-readiness"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].last_state.terminated.reason",
+            "value": "OOMKilled",
+            "kind": "last-termination"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].last_state.terminated.exit_code",
+            "value": "137",
+            "kind": "last-termination"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].last_state.terminated.started_at",
+            "value": "2026-09-07T11:12:30Z",
+            "kind": "last-termination"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].last_state.terminated.finished_at",
+            "value": "2026-09-07T11:19:48Z",
+            "kind": "last-termination"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "deployment.image",
+            "value": "registry.internal/ledger-writer:3.1.4",
+            "kind": "deployment-image"
+          },
+          {
+            "slot": "metrics",
+            "ref": "series[0].points[0].value",
+            "value": "161480704",
+            "kind": "series-endpoint",
+            "ts": "2026-09-07T11:13:00Z",
+            "series": "container_memory_working_set_bytes",
+            "unit": "bytes"
+          },
+          {
+            "slot": "metrics",
+            "ref": "series[0].points[3].value",
+            "value": "160432128",
+            "kind": "series-endpoint",
+            "ts": "2026-09-07T11:19:00Z",
+            "series": "container_memory_working_set_bytes",
+            "unit": "bytes"
+          },
+          {
+            "slot": "metrics",
+            "ref": "series[1].points[0].value",
+            "value": "0",
+            "kind": "series-endpoint",
+            "ts": "2026-09-07T11:12:00Z",
+            "series": "container_cpu_cfs_throttled_seconds_total",
+            "unit": "seconds"
+          },
+          {
+            "slot": "metrics",
+            "ref": "series[1].points[1].value",
+            "value": "0",
+            "kind": "series-endpoint",
+            "ts": "2026-09-07T11:18:00Z",
+            "series": "container_cpu_cfs_throttled_seconds_total",
+            "unit": "seconds"
+          }
+        ]
+      }
+    },
+    "root_cause_code": "CONTAINER_OOM",
+    "root_cause": "The container was terminated due to exceeding its memory limit, resulting in an OOMKilled state.",
+    "confidence": 0.8,
+    "evidence": [
+      {
+        "source": "kubernetes",
+        "fact": "the event says: Container ledger-writer exceeded its memory limit and was killed",
+        "supports": "for"
+      },
+      {
+        "source": "kubernetes",
+        "fact": "the container was terminated due to OOMKilled",
+        "supports": "for"
+      }
+    ],
+    "incident": {
+      "incident_id": "INC-2026-0801",
+      "status": "diagnosed",
+      "service": "ledger-writer",
+      "namespace": "production",
+      "cluster": "prod-eu",
+      "started_at": "2026-09-07T11:20:00Z",
+      "scenario": "conflicting-evidence",
+      "source": {
+        "provider": "fake-datadog",
+        "alert": {
+          "id": "alert-5e93",
+          "title": "ledger-writer killed, cause unclear",
+          "triggered_at": "2026-09-07T11:20:00Z",
+          "severity": "critical",
+          "monitor_id": "mon-8815",
+          "tags": [
+            "service:ledger-writer",
+            "env:production"
+          ]
+        }
+      },
+      "observations": {
+        "kubernetes": {
+          "collected_at": "2026-09-07T11:21:05Z",
+          "pods": [
+            {
+              "name": "ledger-writer-849f6d7bc4-tq5nv",
+              "namespace": "production",
+              "phase": "Running",
+              "restart_count": 2,
+              "containers": [
+                {
+                  "name": "ledger-writer",
+                  "ready": false,
+                  "restart_count": 2,
+                  "limits": {
+                    "memory": "512Mi",
+                    "cpu": "500m"
+                  },
+                  "requests": {
+                    "memory": "256Mi",
+                    "cpu": "250m"
+                  },
+                  "last_state": {
+                    "terminated": {
+                      "reason": "OOMKilled",
+                      "exit_code": 137,
+                      "started_at": "2026-09-07T11:12:30Z",
+                      "finished_at": "2026-09-07T11:19:48Z"
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "events": [
+            {
+              "type": "Warning",
+              "reason": "Killing",
+              "message": "Container ledger-writer exceeded its memory limit and was killed",
+              "count": 2,
+              "last_seen": "2026-09-07T11:19:48Z",
+              "involved_object": "pod/ledger-writer-849f6d7bc4-tq5nv"
+            }
+          ],
+          "deployment": {
+            "name": "ledger-writer",
+            "namespace": "production",
+            "image": "registry.internal/ledger-writer:3.1.4",
+            "replicas": {
+              "desired": 2,
+              "ready": 1,
+              "available": 1
+            }
+          },
+          "provenance": {
+            "collection_id": "37343e8a-21e7-4eed-85da-fa669d660f65",
+            "requested_for": "INC-2026-0801",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-kubernetes"
+          }
+        },
+        "logs": {
+          "collected_at": "2026-09-07T11:21:07Z",
+          "window": {
+            "from": "2026-09-07T11:10:00Z",
+            "to": "2026-09-07T11:21:00Z"
+          },
+          "truncated": false,
+          "lines": [
+            {
+              "ts": "2026-09-07T11:13:02Z",
+              "level": "info",
+              "container": "ledger-writer",
+              "message": "flush cycle complete, 1204 entries, heap 148Mi"
+            },
+            {
+              "ts": "2026-09-07T11:16:40Z",
+              "level": "info",
+              "container": "ledger-writer",
+              "message": "flush cycle complete, 1187 entries, heap 151Mi"
+            },
+            {
+              "ts": "2026-09-07T11:19:44Z",
+              "level": "info",
+              "container": "ledger-writer",
+              "message": "flush cycle complete, 1230 entries, heap 149Mi"
+            }
+          ],
+          "provenance": {
+            "collection_id": "37343e8a-21e7-4eed-85da-fa669d660f65",
+            "requested_for": "INC-2026-0801",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-logs"
+          }
+        },
+        "metrics": {
+          "collected_at": "2026-09-07T11:21:09Z",
+          "window": {
+            "from": "2026-09-07T11:10:00Z",
+            "to": "2026-09-07T11:21:00Z"
+          },
+          "series": [
+            {
+              "name": "container_memory_working_set_bytes",
+              "unit": "bytes",
+              "container": "ledger-writer",
+              "points": [
+                {
+                  "ts": "2026-09-07T11:13:00Z",
+                  "value": 161480704
+                },
+                {
+                  "ts": "2026-09-07T11:15:00Z",
+                  "value": 158334976
+                },
+                {
+                  "ts": "2026-09-07T11:18:00Z",
+                  "value": 163577856
+                },
+                {
+                  "ts": "2026-09-07T11:19:00Z",
+                  "value": 160432128
+                }
+              ]
+            },
+            {
+              "name": "container_cpu_cfs_throttled_seconds_total",
+              "unit": "seconds",
+              "container": "ledger-writer",
+              "points": [
+                {
+                  "ts": "2026-09-07T11:12:00Z",
+                  "value": 0
+                },
+                {
+                  "ts": "2026-09-07T11:18:00Z",
+                  "value": 0
+                }
+              ]
+            }
+          ],
+          "provenance": {
+            "collection_id": "37343e8a-21e7-4eed-85da-fa669d660f65",
+            "requested_for": "INC-2026-0801",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-metrics"
+          }
+        }
+      },
+      "collection": {
+        "kubernetes": {
+          "state": "collected"
+        },
+        "logs": {
+          "state": "collected"
+        },
+        "metrics": {
+          "state": "collected"
+        }
+      },
+      "analysis": {
+        "agents": [
+          {
+            "agent": "kubernetes",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the event says: Container ledger-writer exceeded its memory limit and was killed",
+                "source_ref": "events[0].message",
+                "severity": "warning"
+              },
+              {
+                "fact": "the container was terminated due to OOMKilled",
+                "source_ref": "pods[0].containers[0].last_state.terminated.reason",
+                "severity": "warning"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "logs",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "flush cycle complete, 1204 entries, heap 148Mi",
+                "source_ref": "lines[0].message"
+              },
+              {
+                "fact": "flush cycle complete, 1187 entries, heap 151Mi",
+                "source_ref": "lines[1].message"
+              },
+              {
+                "fact": "flush cycle complete, 1230 entries, heap 149Mi",
+                "source_ref": "lines[2].message"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "metrics",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "memory working set reached 163577856 bytes by 11:18",
+                "source_ref": "series[0].points[2].value"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "root_cause",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the event says: Container ledger-writer exceeded its memory limit and was killed",
+                "source_ref": "events[0].message"
+              },
+              {
+                "fact": "the container was terminated due to OOMKilled",
+                "source_ref": "pods[0].containers[0].last_state.terminated.reason"
+              }
+            ],
+            "hypotheses": [
+              {
+                "code": "CONTAINER_OOM",
+                "statement": "The container was terminated due to exceeding its memory limit, resulting in an OOMKilled state.",
+                "supported_by": [
+                  "events[0].message",
+                  "pods[0].containers[0].last_state.terminated.reason"
+                ]
+              }
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "root_cause_code": "CONTAINER_OOM",
+        "root_cause": "The container was terminated due to exceeding its memory limit, resulting in an OOMKilled state.",
+        "confidence": 0.8,
+        "evidence": [
+          {
+            "source": "kubernetes",
+            "fact": "the event says: Container ledger-writer exceeded its memory limit and was killed",
+            "supports": "for"
+          },
+          {
+            "source": "kubernetes",
+            "fact": "the container was terminated due to OOMKilled",
+            "supports": "for"
+          }
+        ]
+      },
+      "remediation": {
+        "recommended_actions": []
+      },
+      "conversation": {
+        "provider": "fake-slack",
+        "channel_id": "fake-prod-incidents",
+        "thread_id": "thread-INC-2026-0801",
+        "incident_id": "INC-2026-0801",
+        "messages": [
+          {
+            "role": "system",
+            "text": "INC-2026-0801: ledger-writer in production — investigating.",
+            "ts": "2026-09-07T11:20:00Z",
+            "incident_id": "INC-2026-0801"
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0801",
+            "ts": "2026-09-07T11:20:00Z",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the event says: Container ledger-writer exceeded its memory limit and was killed"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container was terminated due to OOMKilled"
+              }
+            ],
+            "text": "kubernetes: the event says: Container ledger-writer exceeded its memory limit and was killed; the container was terminated due to OOMKilled."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0801",
+            "ts": "2026-09-07T11:20:00Z",
+            "cited_evidence": [
+              {
+                "source": "logs",
+                "fact": "flush cycle complete, 1204 entries, heap 148Mi"
+              },
+              {
+                "source": "logs",
+                "fact": "flush cycle complete, 1187 entries, heap 151Mi"
+              },
+              {
+                "source": "logs",
+                "fact": "flush cycle complete, 1230 entries, heap 149Mi"
+              }
+            ],
+            "text": "logs: flush cycle complete, 1204 entries, heap 148Mi; flush cycle complete, 1187 entries, heap 151Mi; flush cycle complete, 1230 entries, heap 149Mi."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0801",
+            "ts": "2026-09-07T11:20:00Z",
+            "cited_evidence": [
+              {
+                "source": "metrics",
+                "fact": "memory working set reached 163577856 bytes by 11:18"
+              }
+            ],
+            "text": "metrics: memory working set reached 163577856 bytes by 11:18."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0801",
+            "ts": "2026-09-07T11:20:00Z",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the event says: Container ledger-writer exceeded its memory limit and was killed"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container was terminated due to OOMKilled"
+              }
+            ],
+            "text": "root_cause: the event says: Container ledger-writer exceeded its memory limit and was killed; the container was terminated due to OOMKilled."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0801",
+            "ts": "2026-09-07T11:20:00Z",
+            "text": "Root cause: CONTAINER_OOM. The container was terminated due to exceeding its memory limit, resulting in an OOMKilled state. The agent puts its confidence at 80%, which is its own estimate and nothing here checks it.",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the event says: Container ledger-writer exceeded its memory limit and was killed"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container was terminated due to OOMKilled"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "thread": [
+      "INC-2026-0801: ledger-writer in production — investigating.",
+      "kubernetes: the event says: Container ledger-writer exceeded its memory limit and was killed; the container was terminated due to OOMKilled.",
+      "logs: flush cycle complete, 1204 entries, heap 148Mi; flush cycle complete, 1187 entries, heap 151Mi; flush cycle complete, 1230 entries, heap 149Mi.",
+      "metrics: memory working set reached 163577856 bytes by 11:18.",
+      "root_cause: the event says: Container ledger-writer exceeded its memory limit and was killed; the container was terminated due to OOMKilled.",
+      "Root cause: CONTAINER_OOM. The container was terminated due to exceeding its memory limit, resulting in an OOMKilled state. The agent puts its confidence at 80%, which is its own estimate and nothing here checks it."
+    ]
+  },
+  "deployment-regression": {
+    "index": 0,
+    "state": "concluded",
+    "scenario": "deployment-regression",
+    "normalised": 0,
+    "raw_answers": {
+      "kubernetes": "{\n  \"agent\": \"kubernetes\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"the event says: Scaled up replica set orders-api-7d4c85b96f to 2 for image registry.internal/orders-api:5.4.0, replacing orders-api-64f9b7c8d5\",\n      \"source_ref\": \"events[0].message\",\n      \"severity\": \"info\"\n    },\n    {\n      \"fact\": \"the event says: Scaled down replica set orders-api-64f9b7c8d5 to 0\",\n      \"source_ref\": \"events[1].message\",\n      \"severity\": \"info\"\n    },\n    {\n      \"fact\": \"the deployment image is the one your observation names\",\n      \"source_ref\": \"deployment.image\"\n    },\n    {\n      \"fact\": \"the container's memory limit is 1Gi\",\n      \"source_ref\": \"pods[0].containers[0].limits.memory\"\n    },\n    {\n      \"fact\": \"the container's cpu limit is 1000m\",\n      \"source_ref\": \"pods[0].containers[0].limits.cpu\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "logs": "{\n  \"agent\": \"logs\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"POST /v2/orders 500: discount_code column is not present in the read model\",\n      \"source_ref\": \"lines[3].message\"\n    },\n    {\n      \"fact\": \"POST /v2/orders 500: discount_code column is not present in the read model\",\n      \"source_ref\": \"lines[4].message\"\n    },\n    {\n      \"fact\": \"POST /v2/orders 500: discount_code column is not present in the read model\",\n      \"source_ref\": \"lines[5].message\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "metrics": "{\n  \"agent\": \"metrics\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"http_requests_failed_ratio reached 0.44 by 09:40\",\n      \"source_ref\": \"series[0].points[3].value\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "root-cause": "{\n  \"agent\": \"root_cause\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"POST /v2/orders 500: discount_code column is not present in the read model\",\n      \"source_ref\": \"lines[3].message\"\n    },\n    {\n      \"fact\": \"http_requests_failed_ratio reached 0.44 by 09:40\",\n      \"source_ref\": \"series[0].points[3].value\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0\n}"
+    },
+    "payloads_sent": {
+      "root-cause": {
+        "incident_id": "INC-2026-0701",
+        "agent_results": [
+          {
+            "agent": "kubernetes",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the event says: Scaled up replica set orders-api-7d4c85b96f to 2 for image registry.internal/orders-api:5.4.0, replacing orders-api-64f9b7c8d5",
+                "source_ref": "events[0].message",
+                "severity": "info"
+              },
+              {
+                "fact": "the event says: Scaled down replica set orders-api-64f9b7c8d5 to 0",
+                "source_ref": "events[1].message",
+                "severity": "info"
+              },
+              {
+                "fact": "the deployment image is the one your observation names",
+                "source_ref": "deployment.image"
+              },
+              {
+                "fact": "the container's memory limit is 1Gi",
+                "source_ref": "pods[0].containers[0].limits.memory"
+              },
+              {
+                "fact": "the container's cpu limit is 1000m",
+                "source_ref": "pods[0].containers[0].limits.cpu"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "logs",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "POST /v2/orders 500: discount_code column is not present in the read model",
+                "source_ref": "lines[3].message"
+              },
+              {
+                "fact": "POST /v2/orders 500: discount_code column is not present in the read model",
+                "source_ref": "lines[4].message"
+              },
+              {
+                "fact": "POST /v2/orders 500: discount_code column is not present in the read model",
+                "source_ref": "lines[5].message"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "metrics",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "http_requests_failed_ratio reached 0.44 by 09:40",
+                "source_ref": "series[0].points[3].value"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          }
+        ],
+        "configuration_read_by_code": [
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].limits.memory",
+            "value": "1Gi",
+            "kind": "resource-limit"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].limits.cpu",
+            "value": "1000m",
+            "kind": "resource-limit"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].requests.memory",
+            "value": "512Mi",
+            "kind": "resource-request"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].requests.cpu",
+            "value": "500m",
+            "kind": "resource-request"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].ready",
+            "value": "true",
+            "kind": "container-readiness"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[1].containers[0].limits.memory",
+            "value": "1Gi",
+            "kind": "resource-limit"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[1].containers[0].limits.cpu",
+            "value": "1000m",
+            "kind": "resource-limit"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[1].containers[0].requests.memory",
+            "value": "512Mi",
+            "kind": "resource-request"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[1].containers[0].requests.cpu",
+            "value": "500m",
+            "kind": "resource-request"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[1].containers[0].ready",
+            "value": "true",
+            "kind": "container-readiness"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "deployment.image",
+            "value": "registry.internal/orders-api:5.4.0",
+            "kind": "deployment-image"
+          },
+          {
+            "slot": "metrics",
+            "ref": "series[0].points[0].value",
+            "value": "0.001",
+            "kind": "series-endpoint",
+            "ts": "2026-09-07T09:32:00Z",
+            "series": "http_requests_failed_ratio",
+            "unit": "ratio"
+          },
+          {
+            "slot": "metrics",
+            "ref": "series[0].points[3].value",
+            "value": "0.44",
+            "kind": "series-endpoint",
+            "ts": "2026-09-07T09:40:00Z",
+            "series": "http_requests_failed_ratio",
+            "unit": "ratio"
+          },
+          {
+            "slot": "metrics",
+            "ref": "series[1].points[0].value",
+            "value": "0",
+            "kind": "series-endpoint",
+            "ts": "2026-09-07T09:32:00Z",
+            "series": "container_cpu_cfs_throttled_seconds_total",
+            "unit": "seconds"
+          },
+          {
+            "slot": "metrics",
+            "ref": "series[1].points[2].value",
+            "value": "0",
+            "kind": "series-endpoint",
+            "ts": "2026-09-07T09:40:00Z",
+            "series": "container_cpu_cfs_throttled_seconds_total",
+            "unit": "seconds"
+          }
+        ]
+      }
+    },
+    "root_cause_code": "INSUFFICIENT_EVIDENCE",
+    "root_cause": "The evidence collected does not support naming a cause.",
+    "confidence": 0,
+    "evidence": [],
+    "incident": {
+      "incident_id": "INC-2026-0701",
+      "status": "insufficient_evidence",
+      "service": "orders-api",
+      "namespace": "production",
+      "cluster": "prod-eu",
+      "started_at": "2026-09-07T09:41:00Z",
+      "scenario": "deployment-regression",
+      "source": {
+        "provider": "fake-datadog",
+        "alert": {
+          "id": "alert-1c07",
+          "title": "orders-api error rate up after rollout",
+          "triggered_at": "2026-09-07T09:41:00Z",
+          "severity": "critical",
+          "monitor_id": "mon-7734",
+          "tags": [
+            "service:orders-api",
+            "env:production"
+          ]
+        }
+      },
+      "observations": {
+        "kubernetes": {
+          "collected_at": "2026-09-07T09:42:10Z",
+          "pods": [
+            {
+              "name": "orders-api-7d4c85b96f-2vqlt",
+              "namespace": "production",
+              "phase": "Running",
+              "restart_count": 0,
+              "containers": [
+                {
+                  "name": "orders-api",
+                  "ready": true,
+                  "restart_count": 0,
+                  "limits": {
+                    "memory": "1Gi",
+                    "cpu": "1000m"
+                  },
+                  "requests": {
+                    "memory": "512Mi",
+                    "cpu": "500m"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "orders-api-7d4c85b96f-nk8rp",
+              "namespace": "production",
+              "phase": "Running",
+              "restart_count": 0,
+              "containers": [
+                {
+                  "name": "orders-api",
+                  "ready": true,
+                  "restart_count": 0,
+                  "limits": {
+                    "memory": "1Gi",
+                    "cpu": "1000m"
+                  },
+                  "requests": {
+                    "memory": "512Mi",
+                    "cpu": "500m"
+                  }
+                }
+              ]
+            }
+          ],
+          "events": [
+            {
+              "type": "Normal",
+              "reason": "ScalingReplicaSet",
+              "message": "Scaled up replica set orders-api-7d4c85b96f to 2 for image registry.internal/orders-api:5.4.0, replacing orders-api-64f9b7c8d5",
+              "count": 1,
+              "last_seen": "2026-09-07T09:38:02Z",
+              "involved_object": "deployment/orders-api"
+            },
+            {
+              "type": "Normal",
+              "reason": "ScalingReplicaSet",
+              "message": "Scaled down replica set orders-api-64f9b7c8d5 to 0",
+              "count": 1,
+              "last_seen": "2026-09-07T09:38:44Z",
+              "involved_object": "deployment/orders-api"
+            }
+          ],
+          "deployment": {
+            "name": "orders-api",
+            "namespace": "production",
+            "image": "registry.internal/orders-api:5.4.0",
+            "replicas": {
+              "desired": 2,
+              "ready": 2,
+              "available": 2
+            }
+          },
+          "provenance": {
+            "collection_id": "834bdc03-86c4-4af6-8e64-b59134980029",
+            "requested_for": "INC-2026-0701",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-kubernetes"
+          }
+        },
+        "logs": {
+          "collected_at": "2026-09-07T09:42:12Z",
+          "window": {
+            "from": "2026-09-07T09:30:00Z",
+            "to": "2026-09-07T09:42:00Z"
+          },
+          "truncated": false,
+          "lines": [
+            {
+              "ts": "2026-09-07T09:33:11Z",
+              "level": "info",
+              "container": "orders-api",
+              "message": "POST /v2/orders 201 in 42ms"
+            },
+            {
+              "ts": "2026-09-07T09:36:50Z",
+              "level": "info",
+              "container": "orders-api",
+              "message": "POST /v2/orders 201 in 39ms"
+            },
+            {
+              "ts": "2026-09-07T09:38:19Z",
+              "level": "info",
+              "container": "orders-api",
+              "message": "orders-api 5.4.0 accepting connections"
+            },
+            {
+              "ts": "2026-09-07T09:38:31Z",
+              "level": "error",
+              "container": "orders-api",
+              "message": "POST /v2/orders 500: discount_code column is not present in the read model"
+            },
+            {
+              "ts": "2026-09-07T09:39:47Z",
+              "level": "error",
+              "container": "orders-api",
+              "message": "POST /v2/orders 500: discount_code column is not present in the read model"
+            },
+            {
+              "ts": "2026-09-07T09:41:22Z",
+              "level": "error",
+              "container": "orders-api",
+              "message": "POST /v2/orders 500: discount_code column is not present in the read model"
+            }
+          ],
+          "provenance": {
+            "collection_id": "834bdc03-86c4-4af6-8e64-b59134980029",
+            "requested_for": "INC-2026-0701",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-logs"
+          }
+        },
+        "metrics": {
+          "collected_at": "2026-09-07T09:42:14Z",
+          "window": {
+            "from": "2026-09-07T09:30:00Z",
+            "to": "2026-09-07T09:42:00Z"
+          },
+          "series": [
+            {
+              "name": "http_requests_failed_ratio",
+              "unit": "ratio",
+              "container": "orders-api",
+              "points": [
+                {
+                  "ts": "2026-09-07T09:32:00Z",
+                  "value": 0.001
+                },
+                {
+                  "ts": "2026-09-07T09:36:00Z",
+                  "value": 0.002
+                },
+                {
+                  "ts": "2026-09-07T09:39:00Z",
+                  "value": 0.31
+                },
+                {
+                  "ts": "2026-09-07T09:40:00Z",
+                  "value": 0.44
+                }
+              ]
+            },
+            {
+              "name": "container_cpu_cfs_throttled_seconds_total",
+              "unit": "seconds",
+              "container": "orders-api",
+              "points": [
+                {
+                  "ts": "2026-09-07T09:32:00Z",
+                  "value": 0
+                },
+                {
+                  "ts": "2026-09-07T09:36:00Z",
+                  "value": 0
+                },
+                {
+                  "ts": "2026-09-07T09:40:00Z",
+                  "value": 0
+                }
+              ]
+            }
+          ],
+          "provenance": {
+            "collection_id": "834bdc03-86c4-4af6-8e64-b59134980029",
+            "requested_for": "INC-2026-0701",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-metrics"
+          }
+        }
+      },
+      "collection": {
+        "kubernetes": {
+          "state": "collected"
+        },
+        "logs": {
+          "state": "collected"
+        },
+        "metrics": {
+          "state": "collected"
+        }
+      },
+      "analysis": {
+        "agents": [
+          {
+            "agent": "kubernetes",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the event says: Scaled up replica set orders-api-7d4c85b96f to 2 for image registry.internal/orders-api:5.4.0, replacing orders-api-64f9b7c8d5",
+                "source_ref": "events[0].message",
+                "severity": "info"
+              },
+              {
+                "fact": "the event says: Scaled down replica set orders-api-64f9b7c8d5 to 0",
+                "source_ref": "events[1].message",
+                "severity": "info"
+              },
+              {
+                "fact": "the deployment image is the one your observation names",
+                "source_ref": "deployment.image"
+              },
+              {
+                "fact": "the container's memory limit is 1Gi",
+                "source_ref": "pods[0].containers[0].limits.memory"
+              },
+              {
+                "fact": "the container's cpu limit is 1000m",
+                "source_ref": "pods[0].containers[0].limits.cpu"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "logs",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "POST /v2/orders 500: discount_code column is not present in the read model",
+                "source_ref": "lines[3].message"
+              },
+              {
+                "fact": "POST /v2/orders 500: discount_code column is not present in the read model",
+                "source_ref": "lines[4].message"
+              },
+              {
+                "fact": "POST /v2/orders 500: discount_code column is not present in the read model",
+                "source_ref": "lines[5].message"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "metrics",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "http_requests_failed_ratio reached 0.44 by 09:40",
+                "source_ref": "series[0].points[3].value"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "root_cause",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "POST /v2/orders 500: discount_code column is not present in the read model",
+                "source_ref": "lines[3].message"
+              },
+              {
+                "fact": "http_requests_failed_ratio reached 0.44 by 09:40",
+                "source_ref": "series[0].points[3].value"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          }
+        ],
+        "root_cause_code": "INSUFFICIENT_EVIDENCE",
+        "root_cause": "The evidence collected does not support naming a cause.",
+        "confidence": 0,
+        "evidence": []
+      },
+      "remediation": {
+        "recommended_actions": []
+      },
+      "conversation": {
+        "provider": "fake-slack",
+        "channel_id": "fake-prod-incidents",
+        "thread_id": "thread-INC-2026-0701",
+        "incident_id": "INC-2026-0701",
+        "messages": [
+          {
+            "role": "system",
+            "text": "INC-2026-0701: orders-api in production — investigating.",
+            "ts": "2026-09-07T09:41:00Z",
+            "incident_id": "INC-2026-0701"
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0701",
+            "ts": "2026-09-07T09:41:00Z",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the event says: Scaled up replica set orders-api-7d4c85b96f to 2 for image registry.internal/orders-api:5.4.0, replacing orders-api-64f9b7c8d5"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the event says: Scaled down replica set orders-api-64f9b7c8d5 to 0"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the deployment image is the one your observation names"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container's memory limit is 1Gi"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container's cpu limit is 1000m"
+              }
+            ],
+            "text": "kubernetes: the event says: Scaled up replica set orders-api-7d4c85b96f to 2 for image registry.internal/orders-api:5.4.0, replacing orders-api-64f9b7c8d5; the event says: Scaled down replica set orders-api-64f9b7c8d5 to 0; the deployment image is the one your observation names; the container's memory limit is 1Gi; the container's cpu limit is 1000m."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0701",
+            "ts": "2026-09-07T09:41:00Z",
+            "cited_evidence": [
+              {
+                "source": "logs",
+                "fact": "POST /v2/orders 500: discount_code column is not present in the read model"
+              },
+              {
+                "source": "logs",
+                "fact": "POST /v2/orders 500: discount_code column is not present in the read model"
+              },
+              {
+                "source": "logs",
+                "fact": "POST /v2/orders 500: discount_code column is not present in the read model"
+              }
+            ],
+            "text": "logs: POST /v2/orders 500: discount_code column is not present in the read model; POST /v2/orders 500: discount_code column is not present in the read model; POST /v2/orders 500: discount_code column is not present in the read model."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0701",
+            "ts": "2026-09-07T09:41:00Z",
+            "cited_evidence": [
+              {
+                "source": "metrics",
+                "fact": "http_requests_failed_ratio reached 0.44 by 09:40"
+              }
+            ],
+            "text": "metrics: http_requests_failed_ratio reached 0.44 by 09:40."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0701",
+            "ts": "2026-09-07T09:41:00Z",
+            "cited_evidence": [
+              {
+                "source": "logs",
+                "fact": "POST /v2/orders 500: discount_code column is not present in the read model"
+              },
+              {
+                "source": "metrics",
+                "fact": "http_requests_failed_ratio reached 0.44 by 09:40"
+              }
+            ],
+            "text": "root_cause: POST /v2/orders 500: discount_code column is not present in the read model; http_requests_failed_ratio reached 0.44 by 09:40."
+          },
+          {
+            "role": "system",
+            "incident_id": "INC-2026-0701",
+            "ts": "2026-09-07T09:41:00Z",
+            "text": "No cause was established from the recorded analysis."
+          }
+        ]
+      }
+    },
+    "thread": [
+      "INC-2026-0701: orders-api in production — investigating.",
+      "kubernetes: the event says: Scaled up replica set orders-api-7d4c85b96f to 2 for image registry.internal/orders-api:5.4.0, replacing orders-api-64f9b7c8d5; the event says: Scaled down replica set orders-api-64f9b7c8d5 to 0; the deployment image is the one your observation names; the container's memory limit is 1Gi; the container's cpu limit is 1000m.",
+      "logs: POST /v2/orders 500: discount_code column is not present in the read model; POST /v2/orders 500: discount_code column is not present in the read model; POST /v2/orders 500: discount_code column is not present in the read model.",
+      "metrics: http_requests_failed_ratio reached 0.44 by 09:40.",
+      "root_cause: POST /v2/orders 500: discount_code column is not present in the read model; http_requests_failed_ratio reached 0.44 by 09:40.",
+      "No cause was established from the recorded analysis."
+    ]
+  },
+  "application-startup-failure": {
+    "index": 0,
+    "state": "concluded",
+    "scenario": "application-startup-failure",
+    "normalised": 0,
+    "raw_answers": {
+      "kubernetes": "{\n  \"agent\": \"kubernetes\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"the pod is in phase Running but the container is not ready\",\n      \"source_ref\": \"pods[0].containers[0].ready\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"the container has restarted 7 times\",\n      \"source_ref\": \"pods[0].containers[0].restart_count\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"the event says: Back-off restarting failed container search-indexer in pod search-indexer-58bd9c4f7-w2xqm\",\n      \"source_ref\": \"events[0].message\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"the deployment image is registry.internal/search-indexer:4.2.0\",\n      \"source_ref\": \"deployment.image\",\n      \"severity\": \"info\"\n    },\n    {\n      \"fact\": \"the container's memory limit is 2Gi\",\n      \"source_ref\": \"pods[0].containers[0].limits.memory\",\n      \"severity\": \"info\"\n    },\n    {\n      \"fact\": \"the container's cpu limit is 1000m\",\n      \"source_ref\": \"pods[0].containers[0].limits.cpu\",\n      \"severity\": \"info\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "logs": "{\n  \"agent\": \"logs\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"fatal: schema.yaml: unknown field 'analyzer_v2' at line 31; refusing to start\",\n      \"source_ref\": \"lines[2].message\"\n    },\n    {\n      \"fact\": \"exiting with status 1 before accepting connections\",\n      \"source_ref\": \"lines[3].message\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "root-cause": "{\n  \"agent\": \"root_cause\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"the pod is in phase Running but the container is not ready\",\n      \"source_ref\": \"pods[0].containers[0].ready\"\n    },\n    {\n      \"fact\": \"the container has restarted 7 times\",\n      \"source_ref\": \"pods[0].containers[0].restart_count\"\n    },\n    {\n      \"fact\": \"the event says: Back-off restarting failed container search-indexer in pod search-indexer-58bd9c4f7-w2xqm\",\n      \"source_ref\": \"events[0].message\"\n    },\n    {\n      \"fact\": \"fatal: schema.yaml: unknown field 'analyzer_v2' at line 31; refusing to start\",\n      \"source_ref\": \"lines[2].message\"\n    },\n    {\n      \"fact\": \"exiting with status 1 before accepting connections\",\n      \"source_ref\": \"lines[3].message\"\n    },\n    {\n      \"fact\": \"the container's memory limit is 2Gi\",\n      \"source_ref\": \"pods[0].containers[0].limits.memory\"\n    },\n    {\n      \"fact\": \"the container's cpu limit is 1000m\",\n      \"source_ref\": \"pods[0].containers[0].limits.cpu\"\n    }\n  ],\n  \"hypotheses\": [\n    {\n      \"code\": \"APPLICATION_STARTUP_FAILURE\",\n      \"statement\": \"The application failed to start due to an unknown field in the configuration file, causing the container to exit with status 1.\",\n      \"supported_by\": [\n        \"lines[2].message\",\n        \"lines[3].message\"\n      ]\n    }\n  ],\n  \"confidence\": 0.8\n}"
+    },
+    "payloads_sent": {
+      "root-cause": {
+        "incident_id": "INC-2026-0601",
+        "agent_results": [
+          {
+            "agent": "kubernetes",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the pod is in phase Running but the container is not ready",
+                "source_ref": "pods[0].containers[0].ready",
+                "severity": "warning"
+              },
+              {
+                "fact": "the container has restarted 7 times",
+                "source_ref": "pods[0].containers[0].restart_count",
+                "severity": "warning"
+              },
+              {
+                "fact": "the event says: Back-off restarting failed container search-indexer in pod search-indexer-58bd9c4f7-w2xqm",
+                "source_ref": "events[0].message",
+                "severity": "warning"
+              },
+              {
+                "fact": "the deployment image is registry.internal/search-indexer:4.2.0",
+                "source_ref": "deployment.image",
+                "severity": "info"
+              },
+              {
+                "fact": "the container's memory limit is 2Gi",
+                "source_ref": "pods[0].containers[0].limits.memory",
+                "severity": "info"
+              },
+              {
+                "fact": "the container's cpu limit is 1000m",
+                "source_ref": "pods[0].containers[0].limits.cpu",
+                "severity": "info"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "logs",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "fatal: schema.yaml: unknown field 'analyzer_v2' at line 31; refusing to start",
+                "source_ref": "lines[2].message"
+              },
+              {
+                "fact": "exiting with status 1 before accepting connections",
+                "source_ref": "lines[3].message"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          }
+        ],
+        "configuration_read_by_code": [
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].limits.memory",
+            "value": "2Gi",
+            "kind": "resource-limit"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].limits.cpu",
+            "value": "1000m",
+            "kind": "resource-limit"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].requests.memory",
+            "value": "1Gi",
+            "kind": "resource-request"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].requests.cpu",
+            "value": "500m",
+            "kind": "resource-request"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].ready",
+            "value": "false",
+            "kind": "container-readiness"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].last_state.terminated.reason",
+            "value": "Error",
+            "kind": "last-termination"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].last_state.terminated.exit_code",
+            "value": "1",
+            "kind": "last-termination"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].last_state.terminated.started_at",
+            "value": "2026-09-07T08:14:41Z",
+            "kind": "last-termination"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].last_state.terminated.finished_at",
+            "value": "2026-09-07T08:14:43Z",
+            "kind": "last-termination"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "deployment.image",
+            "value": "registry.internal/search-indexer:4.2.0",
+            "kind": "deployment-image"
+          }
+        ]
+      }
+    },
+    "root_cause_code": "APPLICATION_STARTUP_FAILURE",
+    "root_cause": "The application failed to start due to an unknown field in the configuration file, causing the container to exit with status 1.",
+    "confidence": 0.8,
+    "evidence": [
+      {
+        "source": "logs",
+        "fact": "fatal: schema.yaml: unknown field 'analyzer_v2' at line 31; refusing to start",
+        "supports": "for"
+      },
+      {
+        "source": "logs",
+        "fact": "exiting with status 1 before accepting connections",
+        "supports": "for"
+      }
+    ],
+    "incident": {
+      "incident_id": "INC-2026-0601",
+      "status": "diagnosed",
+      "service": "search-indexer",
+      "namespace": "production",
+      "cluster": "prod-eu",
+      "started_at": "2026-09-07T08:14:00Z",
+      "scenario": "application-startup-failure",
+      "source": {
+        "provider": "fake-datadog",
+        "alert": {
+          "id": "alert-9f22",
+          "title": "search-indexer restarting continuously",
+          "triggered_at": "2026-09-07T08:14:00Z",
+          "severity": "critical",
+          "monitor_id": "mon-6620",
+          "tags": [
+            "service:search-indexer",
+            "env:production"
+          ]
+        }
+      },
+      "observations": {
+        "kubernetes": {
+          "collected_at": "2026-09-07T08:15:30Z",
+          "pods": [
+            {
+              "name": "search-indexer-58bd9c4f7-w2xqm",
+              "namespace": "production",
+              "phase": "Running",
+              "restart_count": 7,
+              "containers": [
+                {
+                  "name": "search-indexer",
+                  "ready": false,
+                  "restart_count": 7,
+                  "limits": {
+                    "memory": "2Gi",
+                    "cpu": "1000m"
+                  },
+                  "requests": {
+                    "memory": "1Gi",
+                    "cpu": "500m"
+                  },
+                  "last_state": {
+                    "terminated": {
+                      "reason": "Error",
+                      "exit_code": 1,
+                      "started_at": "2026-09-07T08:14:41Z",
+                      "finished_at": "2026-09-07T08:14:43Z"
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "events": [
+            {
+              "type": "Warning",
+              "reason": "BackOff",
+              "message": "Back-off restarting failed container search-indexer in pod search-indexer-58bd9c4f7-w2xqm",
+              "count": 7,
+              "last_seen": "2026-09-07T08:15:12Z",
+              "involved_object": "pod/search-indexer-58bd9c4f7-w2xqm"
+            }
+          ],
+          "deployment": {
+            "name": "search-indexer",
+            "namespace": "production",
+            "image": "registry.internal/search-indexer:4.2.0",
+            "replicas": {
+              "desired": 3,
+              "ready": 0,
+              "available": 0
+            }
+          },
+          "provenance": {
+            "collection_id": "6a738f7c-5a63-4e98-8c63-af6182f59e69",
+            "requested_for": "INC-2026-0601",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-kubernetes"
+          }
+        },
+        "logs": {
+          "collected_at": "2026-09-07T08:15:32Z",
+          "window": {
+            "from": "2026-09-07T08:05:00Z",
+            "to": "2026-09-07T08:15:00Z"
+          },
+          "truncated": false,
+          "lines": [
+            {
+              "ts": "2026-09-07T08:14:41Z",
+              "level": "info",
+              "container": "search-indexer",
+              "message": "search-indexer 4.2.0 starting"
+            },
+            {
+              "ts": "2026-09-07T08:14:42Z",
+              "level": "info",
+              "container": "search-indexer",
+              "message": "loading index schema from /etc/indexer/schema.yaml"
+            },
+            {
+              "ts": "2026-09-07T08:14:43Z",
+              "level": "error",
+              "container": "search-indexer",
+              "message": "fatal: schema.yaml: unknown field 'analyzer_v2' at line 31; refusing to start"
+            },
+            {
+              "ts": "2026-09-07T08:14:43Z",
+              "level": "error",
+              "container": "search-indexer",
+              "message": "exiting with status 1 before accepting connections"
+            }
+          ],
+          "provenance": {
+            "collection_id": "6a738f7c-5a63-4e98-8c63-af6182f59e69",
+            "requested_for": "INC-2026-0601",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-logs"
+          }
+        },
+        "metrics": null
+      },
+      "collection": {
+        "kubernetes": {
+          "state": "collected"
+        },
+        "logs": {
+          "state": "collected"
+        },
+        "metrics": {
+          "state": "nothing"
+        }
+      },
+      "analysis": {
+        "agents": [
+          {
+            "agent": "kubernetes",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the pod is in phase Running but the container is not ready",
+                "source_ref": "pods[0].containers[0].ready",
+                "severity": "warning"
+              },
+              {
+                "fact": "the container has restarted 7 times",
+                "source_ref": "pods[0].containers[0].restart_count",
+                "severity": "warning"
+              },
+              {
+                "fact": "the event says: Back-off restarting failed container search-indexer in pod search-indexer-58bd9c4f7-w2xqm",
+                "source_ref": "events[0].message",
+                "severity": "warning"
+              },
+              {
+                "fact": "the deployment image is registry.internal/search-indexer:4.2.0",
+                "source_ref": "deployment.image",
+                "severity": "info"
+              },
+              {
+                "fact": "the container's memory limit is 2Gi",
+                "source_ref": "pods[0].containers[0].limits.memory",
+                "severity": "info"
+              },
+              {
+                "fact": "the container's cpu limit is 1000m",
+                "source_ref": "pods[0].containers[0].limits.cpu",
+                "severity": "info"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "logs",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "fatal: schema.yaml: unknown field 'analyzer_v2' at line 31; refusing to start",
+                "source_ref": "lines[2].message"
+              },
+              {
+                "fact": "exiting with status 1 before accepting connections",
+                "source_ref": "lines[3].message"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "root_cause",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the pod is in phase Running but the container is not ready",
+                "source_ref": "pods[0].containers[0].ready"
+              },
+              {
+                "fact": "the container has restarted 7 times",
+                "source_ref": "pods[0].containers[0].restart_count"
+              },
+              {
+                "fact": "the event says: Back-off restarting failed container search-indexer in pod search-indexer-58bd9c4f7-w2xqm",
+                "source_ref": "events[0].message"
+              },
+              {
+                "fact": "fatal: schema.yaml: unknown field 'analyzer_v2' at line 31; refusing to start",
+                "source_ref": "lines[2].message"
+              },
+              {
+                "fact": "exiting with status 1 before accepting connections",
+                "source_ref": "lines[3].message"
+              },
+              {
+                "fact": "the container's memory limit is 2Gi",
+                "source_ref": "pods[0].containers[0].limits.memory"
+              },
+              {
+                "fact": "the container's cpu limit is 1000m",
+                "source_ref": "pods[0].containers[0].limits.cpu"
+              }
+            ],
+            "hypotheses": [
+              {
+                "code": "APPLICATION_STARTUP_FAILURE",
+                "statement": "The application failed to start due to an unknown field in the configuration file, causing the container to exit with status 1.",
+                "supported_by": [
+                  "lines[2].message",
+                  "lines[3].message"
+                ]
+              }
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "root_cause_code": "APPLICATION_STARTUP_FAILURE",
+        "root_cause": "The application failed to start due to an unknown field in the configuration file, causing the container to exit with status 1.",
+        "confidence": 0.8,
+        "evidence": [
+          {
+            "source": "logs",
+            "fact": "fatal: schema.yaml: unknown field 'analyzer_v2' at line 31; refusing to start",
+            "supports": "for"
+          },
+          {
+            "source": "logs",
+            "fact": "exiting with status 1 before accepting connections",
+            "supports": "for"
+          }
+        ]
+      },
+      "remediation": {
+        "recommended_actions": []
+      },
+      "conversation": {
+        "provider": "fake-slack",
+        "channel_id": "fake-prod-incidents",
+        "thread_id": "thread-INC-2026-0601",
+        "incident_id": "INC-2026-0601",
+        "messages": [
+          {
+            "role": "system",
+            "text": "INC-2026-0601: search-indexer in production — investigating.",
+            "ts": "2026-09-07T08:14:00Z",
+            "incident_id": "INC-2026-0601"
+          },
+          {
+            "role": "system",
+            "text": "Read and found nothing: metrics.",
+            "ts": "2026-09-07T08:14:00Z",
+            "incident_id": "INC-2026-0601"
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0601",
+            "ts": "2026-09-07T08:14:00Z",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the pod is in phase Running but the container is not ready"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container has restarted 7 times"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the event says: Back-off restarting failed container search-indexer in pod search-indexer-58bd9c4f7-w2xqm"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the deployment image is registry.internal/search-indexer:4.2.0"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container's memory limit is 2Gi"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container's cpu limit is 1000m"
+              }
+            ],
+            "text": "kubernetes: the pod is in phase Running but the container is not ready; the container has restarted 7 times; the event says: Back-off restarting failed container search-indexer in pod search-indexer-58bd9c4f7-w2xqm; the deployment image is registry.internal/search-indexer:4.2.0; the container's memory limit is 2Gi; the container's cpu limit is 1000m."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0601",
+            "ts": "2026-09-07T08:14:00Z",
+            "cited_evidence": [
+              {
+                "source": "logs",
+                "fact": "fatal: schema.yaml: unknown field 'analyzer_v2' at line 31; refusing to start"
+              },
+              {
+                "source": "logs",
+                "fact": "exiting with status 1 before accepting connections"
+              }
+            ],
+            "text": "logs: fatal: schema.yaml: unknown field 'analyzer_v2' at line 31; refusing to start; exiting with status 1 before accepting connections."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0601",
+            "ts": "2026-09-07T08:14:00Z",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the pod is in phase Running but the container is not ready"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container has restarted 7 times"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the event says: Back-off restarting failed container search-indexer in pod search-indexer-58bd9c4f7-w2xqm"
+              },
+              {
+                "source": "logs",
+                "fact": "fatal: schema.yaml: unknown field 'analyzer_v2' at line 31; refusing to start"
+              },
+              {
+                "source": "logs",
+                "fact": "exiting with status 1 before accepting connections"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container's memory limit is 2Gi"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container's cpu limit is 1000m"
+              }
+            ],
+            "text": "root_cause: the pod is in phase Running but the container is not ready; the container has restarted 7 times; the event says: Back-off restarting failed container search-indexer in pod search-indexer-58bd9c4f7-w2xqm; fatal: schema.yaml: unknown field 'analyzer_v2' at line 31; refusing to start; exiting with status 1 before accepting connections; the container's memory limit is 2Gi; the container's cpu limit is 1000m."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0601",
+            "ts": "2026-09-07T08:14:00Z",
+            "text": "Root cause: APPLICATION_STARTUP_FAILURE. The application failed to start due to an unknown field in the configuration file, causing the container to exit with status 1. The agent puts its confidence at 80%, which is its own estimate and nothing here checks it.",
+            "cited_evidence": [
+              {
+                "source": "logs",
+                "fact": "fatal: schema.yaml: unknown field 'analyzer_v2' at line 31; refusing to start"
+              },
+              {
+                "source": "logs",
+                "fact": "exiting with status 1 before accepting connections"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "thread": [
+      "INC-2026-0601: search-indexer in production — investigating.",
+      "Read and found nothing: metrics.",
+      "kubernetes: the pod is in phase Running but the container is not ready; the container has restarted 7 times; the event says: Back-off restarting failed container search-indexer in pod search-indexer-58bd9c4f7-w2xqm; the deployment image is registry.internal/search-indexer:4.2.0; the container's memory limit is 2Gi; the container's cpu limit is 1000m.",
+      "logs: fatal: schema.yaml: unknown field 'analyzer_v2' at line 31; refusing to start; exiting with status 1 before accepting connections.",
+      "root_cause: the pod is in phase Running but the container is not ready; the container has restarted 7 times; the event says: Back-off restarting failed container search-indexer in pod search-indexer-58bd9c4f7-w2xqm; fatal: schema.yaml: unknown field 'analyzer_v2' at line 31; refusing to start; exiting with status 1 before accepting connections; the container's memory limit is 2Gi; the container's cpu limit is 1000m.",
+      "Root cause: APPLICATION_STARTUP_FAILURE. The application failed to start due to an unknown field in the configuration file, causing the container to exit with status 1. The agent puts its confidence at 80%, which is its own estimate and nothing here checks it."
+    ]
+  },
+  "cpu-throttling": {
+    "index": 0,
+    "state": "concluded",
+    "scenario": "cpu-throttling",
+    "normalised": 0,
+    "raw_answers": {
+      "kubernetes": "{\n  \"agent\": \"kubernetes\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"the deployment image is registry.internal/report-worker:1.8.3\",\n      \"source_ref\": \"deployment.image\"\n    },\n    {\n      \"fact\": \"the container's memory limit is 1Gi\",\n      \"source_ref\": \"pods[0].containers[0].limits.memory\"\n    },\n    {\n      \"fact\": \"the container's cpu limit is 250m\",\n      \"source_ref\": \"pods[0].containers[0].limits.cpu\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "logs": "{\n  \"agent\": \"logs\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"monthly report batch started, 41200 rows\",\n      \"source_ref\": \"lines[0].message\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "metrics": "{\n  \"agent\": \"metrics\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"throttled time reached 78.9 seconds by 18:41\",\n      \"source_ref\": \"series[0].points[3].value\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "root-cause": "{\n  \"agent\": \"root_cause\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"throttled time reached 78.9 seconds by 18:41\",\n      \"source_ref\": \"series[0].points[3].value\"\n    }\n  ],\n  \"hypotheses\": [\n    {\n      \"code\": \"CPU_THROTTLING\",\n      \"statement\": \"The container experienced CPU throttling due to reaching its CPU limit.\",\n      \"supported_by\": [\n        \"series[0].points[3].value\"\n      ]\n    }\n  ],\n  \"confidence\": 0.8\n}"
+    },
+    "payloads_sent": {
+      "root-cause": {
+        "incident_id": "INC-2026-0401",
+        "agent_results": [
+          {
+            "agent": "kubernetes",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the deployment image is registry.internal/report-worker:1.8.3",
+                "source_ref": "deployment.image"
+              },
+              {
+                "fact": "the container's memory limit is 1Gi",
+                "source_ref": "pods[0].containers[0].limits.memory"
+              },
+              {
+                "fact": "the container's cpu limit is 250m",
+                "source_ref": "pods[0].containers[0].limits.cpu"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "logs",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "monthly report batch started, 41200 rows",
+                "source_ref": "lines[0].message"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "metrics",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "throttled time reached 78.9 seconds by 18:41",
+                "source_ref": "series[0].points[3].value"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          }
+        ],
+        "configuration_read_by_code": [
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].limits.memory",
+            "value": "1Gi",
+            "kind": "resource-limit"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].limits.cpu",
+            "value": "250m",
+            "kind": "resource-limit"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].requests.memory",
+            "value": "512Mi",
+            "kind": "resource-request"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].requests.cpu",
+            "value": "250m",
+            "kind": "resource-request"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].ready",
+            "value": "true",
+            "kind": "container-readiness"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "deployment.image",
+            "value": "registry.internal/report-worker:1.8.3",
+            "kind": "deployment-image"
+          },
+          {
+            "slot": "metrics",
+            "ref": "series[0].points[0].value",
+            "value": "0.4",
+            "kind": "series-endpoint",
+            "ts": "2026-09-04T18:32:00Z",
+            "series": "container_cpu_cfs_throttled_seconds_total",
+            "unit": "seconds"
+          },
+          {
+            "slot": "metrics",
+            "ref": "series[0].points[3].value",
+            "value": "78.9",
+            "kind": "series-endpoint",
+            "ts": "2026-09-04T18:41:00Z",
+            "series": "container_cpu_cfs_throttled_seconds_total",
+            "unit": "seconds"
+          },
+          {
+            "slot": "metrics",
+            "ref": "series[1].points[0].value",
+            "value": "310378496",
+            "kind": "series-endpoint",
+            "ts": "2026-09-04T18:32:00Z",
+            "series": "container_memory_working_set_bytes",
+            "unit": "bytes"
+          },
+          {
+            "slot": "metrics",
+            "ref": "series[1].points[1].value",
+            "value": "318767104",
+            "kind": "series-endpoint",
+            "ts": "2026-09-04T18:38:00Z",
+            "series": "container_memory_working_set_bytes",
+            "unit": "bytes"
+          }
+        ]
+      }
+    },
+    "root_cause_code": "CPU_THROTTLING",
+    "root_cause": "The container experienced CPU throttling due to reaching its CPU limit.",
+    "confidence": 0.8,
+    "evidence": [
+      {
+        "source": "metrics",
+        "fact": "throttled time reached 78.9 seconds by 18:41",
+        "supports": "for"
+      }
+    ],
+    "incident": {
+      "incident_id": "INC-2026-0401",
+      "status": "diagnosed",
+      "service": "report-worker",
+      "namespace": "production",
+      "cluster": "prod-eu",
+      "started_at": "2026-09-04T18:40:00Z",
+      "scenario": "cpu-throttling",
+      "source": {
+        "provider": "fake-datadog",
+        "alert": {
+          "id": "alert-5c44",
+          "title": "report-worker latency above threshold",
+          "triggered_at": "2026-09-04T18:40:00Z",
+          "severity": "warning",
+          "monitor_id": "mon-9003",
+          "tags": [
+            "service:report-worker",
+            "env:production"
+          ]
+        }
+      },
+      "observations": {
+        "kubernetes": {
+          "collected_at": "2026-09-04T18:41:11Z",
+          "pods": [
+            {
+              "name": "report-worker-79fd5c8bb-2xkvn",
+              "namespace": "production",
+              "phase": "Running",
+              "restart_count": 0,
+              "containers": [
+                {
+                  "name": "report-worker",
+                  "ready": true,
+                  "restart_count": 0,
+                  "limits": {
+                    "memory": "1Gi",
+                    "cpu": "250m"
+                  },
+                  "requests": {
+                    "memory": "512Mi",
+                    "cpu": "250m"
+                  }
+                }
+              ]
+            }
+          ],
+          "events": [],
+          "deployment": {
+            "name": "report-worker",
+            "namespace": "production",
+            "replicas": {
+              "desired": 2,
+              "ready": 2,
+              "available": 2
+            },
+            "image": "registry.internal/report-worker:1.8.3"
+          },
+          "provenance": {
+            "collection_id": "1a869301-e213-4e26-8d12-f0af17819383",
+            "requested_for": "INC-2026-0401",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-kubernetes"
+          }
+        },
+        "logs": {
+          "collected_at": "2026-09-04T18:41:13Z",
+          "window": {
+            "from": "2026-09-04T18:30:00Z",
+            "to": "2026-09-04T18:41:00Z"
+          },
+          "truncated": false,
+          "lines": [
+            {
+              "ts": "2026-09-04T18:38:02Z",
+              "level": "info",
+              "container": "report-worker",
+              "message": "monthly report batch started, 41200 rows"
+            }
+          ],
+          "provenance": {
+            "collection_id": "1a869301-e213-4e26-8d12-f0af17819383",
+            "requested_for": "INC-2026-0401",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-logs"
+          }
+        },
+        "metrics": {
+          "collected_at": "2026-09-04T18:41:15Z",
+          "window": {
+            "from": "2026-09-04T18:30:00Z",
+            "to": "2026-09-04T18:41:00Z"
+          },
+          "series": [
+            {
+              "name": "container_cpu_cfs_throttled_seconds_total",
+              "unit": "seconds",
+              "container": "report-worker",
+              "points": [
+                {
+                  "ts": "2026-09-04T18:32:00Z",
+                  "value": 0.4
+                },
+                {
+                  "ts": "2026-09-04T18:35:00Z",
+                  "value": 12.8
+                },
+                {
+                  "ts": "2026-09-04T18:38:00Z",
+                  "value": 41.2
+                },
+                {
+                  "ts": "2026-09-04T18:41:00Z",
+                  "value": 78.9
+                }
+              ]
+            },
+            {
+              "name": "container_memory_working_set_bytes",
+              "unit": "bytes",
+              "container": "report-worker",
+              "points": [
+                {
+                  "ts": "2026-09-04T18:32:00Z",
+                  "value": 310378496
+                },
+                {
+                  "ts": "2026-09-04T18:38:00Z",
+                  "value": 318767104
+                }
+              ]
+            }
+          ],
+          "provenance": {
+            "collection_id": "1a869301-e213-4e26-8d12-f0af17819383",
+            "requested_for": "INC-2026-0401",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-metrics"
+          }
+        }
+      },
+      "collection": {
+        "kubernetes": {
+          "state": "collected"
+        },
+        "logs": {
+          "state": "collected"
+        },
+        "metrics": {
+          "state": "collected"
+        }
+      },
+      "analysis": {
+        "agents": [
+          {
+            "agent": "kubernetes",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the deployment image is registry.internal/report-worker:1.8.3",
+                "source_ref": "deployment.image"
+              },
+              {
+                "fact": "the container's memory limit is 1Gi",
+                "source_ref": "pods[0].containers[0].limits.memory"
+              },
+              {
+                "fact": "the container's cpu limit is 250m",
+                "source_ref": "pods[0].containers[0].limits.cpu"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "logs",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "monthly report batch started, 41200 rows",
+                "source_ref": "lines[0].message"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "metrics",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "throttled time reached 78.9 seconds by 18:41",
+                "source_ref": "series[0].points[3].value"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "root_cause",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "throttled time reached 78.9 seconds by 18:41",
+                "source_ref": "series[0].points[3].value"
+              }
+            ],
+            "hypotheses": [
+              {
+                "code": "CPU_THROTTLING",
+                "statement": "The container experienced CPU throttling due to reaching its CPU limit.",
+                "supported_by": [
+                  "series[0].points[3].value"
+                ]
+              }
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "root_cause_code": "CPU_THROTTLING",
+        "root_cause": "The container experienced CPU throttling due to reaching its CPU limit.",
+        "confidence": 0.8,
+        "evidence": [
+          {
+            "source": "metrics",
+            "fact": "throttled time reached 78.9 seconds by 18:41",
+            "supports": "for"
+          }
+        ]
+      },
+      "remediation": {
+        "recommended_actions": []
+      },
+      "conversation": {
+        "provider": "fake-slack",
+        "channel_id": "fake-prod-incidents",
+        "thread_id": "thread-INC-2026-0401",
+        "incident_id": "INC-2026-0401",
+        "messages": [
+          {
+            "role": "system",
+            "text": "INC-2026-0401: report-worker in production — investigating.",
+            "ts": "2026-09-04T18:40:00Z",
+            "incident_id": "INC-2026-0401"
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0401",
+            "ts": "2026-09-04T18:40:00Z",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the deployment image is registry.internal/report-worker:1.8.3"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container's memory limit is 1Gi"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container's cpu limit is 250m"
+              }
+            ],
+            "text": "kubernetes: the deployment image is registry.internal/report-worker:1.8.3; the container's memory limit is 1Gi; the container's cpu limit is 250m."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0401",
+            "ts": "2026-09-04T18:40:00Z",
+            "cited_evidence": [
+              {
+                "source": "logs",
+                "fact": "monthly report batch started, 41200 rows"
+              }
+            ],
+            "text": "logs: monthly report batch started, 41200 rows."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0401",
+            "ts": "2026-09-04T18:40:00Z",
+            "cited_evidence": [
+              {
+                "source": "metrics",
+                "fact": "throttled time reached 78.9 seconds by 18:41"
+              }
+            ],
+            "text": "metrics: throttled time reached 78.9 seconds by 18:41."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0401",
+            "ts": "2026-09-04T18:40:00Z",
+            "cited_evidence": [
+              {
+                "source": "metrics",
+                "fact": "throttled time reached 78.9 seconds by 18:41"
+              }
+            ],
+            "text": "root_cause: throttled time reached 78.9 seconds by 18:41."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0401",
+            "ts": "2026-09-04T18:40:00Z",
+            "text": "Root cause: CPU_THROTTLING. The container experienced CPU throttling due to reaching its CPU limit. The agent puts its confidence at 80%, which is its own estimate and nothing here checks it.",
+            "cited_evidence": [
+              {
+                "source": "metrics",
+                "fact": "throttled time reached 78.9 seconds by 18:41"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "thread": [
+      "INC-2026-0401: report-worker in production — investigating.",
+      "kubernetes: the deployment image is registry.internal/report-worker:1.8.3; the container's memory limit is 1Gi; the container's cpu limit is 250m.",
+      "logs: monthly report batch started, 41200 rows.",
+      "metrics: throttled time reached 78.9 seconds by 18:41.",
+      "root_cause: throttled time reached 78.9 seconds by 18:41.",
+      "Root cause: CPU_THROTTLING. The container experienced CPU throttling due to reaching its CPU limit. The agent puts its confidence at 80%, which is its own estimate and nothing here checks it."
+    ]
+  },
+  "insufficient-evidence": {
+    "index": 0,
+    "state": "concluded",
+    "scenario": "insufficient-evidence",
+    "normalised": 0,
+    "raw_answers": {
+      "kubernetes": "{\n  \"agent\": \"kubernetes\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"the deployment image is registry.internal/notify-api:4.0.2\",\n      \"source_ref\": \"deployment.image\"\n    },\n    {\n      \"fact\": \"the container's memory limit is 512Mi\",\n      \"source_ref\": \"pods[0].containers[0].limits.memory\"\n    },\n    {\n      \"fact\": \"the container's cpu limit is 500m\",\n      \"source_ref\": \"pods[0].containers[0].limits.cpu\"\n    },\n    {\n      \"fact\": \"the container's memory request is 256Mi\",\n      \"source_ref\": \"pods[0].containers[0].requests.memory\"\n    },\n    {\n      \"fact\": \"the container's cpu request is 250m\",\n      \"source_ref\": \"pods[0].containers[0].requests.cpu\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "logs": "{\n  \"agent\": \"logs\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"upstream returned 502\",\n      \"source_ref\": \"lines[0].message\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "root-cause": "{\n  \"agent\": \"root_cause\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"the deployment image is registry.internal/notify-api:4.0.2\",\n      \"source_ref\": \"deployment.image\"\n    },\n    {\n      \"fact\": \"the container's memory limit is 512Mi\",\n      \"source_ref\": \"pods[0].containers[0].limits.memory\"\n    },\n    {\n      \"fact\": \"the container's cpu limit is 500m\",\n      \"source_ref\": \"pods[0].containers[0].limits.cpu\"\n    },\n    {\n      \"fact\": \"the container's memory request is 256Mi\",\n      \"source_ref\": \"pods[0].containers[0].requests.memory\"\n    },\n    {\n      \"fact\": \"the container's cpu request is 250m\",\n      \"source_ref\": \"pods[0].containers[0].requests.cpu\"\n    },\n    {\n      \"fact\": \"upstream returned 502\",\n      \"source_ref\": \"lines[0].message\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0\n}"
+    },
+    "payloads_sent": {
+      "root-cause": {
+        "incident_id": "INC-2026-0501",
+        "agent_results": [
+          {
+            "agent": "kubernetes",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the deployment image is registry.internal/notify-api:4.0.2",
+                "source_ref": "deployment.image"
+              },
+              {
+                "fact": "the container's memory limit is 512Mi",
+                "source_ref": "pods[0].containers[0].limits.memory"
+              },
+              {
+                "fact": "the container's cpu limit is 500m",
+                "source_ref": "pods[0].containers[0].limits.cpu"
+              },
+              {
+                "fact": "the container's memory request is 256Mi",
+                "source_ref": "pods[0].containers[0].requests.memory"
+              },
+              {
+                "fact": "the container's cpu request is 250m",
+                "source_ref": "pods[0].containers[0].requests.cpu"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "logs",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "upstream returned 502",
+                "source_ref": "lines[0].message"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          }
+        ],
+        "configuration_read_by_code": [
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].limits.memory",
+            "value": "512Mi",
+            "kind": "resource-limit"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].limits.cpu",
+            "value": "500m",
+            "kind": "resource-limit"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].requests.memory",
+            "value": "256Mi",
+            "kind": "resource-request"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].requests.cpu",
+            "value": "250m",
+            "kind": "resource-request"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].ready",
+            "value": "true",
+            "kind": "container-readiness"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "deployment.image",
+            "value": "registry.internal/notify-api:4.0.2",
+            "kind": "deployment-image"
+          }
+        ]
+      }
+    },
+    "root_cause_code": "INSUFFICIENT_EVIDENCE",
+    "root_cause": "The evidence collected does not support naming a cause.",
+    "confidence": 0,
+    "evidence": [],
+    "incident": {
+      "incident_id": "INC-2026-0501",
+      "status": "insufficient_evidence",
+      "service": "notify-api",
+      "namespace": "production",
+      "cluster": "prod-eu",
+      "started_at": "2026-09-04T21:15:00Z",
+      "scenario": "insufficient-evidence",
+      "source": {
+        "provider": "fake-datadog",
+        "alert": {
+          "id": "alert-0a17",
+          "title": "elevated error rate on notify-api",
+          "triggered_at": "2026-09-04T21:15:00Z",
+          "severity": "warning",
+          "monitor_id": "mon-6612",
+          "tags": [
+            "service:notify-api",
+            "env:production"
+          ]
+        }
+      },
+      "observations": {
+        "kubernetes": {
+          "collected_at": "2026-09-04T21:16:40Z",
+          "pods": [
+            {
+              "name": "notify-api-5b7c9d884-hq2rt",
+              "namespace": "production",
+              "phase": "Running",
+              "restart_count": 0,
+              "containers": [
+                {
+                  "name": "notify-api",
+                  "ready": true,
+                  "restart_count": 0,
+                  "limits": {
+                    "memory": "512Mi",
+                    "cpu": "500m"
+                  },
+                  "requests": {
+                    "memory": "256Mi",
+                    "cpu": "250m"
+                  }
+                }
+              ]
+            }
+          ],
+          "events": [],
+          "deployment": {
+            "name": "notify-api",
+            "namespace": "production",
+            "replicas": {
+              "desired": 3,
+              "ready": 3,
+              "available": 3
+            },
+            "image": "registry.internal/notify-api:4.0.2"
+          },
+          "provenance": {
+            "collection_id": "449c5993-31e4-41a9-8867-85d12d70878d",
+            "requested_for": "INC-2026-0501",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-kubernetes"
+          }
+        },
+        "logs": {
+          "collected_at": "2026-09-04T21:16:42Z",
+          "window": {
+            "from": "2026-09-04T21:14:00Z",
+            "to": "2026-09-04T21:16:00Z"
+          },
+          "truncated": true,
+          "lines": [
+            {
+              "ts": "2026-09-04T21:15:30Z",
+              "level": "error",
+              "container": "notify-api",
+              "message": "upstream returned 502"
+            }
+          ],
+          "provenance": {
+            "collection_id": "449c5993-31e4-41a9-8867-85d12d70878d",
+            "requested_for": "INC-2026-0501",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-logs"
+          }
+        },
+        "metrics": null
+      },
+      "collection": {
+        "kubernetes": {
+          "state": "collected"
+        },
+        "logs": {
+          "state": "collected"
+        },
+        "metrics": {
+          "state": "nothing"
+        }
+      },
+      "analysis": {
+        "agents": [
+          {
+            "agent": "kubernetes",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the deployment image is registry.internal/notify-api:4.0.2",
+                "source_ref": "deployment.image"
+              },
+              {
+                "fact": "the container's memory limit is 512Mi",
+                "source_ref": "pods[0].containers[0].limits.memory"
+              },
+              {
+                "fact": "the container's cpu limit is 500m",
+                "source_ref": "pods[0].containers[0].limits.cpu"
+              },
+              {
+                "fact": "the container's memory request is 256Mi",
+                "source_ref": "pods[0].containers[0].requests.memory"
+              },
+              {
+                "fact": "the container's cpu request is 250m",
+                "source_ref": "pods[0].containers[0].requests.cpu"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "logs",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "upstream returned 502",
+                "source_ref": "lines[0].message"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "root_cause",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the deployment image is registry.internal/notify-api:4.0.2",
+                "source_ref": "deployment.image"
+              },
+              {
+                "fact": "the container's memory limit is 512Mi",
+                "source_ref": "pods[0].containers[0].limits.memory"
+              },
+              {
+                "fact": "the container's cpu limit is 500m",
+                "source_ref": "pods[0].containers[0].limits.cpu"
+              },
+              {
+                "fact": "the container's memory request is 256Mi",
+                "source_ref": "pods[0].containers[0].requests.memory"
+              },
+              {
+                "fact": "the container's cpu request is 250m",
+                "source_ref": "pods[0].containers[0].requests.cpu"
+              },
+              {
+                "fact": "upstream returned 502",
+                "source_ref": "lines[0].message"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          }
+        ],
+        "root_cause_code": "INSUFFICIENT_EVIDENCE",
+        "root_cause": "The evidence collected does not support naming a cause.",
+        "confidence": 0,
+        "evidence": []
+      },
+      "remediation": {
+        "recommended_actions": []
+      },
+      "conversation": {
+        "provider": "fake-slack",
+        "channel_id": "fake-prod-incidents",
+        "thread_id": "thread-INC-2026-0501",
+        "incident_id": "INC-2026-0501",
+        "messages": [
+          {
+            "role": "system",
+            "text": "INC-2026-0501: notify-api in production — investigating.",
+            "ts": "2026-09-04T21:15:00Z",
+            "incident_id": "INC-2026-0501"
+          },
+          {
+            "role": "system",
+            "text": "Read and found nothing: metrics.",
+            "ts": "2026-09-04T21:15:00Z",
+            "incident_id": "INC-2026-0501"
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0501",
+            "ts": "2026-09-04T21:15:00Z",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the deployment image is registry.internal/notify-api:4.0.2"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container's memory limit is 512Mi"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container's cpu limit is 500m"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container's memory request is 256Mi"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container's cpu request is 250m"
+              }
+            ],
+            "text": "kubernetes: the deployment image is registry.internal/notify-api:4.0.2; the container's memory limit is 512Mi; the container's cpu limit is 500m; the container's memory request is 256Mi; the container's cpu request is 250m."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0501",
+            "ts": "2026-09-04T21:15:00Z",
+            "cited_evidence": [
+              {
+                "source": "logs",
+                "fact": "upstream returned 502"
+              }
+            ],
+            "text": "logs: upstream returned 502."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0501",
+            "ts": "2026-09-04T21:15:00Z",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the deployment image is registry.internal/notify-api:4.0.2"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container's memory limit is 512Mi"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container's cpu limit is 500m"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container's memory request is 256Mi"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container's cpu request is 250m"
+              },
+              {
+                "source": "logs",
+                "fact": "upstream returned 502"
+              }
+            ],
+            "text": "root_cause: the deployment image is registry.internal/notify-api:4.0.2; the container's memory limit is 512Mi; the container's cpu limit is 500m; the container's memory request is 256Mi; the container's cpu request is 250m; upstream returned 502."
+          },
+          {
+            "role": "system",
+            "incident_id": "INC-2026-0501",
+            "ts": "2026-09-04T21:15:00Z",
+            "text": "No cause was established from the recorded analysis."
+          }
+        ]
+      }
+    },
+    "thread": [
+      "INC-2026-0501: notify-api in production — investigating.",
+      "Read and found nothing: metrics.",
+      "kubernetes: the deployment image is registry.internal/notify-api:4.0.2; the container's memory limit is 512Mi; the container's cpu limit is 500m; the container's memory request is 256Mi; the container's cpu request is 250m.",
+      "logs: upstream returned 502.",
+      "root_cause: the deployment image is registry.internal/notify-api:4.0.2; the container's memory limit is 512Mi; the container's cpu limit is 500m; the container's memory request is 256Mi; the container's cpu request is 250m; upstream returned 502.",
+      "No cause was established from the recorded analysis."
+    ]
+  }
+}

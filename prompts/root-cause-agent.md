@@ -14,7 +14,9 @@ exactly one incident and no other. You do NOT receive the full raw observations.
 or a unit. **These are code-read observations. They are not agent findings and
 they are not diagnoses.**
 
-An entry being present establishes neither relevance nor causation.
+Use them like any other observation you were given: cite one when it is part of
+what your conclusion rests on, and leave it alone when it is not. Their presence
+is not an argument by itself.
 
 ## What you return
 
