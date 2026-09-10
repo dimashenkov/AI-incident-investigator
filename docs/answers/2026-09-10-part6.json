@@ -1,0 +1,500 @@
+{
+  "container-oom": {
+    "index": 0,
+    "state": "concluded",
+    "scenario": "container-oom",
+    "normalised": 0,
+    "raw_answers": {
+      "kubernetes": "{\n  \"agent\": \"kubernetes\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"the pod is in the Running phase but the container is not ready and has a restart count of 7\",\n      \"source_ref\": \"pods[0].containers[0].restart_count\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"the last state of the container indicates it was terminated due to OOMKilled\",\n      \"source_ref\": \"pods[0].containers[0].last_state.terminated.reason\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"the event says: Back-off restarting failed container payment-api\",\n      \"source_ref\": \"events[0].message\",\n      \"severity\": \"warning\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "logs": "{\n  \"agent\": \"logs\",\n  \"status\": \"ok\",\n  \"findings\": [\n    { \"fact\": \"settlement batch size 18400 exceeds configured page size 500\", \"source_ref\": \"lines[0].message\" },\n    { \"fact\": \"heap usage 468Mi of 512Mi limit\", \"source_ref\": \"lines[1].message\" },\n    { \"fact\": \"allocation failure while building settlement report\", \"source_ref\": \"lines[2].message\" },\n    { \"fact\": \"process terminated\", \"source_ref\": \"lines[3].message\" }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "metrics": "{\n  \"agent\": \"metrics\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"memory working set reached 530579456 bytes by 10:28\",\n      \"source_ref\": \"series[0].points[3].value\"\n    },\n    {\n      \"fact\": \"CPU usage reached 49.6 seconds by 10:28\",\n      \"source_ref\": \"series[1].points[3].value\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "root-cause": "{\n  \"agent\": \"root_cause\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"the last state of the container indicates it was terminated due to OOMKilled\",\n      \"source_ref\": \"pods[0].containers[0].last_state.terminated.reason\"\n    },\n    {\n      \"fact\": \"the pod is in the Running phase but the container is not ready and has a restart count of 7\",\n      \"source_ref\": \"pods[0].containers[0].restart_count\"\n    },\n    {\n      \"fact\": \"heap usage 468Mi of 512Mi limit\",\n      \"source_ref\": \"lines[1].message\"\n    },\n    {\n      \"fact\": \"memory working set reached 530579456 bytes by 10:28\",\n      \"source_ref\": \"series[0].points[3].value\"\n    }\n  ],\n  \"hypotheses\": [\n    {\n      \"code\": \"CONTAINER_OOM\",\n      \"statement\": \"The container was terminated due to an out-of-memory (OOM) condition, as indicated by the termination reason 'OOMKilled' and the memory usage exceeding the limit.\",\n      \"supported_by\": [\n        \"pods[0].containers[0].last_state.terminated.reason\",\n        \"pods[0].containers[0].restart_count\",\n        \"lines[1].message\",\n        \"series[0].points[3].value\"\n      ]\n    }\n  ],\n  \"confidence\": 0.8\n}"
+    },
+    "root_cause_code": "CONTAINER_OOM",
+    "root_cause": "The container was terminated due to an out-of-memory (OOM) condition, as indicated by the termination reason 'OOMKilled' and the memory usage exceeding the limit.",
+    "confidence": 0.8,
+    "evidence": [
+      {
+        "source": "kubernetes",
+        "fact": "the last state of the container indicates it was terminated due to OOMKilled",
+        "supports": "for"
+      },
+      {
+        "source": "kubernetes",
+        "fact": "the pod is in the Running phase but the container is not ready and has a restart count of 7",
+        "supports": "for"
+      },
+      {
+        "source": "logs",
+        "fact": "heap usage 468Mi of 512Mi limit",
+        "supports": "for"
+      },
+      {
+        "source": "metrics",
+        "fact": "memory working set reached 530579456 bytes by 10:28",
+        "supports": "for"
+      }
+    ],
+    "incident": {
+      "incident_id": "INC-2026-0101",
+      "status": "diagnosed",
+      "service": "payment-api",
+      "namespace": "production",
+      "cluster": "prod-eu",
+      "started_at": "2026-09-04T10:29:00Z",
+      "scenario": "container-oom",
+      "source": {
+        "provider": "fake-datadog",
+        "alert": {
+          "id": "alert-9f2c",
+          "title": "payment-api pod restarting repeatedly in production",
+          "triggered_at": "2026-09-04T10:29:00Z",
+          "severity": "critical",
+          "monitor_id": "mon-4471",
+          "tags": [
+            "service:payment-api",
+            "env:production",
+            "cluster:prod-eu"
+          ]
+        }
+      },
+      "observations": {
+        "kubernetes": {
+          "collected_at": "2026-09-04T10:30:12Z",
+          "pods": [
+            {
+              "name": "payment-api-7d4b8c9f5-x2mnq",
+              "namespace": "production",
+              "phase": "Running",
+              "restart_count": 7,
+              "containers": [
+                {
+                  "name": "payment-api",
+                  "ready": false,
+                  "restart_count": 7,
+                  "limits": {
+                    "memory": "512Mi",
+                    "cpu": "500m"
+                  },
+                  "requests": {
+                    "memory": "256Mi",
+                    "cpu": "200m"
+                  },
+                  "last_state": {
+                    "terminated": {
+                      "reason": "OOMKilled",
+                      "exit_code": 137,
+                      "started_at": "2026-09-04T10:24:03Z",
+                      "finished_at": "2026-09-04T10:28:41Z"
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "events": [
+            {
+              "type": "Warning",
+              "reason": "BackOff",
+              "message": "Back-off restarting failed container payment-api",
+              "count": 6,
+              "last_seen": "2026-09-04T10:29:50Z",
+              "involved_object": "pod/payment-api-7d4b8c9f5-x2mnq"
+            }
+          ],
+          "deployment": {
+            "name": "payment-api",
+            "namespace": "production",
+            "replicas": {
+              "desired": 3,
+              "ready": 2,
+              "available": 2
+            },
+            "image": "registry.internal/payment-api:2.14.0"
+          },
+          "provenance": {
+            "collection_id": "e8cc44d4-844b-4bd5-8fa7-03a823952ab2",
+            "requested_for": "INC-2026-0101",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-kubernetes"
+          }
+        },
+        "logs": {
+          "collected_at": "2026-09-04T10:30:14Z",
+          "window": {
+            "from": "2026-09-04T10:20:00Z",
+            "to": "2026-09-04T10:30:00Z"
+          },
+          "truncated": false,
+          "lines": [
+            {
+              "ts": "2026-09-04T10:27:55Z",
+              "level": "warn",
+              "container": "payment-api",
+              "message": "settlement batch size 18400 exceeds configured page size 500"
+            },
+            {
+              "ts": "2026-09-04T10:28:12Z",
+              "level": "warn",
+              "container": "payment-api",
+              "message": "heap usage 468Mi of 512Mi limit"
+            },
+            {
+              "ts": "2026-09-04T10:28:39Z",
+              "level": "error",
+              "container": "payment-api",
+              "message": "allocation failure while building settlement report"
+            },
+            {
+              "ts": "2026-09-04T10:28:41Z",
+              "level": "error",
+              "container": "payment-api",
+              "message": "process terminated"
+            }
+          ],
+          "provenance": {
+            "collection_id": "e8cc44d4-844b-4bd5-8fa7-03a823952ab2",
+            "requested_for": "INC-2026-0101",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-logs"
+          }
+        },
+        "metrics": {
+          "collected_at": "2026-09-04T10:30:16Z",
+          "window": {
+            "from": "2026-09-04T10:20:00Z",
+            "to": "2026-09-04T10:30:00Z"
+          },
+          "series": [
+            {
+              "name": "container_memory_working_set_bytes",
+              "unit": "bytes",
+              "container": "payment-api",
+              "points": [
+                {
+                  "ts": "2026-09-04T10:22:00Z",
+                  "value": 201326592
+                },
+                {
+                  "ts": "2026-09-04T10:24:00Z",
+                  "value": 310378496
+                },
+                {
+                  "ts": "2026-09-04T10:26:00Z",
+                  "value": 421527552
+                },
+                {
+                  "ts": "2026-09-04T10:28:00Z",
+                  "value": 530579456
+                }
+              ]
+            },
+            {
+              "name": "container_cpu_usage_seconds_total",
+              "unit": "seconds",
+              "container": "payment-api",
+              "points": [
+                {
+                  "ts": "2026-09-04T10:22:00Z",
+                  "value": 41.2
+                },
+                {
+                  "ts": "2026-09-04T10:24:00Z",
+                  "value": 44.8
+                },
+                {
+                  "ts": "2026-09-04T10:26:00Z",
+                  "value": 47.1
+                },
+                {
+                  "ts": "2026-09-04T10:28:00Z",
+                  "value": 49.6
+                }
+              ]
+            }
+          ],
+          "provenance": {
+            "collection_id": "e8cc44d4-844b-4bd5-8fa7-03a823952ab2",
+            "requested_for": "INC-2026-0101",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-metrics"
+          }
+        }
+      },
+      "collection": {
+        "kubernetes": {
+          "state": "collected"
+        },
+        "logs": {
+          "state": "collected"
+        },
+        "metrics": {
+          "state": "collected"
+        }
+      },
+      "analysis": {
+        "agents": [
+          {
+            "agent": "kubernetes",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the pod is in the Running phase but the container is not ready and has a restart count of 7",
+                "source_ref": "pods[0].containers[0].restart_count",
+                "severity": "warning"
+              },
+              {
+                "fact": "the last state of the container indicates it was terminated due to OOMKilled",
+                "source_ref": "pods[0].containers[0].last_state.terminated.reason",
+                "severity": "warning"
+              },
+              {
+                "fact": "the event says: Back-off restarting failed container payment-api",
+                "source_ref": "events[0].message",
+                "severity": "warning"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "logs",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "settlement batch size 18400 exceeds configured page size 500",
+                "source_ref": "lines[0].message"
+              },
+              {
+                "fact": "heap usage 468Mi of 512Mi limit",
+                "source_ref": "lines[1].message"
+              },
+              {
+                "fact": "allocation failure while building settlement report",
+                "source_ref": "lines[2].message"
+              },
+              {
+                "fact": "process terminated",
+                "source_ref": "lines[3].message"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "metrics",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "memory working set reached 530579456 bytes by 10:28",
+                "source_ref": "series[0].points[3].value"
+              },
+              {
+                "fact": "CPU usage reached 49.6 seconds by 10:28",
+                "source_ref": "series[1].points[3].value"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "root_cause",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the last state of the container indicates it was terminated due to OOMKilled",
+                "source_ref": "pods[0].containers[0].last_state.terminated.reason"
+              },
+              {
+                "fact": "the pod is in the Running phase but the container is not ready and has a restart count of 7",
+                "source_ref": "pods[0].containers[0].restart_count"
+              },
+              {
+                "fact": "heap usage 468Mi of 512Mi limit",
+                "source_ref": "lines[1].message"
+              },
+              {
+                "fact": "memory working set reached 530579456 bytes by 10:28",
+                "source_ref": "series[0].points[3].value"
+              }
+            ],
+            "hypotheses": [
+              {
+                "code": "CONTAINER_OOM",
+                "statement": "The container was terminated due to an out-of-memory (OOM) condition, as indicated by the termination reason 'OOMKilled' and the memory usage exceeding the limit.",
+                "supported_by": [
+                  "pods[0].containers[0].last_state.terminated.reason",
+                  "pods[0].containers[0].restart_count",
+                  "lines[1].message",
+                  "series[0].points[3].value"
+                ]
+              }
+            ],
+            "confidence": 0.8
+          }
+        ],
+        "root_cause_code": "CONTAINER_OOM",
+        "root_cause": "The container was terminated due to an out-of-memory (OOM) condition, as indicated by the termination reason 'OOMKilled' and the memory usage exceeding the limit.",
+        "confidence": 0.8,
+        "evidence": [
+          {
+            "source": "kubernetes",
+            "fact": "the last state of the container indicates it was terminated due to OOMKilled",
+            "supports": "for"
+          },
+          {
+            "source": "kubernetes",
+            "fact": "the pod is in the Running phase but the container is not ready and has a restart count of 7",
+            "supports": "for"
+          },
+          {
+            "source": "logs",
+            "fact": "heap usage 468Mi of 512Mi limit",
+            "supports": "for"
+          },
+          {
+            "source": "metrics",
+            "fact": "memory working set reached 530579456 bytes by 10:28",
+            "supports": "for"
+          }
+        ]
+      },
+      "remediation": {
+        "recommended_actions": []
+      },
+      "conversation": {
+        "provider": "fake-slack",
+        "channel_id": "fake-prod-incidents",
+        "thread_id": "thread-INC-2026-0101",
+        "incident_id": "INC-2026-0101",
+        "messages": [
+          {
+            "role": "system",
+            "text": "INC-2026-0101: payment-api in production — investigating.",
+            "ts": "2026-09-04T10:29:00Z",
+            "incident_id": "INC-2026-0101"
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0101",
+            "ts": "2026-09-04T10:29:00Z",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the pod is in the Running phase but the container is not ready and has a restart count of 7"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the last state of the container indicates it was terminated due to OOMKilled"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the event says: Back-off restarting failed container payment-api"
+              }
+            ],
+            "text": "kubernetes: the pod is in the Running phase but the container is not ready and has a restart count of 7; the last state of the container indicates it was terminated due to OOMKilled; the event says: Back-off restarting failed container payment-api."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0101",
+            "ts": "2026-09-04T10:29:00Z",
+            "cited_evidence": [
+              {
+                "source": "logs",
+                "fact": "settlement batch size 18400 exceeds configured page size 500"
+              },
+              {
+                "source": "logs",
+                "fact": "heap usage 468Mi of 512Mi limit"
+              },
+              {
+                "source": "logs",
+                "fact": "allocation failure while building settlement report"
+              },
+              {
+                "source": "logs",
+                "fact": "process terminated"
+              }
+            ],
+            "text": "logs: settlement batch size 18400 exceeds configured page size 500; heap usage 468Mi of 512Mi limit; allocation failure while building settlement report; process terminated."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0101",
+            "ts": "2026-09-04T10:29:00Z",
+            "cited_evidence": [
+              {
+                "source": "metrics",
+                "fact": "memory working set reached 530579456 bytes by 10:28"
+              },
+              {
+                "source": "metrics",
+                "fact": "CPU usage reached 49.6 seconds by 10:28"
+              }
+            ],
+            "text": "metrics: memory working set reached 530579456 bytes by 10:28; CPU usage reached 49.6 seconds by 10:28."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0101",
+            "ts": "2026-09-04T10:29:00Z",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the last state of the container indicates it was terminated due to OOMKilled"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the pod is in the Running phase but the container is not ready and has a restart count of 7"
+              },
+              {
+                "source": "logs",
+                "fact": "heap usage 468Mi of 512Mi limit"
+              },
+              {
+                "source": "metrics",
+                "fact": "memory working set reached 530579456 bytes by 10:28"
+              }
+            ],
+            "text": "root_cause: the last state of the container indicates it was terminated due to OOMKilled; the pod is in the Running phase but the container is not ready and has a restart count of 7; heap usage 468Mi of 512Mi limit; memory working set reached 530579456 bytes by 10:28."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0101",
+            "ts": "2026-09-04T10:29:00Z",
+            "text": "Root cause: CONTAINER_OOM. The container was terminated due to an out-of-memory (OOM) condition, as indicated by the termination reason 'OOMKilled' and the memory usage exceeding the limit. The agent puts its confidence at 80%, which is its own estimate and nothing here checks it.",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the last state of the container indicates it was terminated due to OOMKilled"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the pod is in the Running phase but the container is not ready and has a restart count of 7"
+              },
+              {
+                "source": "logs",
+                "fact": "heap usage 468Mi of 512Mi limit"
+              },
+              {
+                "source": "metrics",
+                "fact": "memory working set reached 530579456 bytes by 10:28"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "thread": [
+      "INC-2026-0101: payment-api in production — investigating.",
+      "kubernetes: the pod is in the Running phase but the container is not ready and has a restart count of 7; the last state of the container indicates it was terminated due to OOMKilled; the event says: Back-off restarting failed container payment-api.",
+      "logs: settlement batch size 18400 exceeds configured page size 500; heap usage 468Mi of 512Mi limit; allocation failure while building settlement report; process terminated.",
+      "metrics: memory working set reached 530579456 bytes by 10:28; CPU usage reached 49.6 seconds by 10:28.",
+      "root_cause: the last state of the container indicates it was terminated due to OOMKilled; the pod is in the Running phase but the container is not ready and has a restart count of 7; heap usage 468Mi of 512Mi limit; memory working set reached 530579456 bytes by 10:28.",
+      "Root cause: CONTAINER_OOM. The container was terminated due to an out-of-memory (OOM) condition, as indicated by the termination reason 'OOMKilled' and the memory usage exceeding the limit. The agent puts its confidence at 80%, which is its own estimate and nothing here checks it."
+    ]
+  }
+}
