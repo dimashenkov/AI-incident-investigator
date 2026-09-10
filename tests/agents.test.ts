@@ -164,7 +164,17 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
     { id: "cause-code-from-the-list", prose: /A hypothesis `code` must be one of these, exactly/ },
     { id: "record-contradicting-evidence", prose: /Contradicting evidence is recorded, not dropped/ },
     { id: "lower-confidence-on-conflict", prose: /Lower the confidence when evidence conflicts/ },
-    { id: "cite-only-what-agents-reported", prose: /Only cite what the agents reported/ },
+    { id: "cite-only-what-you-were-given", prose: /Only cite what you were given/ },
+    /*
+     * Renamed on 2026-09-10, with the rule it names.
+     *
+     * The prompt forbade citing anything outside `agent_results`, and the
+     * code had begun handing the agent configuration it had read itself, in
+     * a key the prompt never mentioned. The model was obedient; the
+     * mechanism was half built. Declaring the input is the repair, and it
+     * is a narrow recorded exception to the prompt freeze, not an eighth
+     * rewrite for a citation.
+     */
     { id: "error-is-not-no-data", prose: /is not an agent that found nothing/ },
   ],
 };
@@ -719,8 +729,8 @@ describe("every prompt carries the rules its schema will enforce", () => {
     // because a mutation points at it, and a name built inside a loop cannot be
     // found in the source by that check.
     const p = readPrompt("root-cause")!;
-    const rule = REQUIRED_RULES["root-cause"]!.find((r) => r.id === "cite-only-what-agents-reported")!;
-    expect(p, "the rule id is not declared").toContain("`cite-only-what-agents-reported`");
+    const rule = REQUIRED_RULES["root-cause"]!.find((r) => r.id === "cite-only-what-you-were-given")!;
+    expect(p, "the rule id is not declared").toContain("`cite-only-what-you-were-given`");
     expect(rule.prose.test(p), "the rule id is declared but its prose is gone").toBe(true);
   });
 });
@@ -886,7 +896,14 @@ describe("the example in a prompt is the shape a model copies", () => {
 
   it("does not let the root cause agent invent a fact or compose a citation", () => {
     const rc = readPrompt("root-cause")!;
-    expect(rc, "the rule must still be there").toMatch(/\*\*Only cite what the agents reported\.\*\*/);
+    /*
+     * Reworded on 2026-09-10 with the rule: the agent is now also given
+     * observations the CODE read, so "only what the agents reported" was
+     * forbidding an input it was already being handed.
+     */
+    expect(rc, "the rule must still be there").toMatch(/\*\*Only cite what you were given\*\*/);
+    expect(rc, "and it must name both sources, or it forbids one of them again")
+      .toMatch(/an agent finding or a configuration entry/);
     /*
      * Two shapes, because the invitation can be phrased as inference or as
      * authorship. The first draft of this guard bounded its distance with
@@ -898,7 +915,9 @@ describe("the example in a prompt is the shape a model copies", () => {
     expect(rc, "and nothing may invite it to write one itself")
       .not.toMatch(/(state|write|supply)\s+(that|the|a)\s+(fact|cause|conclusion)\s+yourself/i);
     expect(rc, "the verbatim-copy rule must still be there")
-      .toMatch(/\*\*Copy a `source_ref` verbatim from an entry in `agent_results`\.\*\*/);
+      .toMatch(/\*\*Copy a `source_ref` verbatim\*\*/);
+    expect(rc, "and it must name both places a ref can be copied FROM")
+      .toMatch(/agent finding's `source_ref` or from a\nconfiguration entry's `ref`/);
     /*
      * The path a model would compose if invited to. Measured live on
      * 2026-09-06: a wrapper-prefixed source_ref refused two whole scenarios,

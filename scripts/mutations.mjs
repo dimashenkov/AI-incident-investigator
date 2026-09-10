@@ -812,15 +812,15 @@ export const MUTATIONS = [
   {
     id: "root-cause-invited-to-state-an-unreported-fact",
     file: "prompts/root-cause-agent.md",
-    from: "**Only cite what the agents reported.** You cannot introduce a fact they did not\nfind;",
-    to: "**Only cite what the agents reported.** Where their findings imply a fact none of\nthem spelled out, state that fact yourself;",
+    from: "**Only cite what you were given** — an agent finding or a configuration entry.\nYou cannot introduce a fact from neither;",
+    to: "**Only cite what you were given** — an agent finding or a configuration entry.\nWhere they imply a fact none of them spelled out, state that fact yourself;",
     mustFail: "does not let the root cause agent invent a fact or compose a citation",
   },
   {
     id: "root-cause-invited-to-compose-a-prefixed-path",
     file: "prompts/root-cause-agent.md",
-    from: "**Copy a `source_ref` verbatim from an entry in `agent_results`.** Never prefix\nit with `agent_results[...]` — you were not given the observations, so a path\nyou compose yourself is a citation you cannot have checked.",
-    to: "**Copy a `source_ref` verbatim from an entry in `agent_results`.** Then prefix it\nas `agent_results[0].findings` so a reader sees which agent said it; the path you\nwrite is your own composition.",
+    from: "**Copy a `source_ref` verbatim** from an agent finding's `source_ref` or from a\nconfiguration entry's `ref`. Never prefix it and never compose one yourself:",
+    to: "**Copy a `source_ref` verbatim** from an agent finding's `source_ref` or from a\nconfiguration entry's `ref`. Then prefix it as `agent_results[0].findings` so a\nreader sees which agent said it; the path you write is your own composition:",
     mustFail: "does not let the root cause agent invent a fact or compose a citation",
   },
   {
@@ -2392,8 +2392,8 @@ export const MUTATIONS = [
   {
     id: "prompt-rule-disappears",
     file: "prompts/root-cause-agent.md",
-    from: "**Only cite what the agents reported.**",
-    to: "**Cite whatever seems right.**",
+    from: "**Only cite what you were given**",
+    to: "**Cite whatever seems right**",
     mustFail: "requires the root cause agent to cite only what agents reported",
   },
   {

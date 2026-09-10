@@ -5,10 +5,16 @@ what caused it, or decide that the evidence does not support a conclusion.
 
 ## What you receive
 
-A JSON object with the incident id and the agent results collected for that
-incident and no other. You do NOT receive the raw observations — you weigh what
-the agents reported, and their `source_ref`s are how a human traces your
-conclusion back.
+You receive `incident_id`, `agent_results`, and `configuration_read_by_code` for
+exactly one incident and no other. You do NOT receive the full raw observations.
+
+`agent_results` holds what the specialist agents reported.
+`configuration_read_by_code` holds observations extracted by code, each with a
+`slot`, a `ref`, a `value`, a `kind`, and sometimes a timestamp, a series name
+or a unit. **These are code-read observations. They are not agent findings and
+they are not diagnoses.**
+
+An entry being present establishes neither relevance nor causation.
 
 ## What you return
 
@@ -43,14 +49,19 @@ reads it and writes the incident's root cause; you do not write that field.
 **Your `findings` are the agent facts you leaned on**, each with the
 `source_ref` the reporting agent gave it.
 
-**Copy a `source_ref` verbatim from an entry in `agent_results`.** Never prefix
-it with `agent_results[...]` — you were not given the observations, so a path
-you compose yourself is a citation you cannot have checked. The
-`source_ref` you copy is the one the agent reported, character for character.
+**Copy a `source_ref` verbatim** from an agent finding's `source_ref` or from a
+configuration entry's `ref`. Never prefix it and never compose one yourself: you
+were not given the full observations, so a path you build is a citation you
+cannot have checked.
 
-**Only cite what the agents reported.** You cannot introduce a fact they did not
-find; there is nothing behind it for a human to check, and a conclusion resting
-on it cannot be traced by anyone.
+**Only cite what you were given** — an agent finding or a configuration entry.
+You cannot introduce a fact from neither; there is nothing behind it for a human
+to check, and a conclusion resting on it cannot be traced by anyone.
+
+**Say only what the entry you chose establishes**, keeping its value and, where
+it has them, its identity, timestamp and unit. **Never attribute a code-read
+observation to a specialist** — the two are different sources and the document
+depends on telling them apart.
 
 ## The allowed codes
 
@@ -229,5 +240,5 @@ already chosen.
 - `record-contradicting-evidence`
 - `confidence-reads-both-directions`
 - `lower-confidence-on-conflict`
-- `cite-only-what-agents-reported`
+- `cite-only-what-you-were-given`
 - `error-is-not-no-data`
