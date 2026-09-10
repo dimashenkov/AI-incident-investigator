@@ -871,7 +871,20 @@ export const LIMITATIONS = [
   // look for; a validator refusing an answer for missing one would turn a note
   // into a rule nobody agreed, and scripts/score-run.mjs already reports the
   // omission as its own verdict rather than hiding it inside "correct".
+  /*
+   * Widened on 2026-09-10, after a rubric meant to fix it was designed,
+   * attacked twice and rejected. A required citation names ONE canonical path,
+   * and an answer reading the same value from somewhere else is recorded as a
+   * miss. `must_support` — a proposition with an entity and a set of accepted
+   * paths — was written out in docs/must-support.md and not built: it would add
+   * identity resolution and semantic parsers while measuring citation, not
+   * reasoning. And the case that motivated it did not survive: the log line
+   * says "heap usage 468Mi of 512Mi limit" and does NOT say those 512Mi are the
+   * container's configured limit.
+   */
   "that an agent cites what a scenario was built around — the prompt asks, nothing enforces, and the scorer reports the miss rather than refusing the answer",
+  "that a required citation could be satisfied from anywhere but its one canonical path — "
+    + "an answer reading the same value elsewhere is recorded as a miss, and the misses are reviewed by hand",
   /*
    * `src/core/review.ts` builds and reads a human review log, and its own
    * header calls itself "the only signal in the project that can tell a right
