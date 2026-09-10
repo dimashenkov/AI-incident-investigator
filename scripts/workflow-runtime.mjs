@@ -392,7 +392,8 @@ return items.map(function (item, index) {
 
   if (NEXT === null) {
     return { json: { index, state: "recorded", agent: AGENT, scenario: j.scenario,
-      incident: j.incident, normalised: j.normalised || 0, raw_answers: j.raw_answers || {} } };
+      incident: j.incident, normalised: j.normalised || 0, raw_answers: j.raw_answers || {},
+      payloads_sent: j.payloads_sent || {} } };
   }
 
   /*
@@ -403,9 +404,28 @@ return items.map(function (item, index) {
   const configRead = NEXT === "root-cause" ? configurationForIncidentInNode(j.incident) : [];
   const ctx = buildCheckedContext(NEXT, j.incident, PROMPTS[NEXT], configRead, factProblems);
   if (ctx.state === "assembled") {
+    /*
+     * The concluding agent's payload is CARRIED, beside the raw answers.
+     *
+     * On 2026-09-10 the six scenarios were measured twice, and the second run
+     * said the fields the code reads had been handed over and not cited. That
+     * claim could only be checked along the chain — the payload lives in the
+     * call and dies with it — so it asserted more than the record held.
+     *
+     * Only root-cause's. A collection agent's payload is the incident id and
+     * one observation, recoverable from the incident in full, and recording it
+     * would double the artifact for nothing.
+     *
+     * What it shows, and the limit is the point: what was SENT. Not what the
+     * model read.
+     */
+    const sent = NEXT === "root-cause"
+      ? Object.assign({}, j.payloads_sent || {}, { "root-cause": ctx.payload })
+      : (j.payloads_sent || {});
     return { json: { index, state: "asking", agent: NEXT, scenario: j.scenario,
       incident: j.incident, prompt: ctx.prompt, payload: ctx.payload,
-      normalised: j.normalised || 0, raw_answers: j.raw_answers || {} } };
+      normalised: j.normalised || 0, raw_answers: j.raw_answers || {},
+      payloads_sent: sent } };
   }
 
   /*
@@ -456,6 +476,7 @@ return items.map(function (item, index) {
   if (record.state === "nothing" && ctx.why === "empty-slot") {
     return { json: { index, state: "skipped", agent: NEXT, scenario: j.scenario,
       incident: j.incident, normalised: j.normalised || 0, raw_answers: j.raw_answers || {},
+      payloads_sent: j.payloads_sent || {},
       skipped_because: NEXT + " had nothing to read: the provider reported an established absence" } };
   }
   return { json: Object.assign({}, j, { index, state: "refused", agent: NEXT,
@@ -575,6 +596,12 @@ return items.map(function (item, index) {
      * dependent spending has nothing to recompute from.
      */
     raw_answers: j.raw_answers || {},
+    /*
+     * Carried to the caller for the same reason the raw answers are: a run that
+     * has been paid for must be re-judgeable from what came back, and "what was
+     * sent" is half of that.
+     */
+    payloads_sent: j.payloads_sent || {},
     root_cause_code: analysis.root_cause_code,
     root_cause: analysis.root_cause,
     confidence: analysis.confidence,

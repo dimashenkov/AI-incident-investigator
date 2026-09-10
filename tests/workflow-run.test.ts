@@ -710,3 +710,34 @@ describe("every scenario travels the generated workflow at least once", () => {
     });
   }
 });
+
+describe("what was sent is recorded beside what came back", () => {
+  /*
+   * On 2026-09-10 a commit asserted that the fields the code reads had been
+   * handed to the concluding agent and not cited. The payload lives in the call
+   * and dies with it, so that claim could only be checked along the chain — a
+   * claim larger than the record that held it.
+   *
+   * The concluding agent's payload is carried out with the answer now. Only
+   * that one: a collection agent's payload is the incident id and one
+   * observation, recoverable from the incident in full.
+   *
+   * What it shows is what was SENT. Not what the model read.
+   */
+  it("carries the root cause payload out of the chain", async () => {
+    const out = await runScenario("container-oom", STUB_AGENTS);
+    const sent = (out as Record<string, unknown>)["payloads_sent"] as Record<string, unknown>;
+    expect(sent, "the record must say what was sent").toBeDefined();
+    const rc = sent["root-cause"] as { configuration_read_by_code?: Array<{ ref: string }> };
+    expect(rc, "and the concluding agent's payload is the one that matters").toBeDefined();
+    const refs = (rc.configuration_read_by_code ?? []).map((f) => f.ref);
+    expect(refs, "so the claim about limits.memory can be read, not inferred")
+      .toContain("pods[0].containers[0].limits.memory");
+  });
+
+  it("does not carry a collection agent's payload, which the incident already holds", async () => {
+    const out = await runScenario("container-oom", STUB_AGENTS);
+    const sent = (out as Record<string, unknown>)["payloads_sent"] as Record<string, unknown>;
+    expect(Object.keys(sent), "one payload, not four").toEqual(["root-cause"]);
+  });
+});
