@@ -591,6 +591,19 @@ function checkMutations() {
 
   const survived = [];
   const unresolvedIds = [];
+  /*
+   * The report from this gate's own full suite run, used only to decide WHICH
+   * FILE to run per mutation. If it cannot be read, `fullReport` stays null and
+   * `filesDeclaring` returns nothing, so every mutation runs the whole suite —
+   * slower, and never weaker.
+   */
+  let fullReport = null;
+  try {
+    const full = resolve(ROOT, "out/vitest-report.json");
+    if (existsSync(full)) fullReport = JSON.parse(readFileSync(full, "utf8"));
+  } catch {
+    fullReport = null;
+  }
 
   for (const m of MUTATIONS) {
     const target = resolve(ROOT, m.file);
@@ -637,8 +650,17 @@ function checkMutations() {
     try {
       writeFileSync(target, original.replace(m.from, m.to));
       const mutReport = resolve(ROOT, "out/mutation-report.json");
-      const { run: r, json } = readFreshReport(mutReport, () =>
-        run("npx", ["vitest", "run", "--reporter=json", `--outputFile=${mutReport}`]));
+      /*
+       * Only the file that declares the named test.
+       *
+       * `narrowTo` comes from the full report this gate produced at the start,
+       * so it is this tree's own answer, not a guess. When it is empty — a
+       * generated title, a report that did not list it — the whole suite runs,
+       * because "I could not narrow it" must not become "I checked less".
+       */
+      const narrowTo = filesDeclaring(fullReport, m.mustFail);
+      const args = ["vitest", "run", "--reporter=json", `--outputFile=${mutReport}`, ...narrowTo];
+      const { run: r, json } = readFreshReport(mutReport, () => run("npx", args));
       if (!r.ran) {
         outcome = { kind: "unresolved", detail: `${m.id} (vitest did not run)` };
       } else {
@@ -673,6 +695,27 @@ function checkMutations() {
 }
 
 /** Did the test with this name fail in the report? A test that vanished is not a pass. */
+/**
+ * Which test FILE holds a given test title, read from a vitest JSON report.
+ *
+ * The mutation check asks one question — did the named test fail — and answered
+ * it by running all 735 tests, 265 times. The file that holds the title is
+ * enough, and the report the gate already produced knows which file that is.
+ *
+ * Returns an array, not a string: two files may declare the same title, and
+ * running both is the answer that does not have to choose. An empty array means
+ * the title was not in the report, and the caller then runs everything rather
+ * than assume.
+ */
+export function filesDeclaring(report, name) {
+  const out = [];
+  for (const file of report?.testResults ?? []) {
+    const holds = (file.assertionResults ?? []).some((t) => t?.fullName === name || t?.title === name);
+    if (holds && typeof file.name === "string" && !out.includes(file.name)) out.push(file.name);
+  }
+  return out;
+}
+
 export function namedTestFailed(report, name) {
   /*
    * Three states, in the checker that exists to enforce them.

@@ -39,7 +39,7 @@ function collectTests(dir: string): string[] {
 }
 // Plain .mjs — the same file node runs in production, so there are no types.
 // @ts-expect-error
-import { artifactDisagreesWithManifest, dueFrom, runGate, format, restoreInterruptedMutation, CHECKS, CHILD_MARKER, LIMITATIONS, DEBT, SECRET_SHAPED, readFreshReport, interpretVitestReport, interpretScripts, findSecretShaped, parsePorcelainZ, readCurrentChunk, namedTestFailed, coverageGaps, someRunWasScored, withRepair, reportIsFromThisRun, splitDebt} from "../scripts/acceptance-gate.mjs";
+import { filesDeclaring, artifactDisagreesWithManifest, dueFrom, runGate, format, restoreInterruptedMutation, CHECKS, CHILD_MARKER, LIMITATIONS, DEBT, SECRET_SHAPED, readFreshReport, interpretVitestReport, interpretScripts, findSecretShaped, parsePorcelainZ, readCurrentChunk, namedTestFailed, coverageGaps, someRunWasScored, withRepair, reportIsFromThisRun, splitDebt} from "../scripts/acceptance-gate.mjs";
 // @ts-expect-error
 import { MUTATIONS } from "../scripts/mutations.mjs";
 
@@ -1174,5 +1174,37 @@ describe("what the artifact says against what the manifest claims about it", () 
   it("treats a missing count as none found, not as agreement", () => {
     expect(artifactDisagreesWithManifest(undefined as any, undefined as any),
       "an absent manifest number is not zero").not.toBe(null);
+  });
+});
+
+describe("which file to run for one mutation", () => {
+  /*
+   * The mutation check asks one question — did the NAMED test fail — and used
+   * to answer it by running all 735 tests, 265 times: about twenty minutes.
+   * The file that declares the title is enough. What must not happen is
+   * "I could not narrow it" quietly becoming "I checked less".
+   */
+  const report = { testResults: [
+    { name: "/r/tests/a.test.ts", assertionResults: [{ fullName: "a shared title" }] },
+    { name: "/r/tests/b.test.ts", assertionResults: [{ fullName: "a shared title" }, { fullName: "only here" }] },
+  ] };
+
+  it("names the one file that declares the title", () => {
+    expect(filesDeclaring(report, "only here")).toEqual(["/r/tests/b.test.ts"]);
+  });
+
+  it("names both when two files declare the same title, rather than choosing", () => {
+    expect(filesDeclaring(report, "a shared title").length,
+      "choosing one of two would decide by report order, which decides nothing").toBe(2);
+  });
+
+  it("returns nothing for a title the report does not carry, so the caller runs everything", () => {
+    expect(filesDeclaring(report, "never written"),
+      "an empty list means could-not-narrow, and the caller must widen, not narrow").toEqual([]);
+  });
+
+  it("returns nothing for a report it could not read", () => {
+    expect(filesDeclaring(null as never, "x")).toEqual([]);
+    expect(filesDeclaring({} as never, "x")).toEqual([]);
   });
 });

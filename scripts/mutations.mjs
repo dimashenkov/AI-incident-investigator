@@ -15,6 +15,16 @@
  */
 export const MUTATIONS = [
   {
+    // Could-not-narrow becomes checked-less: a title the report does not carry
+    // returns a file list anyway, and the mutation run then exercises the wrong
+    // file instead of the whole suite.
+    id: "a-title-the-report-lacks-narrowing-the-run-anyway",
+    file: "scripts/acceptance-gate.mjs",
+    from: "    if (holds && typeof file.name === \"string\" && !out.includes(file.name)) out.push(file.name);",
+    to: "    if (typeof file.name === \"string\" && !out.includes(file.name)) out.push(file.name);",
+    mustFail: "returns nothing for a title the report does not carry, so the caller runs everything",
+  },
+  {
     // The provenance check stops refusing. Until 2026-09-10 no test noticed:
     // the ones named after it injected rogueProvider, which fails every slot in
     // `stampOrRefuse`, so assembly refused at "every observation failed" and the
