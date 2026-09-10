@@ -529,10 +529,17 @@ export function resolvesForAgent(answer, cited) {
  */
 export function scoreAll(answers, root = SCENARIOS) {
   const keys = Object.keys(answers ?? {});
+  /*
+   * `gathering` travels with the verdict, and is not part of it.
+   *
+   * The printer for the fourth axis was added before this line existed, so it
+   * had nothing to print: half a fix that looked whole. Attached here, at the
+   * one place every scored attempt passes through.
+   */
   const extra = keys
     .filter((k) => attemptOf(k) !== null)
     .sort()
-    .map((k) => score(k, answers[k], root));
+    .map((k) => ({ ...score(k, answers[k], root), gathering: gathering(answers[k]) }));
   /*
    * A scenario answered ONLY under numbered attempts was still answered.
    *
@@ -604,6 +611,30 @@ export function compareConfidences(results, answers, root = SCENARIOS) {
   });
 }
 
+/**
+ * The slots that did NOT come back collected, from a recorded answer.
+ *
+ * The fourth axis of docs/measurement-contract.md. A right code reached from
+ * two slices, because the third was never gathered, is a different result from
+ * a right code reached from three — and the verdict line does not say which.
+ * It is reported beside the verdict, never folded into it: this does not change
+ * whether an answer is correct, it says what the answer was reached from.
+ */
+export function gathering(answer) {
+  const c = answer?.incident?.collection;
+  if (c === null || typeof c !== "object" || Array.isArray(c)) return [];
+  const out = [];
+  for (const [slot, raw] of Object.entries(c)) {
+    if (raw === null || typeof raw !== "object") continue;
+    const state = raw.state;
+    if (state === "collected") continue;
+    out.push(state === "failed"
+      ? `${slot} failed: ${typeof raw.reason === "string" ? raw.reason : "no reason recorded"}`
+      : `${slot} ${state === "nothing" ? "held nothing" : `was ${String(state)}`}`);
+  }
+  return out;
+}
+
 export function format(results) {
   const lines = ["", "WHAT THE RUN ANSWERED", ""];
   for (const r of results) {
@@ -633,6 +664,11 @@ export function format(results) {
   lines.push("", `  ${correct} correct, ${ungrounded} right code on other ground, ` +
     `${unqualified} right code held wrongly, ${wrong} wrong, ` +
     `${unestablished} not established, of ${results.length}`);
+  const partial = results.filter((r) => Array.isArray(r.gathering) && r.gathering.length > 0);
+  if (partial.length > 0) {
+    lines.push("", "  WHAT THE ANSWERS WERE REACHED FROM — not a verdict, and not folded into one:");
+    for (const r of partial) lines.push(`    ${r.scenario}: ${r.gathering.join("; ")}`);
+  }
   lines.push("", "  Concluding and being right are different things. A run that did not conclude is",
     "  not a wrong answer — it gave none.", "");
   return lines.join("\n");
