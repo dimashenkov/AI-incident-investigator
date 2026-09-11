@@ -1,0 +1,91 @@
+{
+  "collected_at": "2026-09-11T14:08:11Z",
+  "pods": [
+    {
+      "name": "checkout-api-6f8b4d9c7-lm2xk",
+      "namespace": "production",
+      "phase": "Pending",
+      "restart_count": 0,
+      "containers": [
+        {
+          "name": "checkout-api",
+          "ready": false,
+          "restart_count": 0,
+          "limits": {
+            "memory": "1Gi",
+            "cpu": "500m"
+          },
+          "requests": {
+            "memory": "512Mi",
+            "cpu": "250m"
+          }
+        }
+      ]
+    },
+    {
+      "name": "checkout-api-6f8b4d9c7-qd7vn",
+      "namespace": "production",
+      "phase": "Failed",
+      "restart_count": 0,
+      "containers": [
+        {
+          "name": "checkout-api",
+          "ready": false,
+          "restart_count": 0,
+          "last_state": {
+            "terminated": {
+              "reason": "ContainerStatusUnknown",
+              "exit_code": 137,
+              "started_at": "2026-09-11T13:57:01Z",
+              "finished_at": "2026-09-11T14:06:20Z"
+            }
+          },
+          "limits": {
+            "memory": "1Gi",
+            "cpu": "500m"
+          },
+          "requests": {
+            "memory": "512Mi",
+            "cpu": "250m"
+          }
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "reason": "NodeNotReady",
+      "type": "Normal",
+      "count": 1,
+      "last_seen": "2026-09-11T14:01:12Z",
+      "involved_object": "node/ip-10-2-41-88",
+      "message": "Node ip-10-2-41-88 status is now: NodeNotReady"
+    },
+    {
+      "reason": "TaintManagerEviction",
+      "type": "Normal",
+      "count": 1,
+      "last_seen": "2026-09-11T14:06:20Z",
+      "involved_object": "pod/checkout-api-6f8b4d9c7-qd7vn",
+      "message": "Marking for deletion Pod production/checkout-api-6f8b4d9c7-qd7vn"
+    },
+    {
+      "reason": "FailedScheduling",
+      "type": "Warning",
+      "count": 9,
+      "last_seen": "2026-09-11T14:07:55Z",
+      "involved_object": "pod/checkout-api-6f8b4d9c7-lm2xk",
+      "message": "0/4 nodes are available: 1 node(s) had untolerated taint {node.kubernetes.io/not-ready: }, 3 Insufficient cpu. preemption: 0/4 nodes are available: 4 No preemption victims found for incoming pod."
+    }
+  ],
+  "deployment": {
+    "name": "checkout-api",
+    "namespace": "production",
+    "replicas": {
+      "desired": 4,
+      "ready": 2,
+      "available": 2
+    },
+    "image": "registry.internal/checkout-api:2.9.4"
+  }
+}

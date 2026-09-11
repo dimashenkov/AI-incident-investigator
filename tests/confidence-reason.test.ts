@@ -106,25 +106,88 @@ describe("the schema knows the field and deliberately does not demand it", () =>
 });
 
 describe("what the report says a figure stands on", () => {
+  /*
+   * The first version of this line counted: "90%, standing on 9 for, from
+   * kubernetes and logs and metrics". The owner, immediately: that carries no
+   * information. He was right twice — it says how many rather than what, and
+   * the nine were about five distinct facts, two timestamps and two points of
+   * one series, so the count overstated even what it counted.
+   */
   const answer = (evidence: unknown, confidence: unknown = 0.9) => ({
     incident: { analysis: { confidence, evidence } },
   });
+  const fact = (source: string, text: string, supports = "for") => ({ source, fact: text, supports });
 
-  it("counts the sides separately, by what each entry says it does", () => {
-    const stands = whatTheFigureStandsOn(answer([
-      { source: "kubernetes", supports: "for" },
-      { source: "logs", supports: "for" },
-      { source: "metrics", supports: "against" },
-    ]));
-    expect(stands).toMatchObject({ confidence: 0.9, for: 2, against: 1, unstated: 0 });
-    expect(stands.sources).toEqual(["kubernetes", "logs", "metrics"]);
+  it("quotes the facts, in the order the conclusion cited them", () => {
+    const line = figureLine(whatTheFigureStandsOn(answer([
+      fact("kubernetes", "the deployment image is orders-api:5.4.0"),
+      fact("logs", "POST /v2/orders 500: discount_code column is not present"),
+    ], 0.9)));
+    expect(line).toContain("90% · the deployment image is orders-api:5.4.0 "
+      + "· POST /v2/orders 500: discount_code column is not present");
   });
 
-  it("counts an entry that takes no side as neither, not as support", () => {
-    // Folding it into "for" would inflate the very number this exists to make
-    // readable.
-    const stands = whatTheFigureStandsOn(answer([{ source: "logs" }, { source: "logs", supports: "sideways" }]));
-    expect(stands).toMatchObject({ for: 0, against: 0, unstated: 2 });
+  it("drops a citation that only says when something was seen", () => {
+    /*
+     * `events[0].last_seen is 2026-...` is provenance, not evidence for a
+     * cause, and it was padding the number the owner was reading.
+     */
+    const stands = whatTheFigureStandsOn(answer([
+      fact("kubernetes", "the deployment image is orders-api:5.4.0"),
+      fact("kubernetes", "events[0] last_seen is 2026-09-07T09:38:02Z"),
+      fact("logs", "logs line[3] timestamp is 2026-09-07T09:38:31Z"),
+    ]));
+    expect(stands.facts).toEqual(["the deployment image is orders-api:5.4.0"]);
+    expect(stands.dropped, "and it knows how many it dropped").toBe(2);
+  });
+
+  it("separates three different silences rather than blaming one", () => {
+    /*
+     * Nothing cited; citations that were all timestamps; and citations with no
+     * readable sentence. The first version called the third one "every
+     * citation is a timestamp", which named the wrong cause — caught by a
+     * fixture that simply had no `fact` field.
+     */
+    expect(figureLine(whatTheFigureStandsOn(answer([{ source: "logs", supports: "for" }]))))
+      .toContain("its citations carry no readable statement");
+  });
+
+  it("says so when every citation it gave is a timestamp", () => {
+    // Not "no evidence" — there were citations, and every one of them was
+    // provenance. That is a different and more damning thing.
+    const line = figureLine(whatTheFigureStandsOn(answer([
+      fact("kubernetes", "events[0] last_seen is 2026-09-07T09:38:02Z"),
+    ])));
+    expect(line).toContain("every citation it gave is a timestamp; nothing states a cause");
+  });
+
+  it("shows what argued AGAINST separately, rather than folding it in", () => {
+    const line = figureLine(whatTheFigureStandsOn(answer([
+      fact("logs", "the pod restarted"),
+      fact("metrics", "memory never rose above 40%", "against"),
+    ], 0.5)));
+    expect(line).toContain("50% · the pod restarted");
+    expect(line).toContain("AGAINST: memory never rose above 40%");
+  });
+
+  it("does not quote an entry that takes no side as if it supported the answer", () => {
+    /*
+     * An entry with no `supports` is neither for nor against. Reading it as
+     * support puts a sentence into the reason that the model never offered as
+     * one.
+     *
+     * This property had a test, and I deleted it while rewriting the block
+     * around it — the mutation that reintroduces the defect then survived a
+     * whole gate run saying so. Rewriting a describe is how a test disappears
+     * without anyone choosing to remove it.
+     */
+    const stands = whatTheFigureStandsOn(answer([
+      fact("logs", "the read model is missing a column"),
+      { source: "metrics", fact: "cpu was fine", supports: undefined },
+      { source: "metrics", fact: "memory was fine" },
+    ]));
+    expect(stands.facts).toEqual(["the read model is missing a column"]);
+    expect(figureLine(stands), "neither does the line").not.toContain("cpu was fine");
   });
 
   it("says plainly when a figure stands on nothing at all", () => {
@@ -136,37 +199,26 @@ describe("what the report says a figure stands on", () => {
      * Not "0%" — absent is not zero, and this line must not invent one.
      *
      * Built inline rather than through the helper: a default parameter fires
-     * on `undefined`, so passing it explicitly would have handed 0.9 back and
-     * the test would have been asserting the opposite of its own name. The
-     * first version of this did exactly that and failed, which is the outcome
-     * to prefer over passing quietly.
+     * on `undefined`, so passing it explicitly would hand 0.9 back and the
+     * test would assert the opposite of its own name.
      */
-    expect(whatTheFigureStandsOn({ incident: { analysis: { evidence: [{ supports: "for" }] } } })).toBeNull();
-    expect(whatTheFigureStandsOn(answer([{ supports: "for" }], "high"))).toBeNull();
-    expect(whatTheFigureStandsOn(answer([{ supports: "for" }], Number.NaN)),
-      "not a finite number is not a figure").toBeNull();
+    expect(whatTheFigureStandsOn({ incident: { analysis: { evidence: [fact("logs", "x")] } } })).toBeNull();
+    expect(whatTheFigureStandsOn(answer([fact("logs", "x")], "high"))).toBeNull();
+    expect(whatTheFigureStandsOn(answer([fact("logs", "x")], Number.NaN))).toBeNull();
     expect(whatTheFigureStandsOn({})).toBeNull();
     expect(figureLine(null)).toBeNull();
   });
 
-  it("reads the figure as a percentage, the way the owner asked for it", () => {
-    const line = figureLine(whatTheFigureStandsOn(answer([
-      { source: "kubernetes", supports: "for" }, { source: "logs", supports: "for" },
-    ], 0.8)));
-    expect(line).toContain("80%, standing on 2 for, from kubernetes and logs");
-  });
-
-  it("names the contradiction when there is one", () => {
-    const line = figureLine(whatTheFigureStandsOn(answer([
-      { source: "logs", supports: "for" }, { source: "metrics", supports: "against" },
-    ], 0.5)));
-    expect(line).toContain("1 against");
+  it("ignores an entry with no readable fact rather than printing a blank", () => {
+    const stands = whatTheFigureStandsOn(answer([fact("logs", "a real one"), { supports: "for" }, null]));
+    expect(stands.facts).toEqual(["a real one"]);
   });
 });
 
 describe("whether the concluder gave a reason at all", () => {
   const withRaw = (raw: unknown) => ({
-    incident: { analysis: { confidence: 0.9, evidence: [{ source: "logs", supports: "for" }] } },
+    incident: { analysis: { confidence: 0.9,
+      evidence: [{ source: "logs", fact: "the read model is missing a column", supports: "for" }] } },
     raw_answers: { "root-cause": raw },
   });
 

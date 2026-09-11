@@ -10,8 +10,12 @@
 import { describe, it, expect } from "vitest";
 import { resolveRef } from "../src/core/assemble.js";
 import { listScenarios, readSlot } from "../src/providers/fixtures.js";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { validate } from "../src/schema/validate.js";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 import agentResultSchema from "../schemas/agent-result.schema.json" with { type: "json" };
 import incidentSchema from "../schemas/incident.schema.json" with { type: "json" };
 import commonSchema from "../schemas/common.schema.json" with { type: "json" };
@@ -179,6 +183,76 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
   ],
 };
 
+describe("a code list that grows has to grow with something that measures it", () => {
+  /*
+   * Asked for on 2026-09-11: cover the situations a real cluster produces,
+   * one at a time. The danger in "one at a time" is the list: a code added to
+   * the schema with no scenario behind it is a longer menu and not a wider
+   * reach, and NOTHING here checked that before this test.
+   *
+   * The failure it prevents is specific. An agent handed a code it has never
+   * been measured on has two moves — refuse, or press the case into the
+   * nearest code it knows. The second looks like an answer.
+   */
+  const codes = (): string[] => {
+    const common = JSON.parse(readFileSync(resolve(ROOT, "schemas/common.schema.json"), "utf8")) as
+      Record<string, unknown>;
+    const found: string[] = [];
+    const walk = (node: unknown): void => {
+      if (Array.isArray(node)) { node.forEach(walk); return; }
+      if (node === null || typeof node !== "object") return;
+      const o = node as Record<string, unknown>;
+      if (Array.isArray(o["enum"]) && o["enum"].includes("CONTAINER_OOM")) {
+        for (const c of o["enum"] as string[]) found.push(c);
+      }
+      Object.values(o).forEach(walk);
+    };
+    walk(common);
+    return [...new Set(found)];
+  };
+
+  const expectedCodes = (): Map<string, string> => {
+    const out = new Map<string, string>();
+    for (const dir of readdirSync(resolve(ROOT, "scenarios"), { withFileTypes: true })) {
+      if (!dir.isDirectory()) continue;
+      const at = resolve(ROOT, "scenarios", dir.name, "expected.json");
+      if (!existsSync(at)) continue;
+      const want = JSON.parse(readFileSync(at, "utf8")) as { root_cause_code?: string };
+      if (typeof want.root_cause_code === "string") out.set(want.root_cause_code, dir.name);
+    }
+    return out;
+  };
+
+  it("has codes to check, so nothing below passes on an empty set", () => {
+    expect(codes().length).toBeGreaterThan(5);
+    expect(expectedCodes().size).toBeGreaterThan(5);
+  });
+
+  it("gives every code in the schema a scenario that expects it", () => {
+    /*
+     * The one direction that matters. A scenario without a code cannot exist —
+     * the schema refuses it — but a code without a scenario is added by
+     * editing one enum, and then nothing ever asks the model to produce it.
+     */
+    const have = expectedCodes();
+    const orphans = codes().filter((c) => !have.has(c));
+    expect(orphans, `these codes have no scenario that expects them: ${orphans.join(", ")}`).toEqual([]);
+  });
+
+  it("lists every code in every prompt that may propose one", () => {
+    // The list is written FOUR times — once per prompt — and this is what
+    // keeps the four from disagreeing. Said out loud because four copies of
+    // one list is the shape this repository fixes everywhere else, and here
+    // it is held by a test rather than by generation.
+    for (const agent of ["kubernetes", "logs", "metrics", "root-cause"]) {
+      const prompt = readFileSync(resolve(ROOT, `prompts/${agent}-agent.md`), "utf8");
+      for (const code of codes()) {
+        expect(prompt.includes(`\`${code}\``), `${agent} prompt does not list ${code}`).toBe(true);
+      }
+    }
+  });
+});
+
 describe("every prompt carries the rules its schema will enforce", () => {
   it("finds a prompt file for every agent", () => {
     for (const agent of [...OBSERVING_AGENTS, "root-cause"] as AgentName[]) {
@@ -296,9 +370,17 @@ describe("every prompt carries the rules its schema will enforce", () => {
      * the example it was shown.
      */
     const text = readPrompt("root-cause")!;
-    const codes = ["CONTAINER_OOM", "CPU_THROTTLING", "IMAGE_PULL_FAILURE",
-      "READINESS_PROBE_FAILURE", "APPLICATION_STARTUP_FAILURE", "DEPLOYMENT_REGRESSION"];
-    for (const code of codes) {
+    /*
+     * Derived, not written out.
+     *
+     * This was a literal list of six while the schema held seven, so
+     * `NODE_NOT_READY` could be offered to the model with nothing saying what
+     * observes it — and the prompt's own sentence promises that every code is
+     * "named by something an agent can observe directly". A subagent reading
+     * for one defect class found it on 2026-09-11: the only non-derived code
+     * list left in the repository, and the only reader anywhere of that table.
+     */
+    for (const code of CAUSE_CODES) {
       const row = text.split("\n").find((l) => l.startsWith(`| \`${code}\``));
       expect(row, `${code} has no row saying what observes it`).toBeDefined();
       expect(row!.split("|")[2]!.trim().length, `${code}'s row says nothing`).toBeGreaterThan(20);

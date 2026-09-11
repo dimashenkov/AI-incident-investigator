@@ -664,84 +664,83 @@ export function compareConfidences(results, answers, root = SCENARIOS) {
  * whether an answer is correct, it says what the answer was reached from.
  */
 /**
- * What a confidence figure STANDS ON, counted rather than argued.
+ * What a confidence figure stands on — the FACTS, not a count of them.
  *
- * The owner asked why one answer said 90%, and the honest reply was that
- * nothing in the record says. Counted across all 49 recorded answers on
- * 2026-09-11: the figure is carried faithfully from the concluding agent in 47
- * of them, the hypothesis carries no figure of its own in 40, and `0.8` exactly
- * accounts for 22. So the number is not arbitrary at the coarsest grain —
- * insufficient-evidence answered 0 six times out of six — and it is arbitrary
- * at the fine grain, which is where a 0.6 ceiling gets compared against it.
+ * The first version of this line said "90%, standing on 9 for, from kubernetes
+ * and logs and metrics". The owner, immediately: that carries no information.
+ * He was right, twice over. It says how many rather than what; and the nine
+ * turned out to be about five distinct facts, two timestamps, and two points of
+ * one series — so the number overstated even the thing it was counting.
  *
- * This does not invent a rule connecting the two. It puts them side by side, so
- * "0.9" is read as "0.9, standing on nine citations and no contradiction"
- * rather than as a number with nothing behind it. Deterministic, from the
- * recorded answer, and it costs no run.
+ * A reader wants the reason, not statistics about the reason. So the facts are
+ * quoted, in the order the conclusion cited them, and anything that is only a
+ * timestamp is dropped: `events[0].last_seen` is provenance, not evidence for a
+ * cause, and it padded the count.
  */
 export function whatTheFigureStandsOn(answer) {
   const conf = answer?.incident?.analysis?.confidence;
   if (typeof conf !== "number" || !Number.isFinite(conf)) return null;
   const ev = answer?.incident?.analysis?.evidence;
   const rows = Array.isArray(ev) ? ev : [];
+  const said = (e) => (e !== null && typeof e === "object" && typeof e.fact === "string" ? e.fact.trim() : "");
   /*
-   * Counted by what each entry SAYS it does, not by its position. An entry
-   * with no `supports` is neither for nor against, and it is counted as
-   * neither — folding it into "for" would inflate exactly the number this is
-   * meant to make readable.
-   */
-  let forIt = 0;
-  let against = 0;
-  let unstated = 0;
-  for (const e of rows) {
-    const side = e === null || typeof e !== "object" ? undefined : e.supports;
-    if (side === "for") forIt += 1;
-    else if (side === "against") against += 1;
-    else unstated += 1;
-  }
-  const sources = new Set(rows
-    .filter((e) => e !== null && typeof e === "object" && typeof e.source === "string")
-    .map((e) => e.source));
-  /*
-   * Whether the concluder said WHY, carried beside the count.
+   * A fact that only reports WHEN something was seen is dropped.
    *
-   * The schema does not demand it: refusing an answer for a missing sentence
-   * throws away a paid measurement whose code and citations were both there.
-   * So the absence is reported instead of being fatal, and a model that
-   * ignores the prompt is visible without a run being lost.
+   * Recognised by what the sentence says about itself, since the conclusion's
+   * evidence carries no path: "... last_seen is 2026-..." and "... timestamp is
+   * 2026-..." are the two shapes the agents produce. This is a display choice
+   * and it is stated as one — the entry is still in the record, and the scorer
+   * still counts it everywhere a count matters.
    */
+  const isTimestamp = (t) => /\b(last_seen|timestamp|collected_at)\b\s+is\b/i.test(t)
+    || /^\s*\S+\s+(last_seen|timestamp)\b/i.test(t);
+  const forIt = rows.filter((e) => e?.supports === "for");
+  const against = rows.filter((e) => e?.supports === "against");
+  /*
+   * Two removals, counted apart. An entry with no readable sentence was being
+   * counted as a dropped TIMESTAMP, so a figure whose citations carried no
+   * text at all was reported as one that cited only times — the wrong cause,
+   * named confidently.
+   */
+  const readable = forIt.map(said).filter((t) => t.length > 0);
+  const facts = readable.filter((t) => !isTimestamp(t));
+  const objections = against.map(said).filter((t) => t.length > 0);
   const raw = answer?.raw_answers?.["root-cause"];
-  let said = null;
-  if (typeof raw === "string") { try { said = JSON.parse(raw)?.confidence_because ?? null; } catch { said = null; } }
-  else if (raw !== null && typeof raw === "object") said = raw.confidence_because ?? null;
-  const because = typeof said === "string" && said.trim().length >= 12 ? said.trim() : null;
-  return { confidence: conf, for: forIt, against, unstated, because, sources: [...sources].sort() };
+  let told = null;
+  if (typeof raw === "string") { try { told = JSON.parse(raw)?.confidence_because ?? null; } catch { told = null; } }
+  else if (raw !== null && typeof raw === "object") told = raw.confidence_because ?? null;
+  const because = typeof told === "string" && told.trim().length >= 12 ? told.trim() : null;
+  return { confidence: conf, facts, objections, because,
+    dropped: readable.length - facts.length, unreadable: forIt.length - readable.length, cited: rows.length };
 }
 
-/** One line saying what the figure stands on, or null when there is no figure. */
+/**
+ * The figure and the facts behind it, as one line a person can read.
+ *
+ * Long on purpose. The short version was a count, and a count of evidence is
+ * not evidence.
+ */
 export function figureLine(stands) {
   if (stands === null) return null;
   const pct = `${Math.round(stands.confidence * 100)}%`;
-  const bits = [`${stands.for} for`];
-  if (stands.against > 0) bits.push(`${stands.against} against`);
-  if (stands.unstated > 0) bits.push(`${stands.unstated} taking no side`);
-  const from = stands.sources.length > 0 ? `, from ${stands.sources.join(" and ")}` : "";
-  /*
-   * An answer with a figure and NO evidence is the one worth naming out loud:
-   * a number standing on nothing is the shape this whole line exists to expose.
-   */
-  /*
-   * The model's own sentence, when it gave one, and the fact that it did not
-   * when it did not. Both are readings of the same record and neither is a
-   * verdict.
-   */
-  const why = stands.because === null
-    ? " · the concluder gave no reason, which the prompt asks for and the schema does not enforce"
-    : ` · it says: ${stands.because}`;
-  if (stands.for === 0 && stands.against === 0 && stands.unstated === 0) {
-    return `${pct}, standing on no cited evidence at all${why}`;
+  if (stands.facts.length === 0 && stands.objections.length === 0) {
+    /*
+     * Three different silences, and they are not the same failure.
+     *
+     * Nothing cited at all; citations that were ALL timestamps; and citations
+     * that carried no readable sentence. The first version collapsed the last
+     * two into "every citation is a timestamp", which named the wrong cause —
+     * caught by a test whose fixture had no `fact` field at all.
+     */
+    if (stands.cited === 0) return `${pct} · standing on no cited evidence at all`;
+    if (stands.dropped > 0) return `${pct} · every citation it gave is a timestamp; nothing states a cause`;
+    return `${pct} · its citations carry no readable statement`;
   }
-  return `${pct}, standing on ${bits.join(", ")}${from}${why}`;
+  const parts = [`${pct} · ${stands.facts.join(" · ")}`];
+  if (stands.objections.length > 0) parts.push(`AGAINST: ${stands.objections.join(" · ")}`);
+  if (stands.because !== null) parts.push(`it says: ${stands.because}`);
+  else parts.push("the concluder gave no reason, which the prompt asks for and the schema does not enforce");
+  return parts.join(" · ");
 }
 
 export function gathering(answer) {
@@ -798,7 +797,7 @@ export function format(results) {
     `${unestablished} not established, of ${results.length}`);
   const standing = results.filter((r) => typeof r.figure === "string" && r.figure.length > 0);
   if (standing.length > 0) {
-    lines.push("", "  WHAT EACH CONFIDENCE FIGURE STANDS ON — counted, not a rule:");
+    lines.push("", "  WHAT EACH CONFIDENCE FIGURE STANDS ON — the facts it cited, not a count of them:");
     for (const r of standing) lines.push(`    ${r.scenario}: ${r.figure}`);
   }
   const partial = results.filter((r) => Array.isArray(r.gathering) && r.gathering.length > 0);

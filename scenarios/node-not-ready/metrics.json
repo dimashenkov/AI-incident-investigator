@@ -1,0 +1,51 @@
+{
+  "collected_at": "2026-09-11T14:08:16Z",
+  "window": {
+    "from": "2026-09-11T13:55:00Z",
+    "to": "2026-09-11T14:08:00Z"
+  },
+  "series": [
+    {
+      "name": "kube_deployment_status_replicas_available",
+      "unit": "count",
+      "container": "checkout-api",
+      "points": [
+        {
+          "ts": "2026-09-11T13:58:00Z",
+          "value": 4
+        },
+        {
+          "ts": "2026-09-11T14:01:00Z",
+          "value": 4
+        },
+        {
+          "ts": "2026-09-11T14:02:00Z",
+          "value": 2
+        },
+        {
+          "ts": "2026-09-11T14:07:00Z",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "name": "http_requests_failed_ratio",
+      "unit": "ratio",
+      "container": "checkout-api",
+      "points": [
+        {
+          "ts": "2026-09-11T13:58:00Z",
+          "value": 0.002
+        },
+        {
+          "ts": "2026-09-11T14:02:00Z",
+          "value": 0.003
+        },
+        {
+          "ts": "2026-09-11T14:07:00Z",
+          "value": 0.002
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "id": "alert-3c71",
+  "title": "checkout-api lost two replicas, one unschedulable",
+  "triggered_at": "2026-09-11T14:02:00Z",
+  "severity": "critical",
+  "monitor_id": "mon-6633",
+  "tags": [
+    "service:checkout-api",
+    "env:production",
+    "cluster:prod-eu"
+  ]
+}

@@ -1046,6 +1046,36 @@ describe("the isolation refusals, through the entry point that actually assemble
     expect(a.reason).not.toContain("every observation failed");
   });
 
+  it("keeps three incidents apart when three are assembled at once", () => {
+    /*
+     * Asked on 2026-09-11: if Datadog registers three incidents at the same
+     * moment, does the agent analyse them?
+     *
+     * The webhook answers per request and the chain holds no state between
+     * executions, so three alerts are three executions — measured that day
+     * with four, as n8n executions 332 to 335. What was NOT checked is the
+     * half that would bite silently: that three incidents built in one process
+     * do not share an identity. A collection id reused across two incidents
+     * would make each one's isolation check pass while the two observations
+     * were interchangeable.
+     */
+    const three = ["container-oom", "cpu-throttling", "image-pull-failure"]
+      .map((s) => assembleIncident(s, 1, { root: SCENARIOS }));
+    for (const a of three) expect(a.state, "each of the three assembles").toBe("assembled");
+    const ids = three.map((a) => (a.state === "assembled"
+      ? (a.incident as Record<string, unknown>).incident_id : null));
+    const collections = three.map((a) => {
+      if (a.state !== "assembled") return null;
+      const obs = (a.incident as { observations?: Record<string, { provenance?: Record<string, unknown> }> })
+        .observations ?? {};
+      return obs["kubernetes"]?.provenance?.["collection_id"] ?? null;
+    });
+    expect(new Set(ids).size, "three incidents, three identities").toBe(3);
+    expect(new Set(collections).size, "three collections, three ids").toBe(3);
+    expect(collections.every((c) => typeof c === "string" && c.length > 0),
+      "and every one of them is stamped").toBe(true);
+  });
+
   it("refuses production fixtures asked about another namespace, and the request still reached the provider", () => {
     /*
      * This test used to expect `assembled`, and it was right to until the

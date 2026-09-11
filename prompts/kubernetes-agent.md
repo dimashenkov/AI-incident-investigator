@@ -259,6 +259,12 @@ result, and the run was wasted on a question nobody had answered.
 - `READINESS_PROBE_FAILURE`
 - `DEPLOYMENT_REGRESSION`
 - `CPU_THROTTLING`
+- `NODE_NOT_READY`
+
+**`NODE_NOT_READY` is for a fault UNDER the pod.** A node reported `NotReady`,
+with pods `Pending` or evicted because of it — restart counts at zero, no probe
+failing, nothing terminated. If the pod is `Running` and its own probe is
+failing, that is `READINESS_PROBE_FAILURE` and not this.
 
 If none fits, report the findings and return no hypotheses at all. An invented
 code is refused, and a wrong one from the list is worse — it sends the next

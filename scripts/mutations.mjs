@@ -2837,8 +2837,8 @@ export const MUTATIONS = [
     // report and a model that ignores the prompt becomes invisible.
     id: "a-missing-reason-is-not-reported",
     file: "scripts/score-run.mjs",
-    from: '    ? " · the concluder gave no reason, which the prompt asks for and the schema does not enforce"',
-    to: '    ? ""',
+    from: '  else parts.push("the concluder gave no reason, which the prompt asks for and the schema does not enforce");',
+    to: "  else parts.push(\"\");",
     mustFail: "says the reason is missing, naming whose job it was",
   },
   {
@@ -2852,11 +2852,11 @@ export const MUTATIONS = [
   {
     // Folding an entry that takes no side into the supporting count inflates
     // the very number this line exists to make readable.
-    id: "evidence-taking-no-side-counts-as-support",
+    id: "evidence-taking-no-side-counts-as-support-for",
     file: "scripts/score-run.mjs",
-    from: '    if (side === "for") forIt += 1;',
-    to: '    if (side !== "against") forIt += 1;',
-    mustFail: "counts an entry that takes no side as neither, not as support",
+    from: '  const forIt = rows.filter((e) => e?.supports === "for");',
+    to: '  const forIt = rows.filter((e) => e?.supports !== "against");',
+    mustFail: "does not quote an entry that takes no side as if it supported the answer",
   },
   {
     // Absent is not zero. A line that renders a missing figure as 0% invents
@@ -2875,5 +2875,48 @@ export const MUTATIONS = [
     from: "**Say in one sentence what the figure stands on.** Put it in\n`confidence_because`:",
     to: "**Say in one sentence what the figure stands on.** Put it in\nthe answer somewhere:",
     mustFail: "is asked for in the prompt, not only enforced by the schema",
+  },
+  {
+    // A count of evidence is not evidence. The owner read "9 for, from
+    // kubernetes and logs and metrics" and said it carries no information.
+    id: "the-line-counts-instead-of-quoting",
+    file: "scripts/score-run.mjs",
+    from: "  const parts = [`${pct} · ${stands.facts.join(\" · \")}`];",
+    to: "  const parts = [`${pct} · ${stands.facts.length} for`];",
+    mustFail: "quotes the facts, in the order the conclusion cited them",
+  },
+  {
+    // A timestamp is provenance, not a reason, and it padded the number the
+    // owner was reading.
+    id: "a-timestamp-counts-as-a-reason",
+    file: "scripts/score-run.mjs",
+    from: "  const facts = readable.filter((t) => !isTimestamp(t));",
+    to: "  const facts = readable;",
+    mustFail: "drops a citation that only says when something was seen",
+  },
+  {
+    // Citations with no readable sentence are not citations that were all
+    // timestamps. Naming the wrong cause confidently is the defect.
+    id: "no-readable-citation-blamed-on-timestamps",
+    file: "scripts/score-run.mjs",
+    from: "    if (stands.dropped > 0) return `${pct} · every citation it gave is a timestamp; nothing states a cause`;",
+    to: "    if (true) return `${pct} · every citation it gave is a timestamp; nothing states a cause`;",
+    mustFail: "separates three different silences rather than blaming one",
+  },
+  {
+    /*
+     * Mutating the SCHEMA, not the test.
+     *
+     * The first two attempts at this mutated `tests/agents.test.ts` itself and
+     * both survived a gate run — of course they did: they deleted the
+     * assertion and then asked whether the assertion fired. A mutation that
+     * edits a test proves nothing about that test. It has to break the thing
+     * the test guards, and what this one guards is the code list.
+     */
+    id: "a-code-may-exist-with-no-scenario",
+    file: "schemas/common.schema.json",
+    from: '        "NODE_NOT_READY"',
+    to: '        "VOLUME_FULL"',
+    mustFail: "gives every code in the schema a scenario that expects it",
   },
 ];

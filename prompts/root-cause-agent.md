@@ -81,6 +81,7 @@ fix. Write `hypotheses[0].code` and nothing else:
 - `READINESS_PROBE_FAILURE`
 - `DEPLOYMENT_REGRESSION`
 - `CPU_THROTTLING`
+- `NODE_NOT_READY`
 
 `INSUFFICIENT_EVIDENCE` is **not** in that list and is not a hypothesis. If the
 evidence does not support a cause, return **no hypotheses at all** and
@@ -115,9 +116,27 @@ below is named by something an agent can observe directly:
 | `READINESS_PROBE_FAILURE` | a readiness probe reported as failing, and a pod not ready |
 | `APPLICATION_STARTUP_FAILURE` | the process exiting or erroring during start, in the logs |
 | `DEPLOYMENT_REGRESSION` | a change in the deployment lining up in time with the failure |
+| `NODE_NOT_READY` | a node reported `NotReady`, with pods evicted or unschedulable **because of it** |
 
 If a finding is one of those direct observations, that code is your hypothesis —
 even though no agent named it, because none of them was allowed to.
+
+**`NODE_NOT_READY` against `READINESS_PROBE_FAILURE`: read what is FAILING.**
+The two look alike from the pod's side, and telling them apart is the whole
+reason the first exists.
+
+| | `READINESS_PROBE_FAILURE` | `NODE_NOT_READY` |
+|---|---|---|
+| the pod | `Running`, and its probe fails | `Pending` or `Failed`, and no probe is mentioned |
+| restarts | may be climbing | **zero** — nothing crashed |
+| the logs | the application says something is wrong | the application is clean, often a tidy shutdown |
+| the event | names the pod and the probe | names the **node**, or says the pod cannot be scheduled |
+
+A pod that is not ready because its own probe fails is the first. A pod that is
+not running because the machine under it went away is the second. Clean logs are
+evidence FOR the second, not a reason to answer that there is not enough to tell:
+an application that shut down without errors while its node went `NotReady` has
+told you exactly where the fault is not.
 
 **Not enough to tell is a real answer, for one situation only.** That situation
 is the findings pointing nowhere: the agents found little, or what they found

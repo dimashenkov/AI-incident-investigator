@@ -107,6 +107,7 @@ result, and the run was wasted on a question nobody had answered.
 - `READINESS_PROBE_FAILURE`
 - `DEPLOYMENT_REGRESSION`
 - `CPU_THROTTLING`
+- `NODE_NOT_READY`
 
 If none of them fits what you see, report the findings and return no hypotheses
 at all. An invented code is refused, and a wrong one from the list is worse — it

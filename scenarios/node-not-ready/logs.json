@@ -1,0 +1,28 @@
+{
+  "collected_at": "2026-09-11T14:08:14Z",
+  "window": {
+    "from": "2026-09-11T13:55:00Z",
+    "to": "2026-09-11T14:08:00Z"
+  },
+  "truncated": false,
+  "lines": [
+    {
+      "ts": "2026-09-11T13:57:02Z",
+      "level": "info",
+      "container": "checkout-api",
+      "message": "checkout-api accepting connections"
+    },
+    {
+      "ts": "2026-09-11T14:00:31Z",
+      "level": "info",
+      "container": "checkout-api",
+      "message": "POST /v2/checkout 201 in 42ms"
+    },
+    {
+      "ts": "2026-09-11T14:01:04Z",
+      "level": "info",
+      "container": "checkout-api",
+      "message": "POST /v2/checkout 201 in 39ms"
+    }
+  ]
+}
