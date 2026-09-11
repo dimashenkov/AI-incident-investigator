@@ -70,6 +70,26 @@ export const DEFINITION_OF_DONE = [
     n: 6, claim: "No cross-incident data in assembled prompts.", covered: false,
     needs: "a way to tell whose data an unstamped answer is",
     /*
+     * Grok, 2026-09-11, argued against closing this and was right (88%). Two
+     * approaches were weighed and both buy a green test on a false signal:
+     *   A. a namespace field on every log line / metric series — UNREALISTIC.
+     *      `kubectl logs -n production` returns time, level, text; the namespace
+     *      is on the QUERY, not the line. Loki is `{namespace="production"}` the
+     *      same way. A per-line owner is invented data, and invented fixtures do
+     *      not transfer to a real cluster — the defect this project refuses.
+     *   B. tie each log/metric container to a namespace-checked pod — has a
+     *      hole exactly where isolation matters: two tenants both name a
+     *      container `payment-api`, so a foreign line passes on the name; and it
+     *      refuses a legitimate logs-only incident when no pod anchors it.
+     * The honest reading: ownership of logs and metrics IS the provenance stamp
+     * (the query), not the content, so it cannot be content-checked the way
+     * kubernetes pods[].namespace can. This stays a BOUNDARY, like
+     * events[].involved_object — not pending work, and not coverable without
+     * faking a field. The claim "No cross-incident data" is therefore true for
+     * kubernetes content and is the stamp's word for logs and metrics, and the
+     * item is left open rather than marked covered on a fake check.
+     */
+    /*
      * Marked covered on 2026-09-05 and reversed within the hour by Codex,
      * whose objection is the reason the claim is written out in full here:
      * "the named test expects an allegedly foreign answer to be ACCEPTED. No

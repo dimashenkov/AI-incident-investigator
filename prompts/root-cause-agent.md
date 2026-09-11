@@ -226,6 +226,20 @@ forbade it here was thirty lines up. A rule that competes loses.
 | agents disagree, or a source could not be read | **below 0.4**, and say why |
 | **no** direct observation from the code table, only circumstantial findings | **no hypotheses**, and `0` |
 | nothing supports any cause at all | **no hypotheses**, and `0` |
+| a direct observation of the cause, but something ALSO contradicts it | **below the ceiling the scenario declares — at most 0.6, and lower if the contradiction is strong** |
+
+**A contradiction caps the number even when the cause is directly observed.**
+The rows above read as if a direct observation always earns 0.8 to 0.95. It does
+not when a finding also points the other way. Measured on 2026-09-11: a
+termination reason of `OOMKilled` was present AND a memory series showed the
+container never approached its limit, and the answer came back at 0.85 — the
+direct-observation row winning over the contradiction. That is the mistake.
+
+When your `contradicted_by` is non-empty, you are not in the clean
+high-confidence case no matter how direct the observation: name the cause if it
+is still the best reading, but the contradiction is the fact that sets the
+number, and it belongs below 0.6. A cause you can see and also see argued
+against is a cause held at low confidence, not a clean one.
 
 **`INSUFFICIENT_EVIDENCE` is not a code you may write.** It is not in the list
 above and no field in your answer can hold it: `hypotheses[0].code` is checked
