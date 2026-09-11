@@ -1,0 +1,16 @@
+{
+  "when": "2026-09-11",
+  "tool": "n8n",
+  "model_asked": "gpt-5 concluding, gpt-5-mini collecting",
+  "kind": "measurement",
+  "outcome": "HTTP 524 again. The split did NOT bring the chain under the gateway window. Zero answers of one. Not retried: one authorisation is one run.",
+  "what_it_settles": "C bought time and not enough of it. The run before this one arrived, which made the split look sufficient; this one says that run was near the boundary rather than under it. Two runs, one each side — so the honest reading is that the chain sits ON the limit, and the limit is not a number this project controls.",
+  "what_follows": "B, the asynchronous shape, is not an optimisation any more. The chain returns its answer inside the HTTP response, and four sequential calls to a reasoning model do not fit inside one, whichever of them is smaller. Decided by me rather than asked: the owner settled C and left A and B to me, and the measurement has now closed C.",
+  "charged": "unestablished, probably yes: the timeout is between this machine and n8n, and the execution may have run to completion inside it. The record says may have been charged because that is what is known here.",
+  "totals": {
+    "input_tokens": null,
+    "output_tokens": null,
+    "why": "No reply reached this machine. The usage now travels with the answer, and the answer did not arrive — which is exactly the shape B exists to fix."
+  },
+  "scored": {}
+}

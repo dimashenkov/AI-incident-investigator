@@ -1,0 +1,18 @@
+{
+  "note": "Issued by scripts/run-scenarios.mjs against the deployed workflow's webhook. The reply carries the chain's report; it does not carry the model's token usage, because the Collect nodes keep only the reply. Token counts and cost are therefore UNESTABLISHED on this path, not zero — read them from the n8n execution and add them with a second edit if they are wanted, and say that they were added by hand.",
+  "recorded": "at the moment the answers arrived, by the script that issued them",
+  "when": "2026-09-11",
+  "webhook_host": "dimitarshenkov.app.n8n.cloud",
+  "keys": [
+    "conflicting-evidence"
+  ],
+  "outcomes": {
+    "conflicting-evidence": "called, no reply recorded — this key may have been charged (unreachable: HTTP 524 | body: <!DOCTYPE html>\n<!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 7]>    <html class=\"no-js ie7 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 8]>    <html class=\"no-js ie8 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if gt IE 8]><!--> <html class=\"no-js\" lang=\"en-US\"> <!--<![endif]-->\n<head>\n\n<title>n8n.cloud | 524: A timeout occurred</title>\n<meta charset=\"UTF-8\" />\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />\n<meta http-equiv=\"X-UA-Compatib)"
+  },
+  "totals": {
+    "input_tokens": null,
+    "output_tokens": null,
+    "why": "the webhook reply carries no usage; nothing here could read it"
+  },
+  "scored": null
+}
