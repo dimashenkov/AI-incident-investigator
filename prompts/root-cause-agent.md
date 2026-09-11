@@ -210,8 +210,11 @@ So, in both directions:
 
 **Read the code table above FIRST, and this one second.** If a finding you
 reported is one of the direct observations listed there, that code is your
-hypothesis and the last two rows of this table do not apply to you. They are for
-the case where **none** of those observations is in your findings.
+hypothesis and the two `no hypotheses, and 0` rows of this table do not apply to
+you — they are for the case where **none** of those observations is in your
+findings. The contradiction row is NOT one of them: a direct observation that is
+**also contradicted** is exactly what the last row is for, and it caps your
+number even though the cause is named.
 
 Measured on 2026-09-07, three attempts on one scenario: the agent reported a
 readiness probe failing AND a pod not ready — which is exactly what the code
@@ -282,8 +285,10 @@ a model obeying the prohibition returned nothing.
 | **observes the cause itself** — throttled time, a termination reason, an image that could not be pulled | decisive on its own |
 | is **circumstantial** — a restart count, a latency rise, a batch size | not enough alone, however many of them there are |
 
-A single direct observation settles it. A pile of circumstantial ones does not,
-and adding more of the same kind does not change that. What is still forbidden
+A single direct observation settles **which** cause it is, not how confident you
+are: when a finding also points the other way, the contradiction row above caps
+the number. A pile of circumstantial ones settles nothing, and adding more of the
+same kind does not change that. What is still forbidden
 is picking the answer first and then finding something to put in
 `supported_by` — ask whether the evidence would point there if you had not
 already chosen.
