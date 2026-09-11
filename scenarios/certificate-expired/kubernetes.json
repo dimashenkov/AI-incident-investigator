@@ -68,7 +68,7 @@
   "events": [
     {
       "type": "Warning",
-      "reason": "CertificateExpired",
+      "reason": "TLSHandshakeErrors",
       "count": 1,
       "last_seen": "2026-09-14T02:17:10Z",
       "involved_object": "certificate/partner-gateway-tls",

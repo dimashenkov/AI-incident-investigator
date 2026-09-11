@@ -10,7 +10,7 @@
       "ts": "2026-09-13T09:27:12Z",
       "level": "info",
       "container": "webhook-dispatcher",
-      "message": "POST http://events-gateway:8080/v2/hooks 202 in 34ms, resolved events-gateway to 10.96.58.20"
+      "message": "POST http://events-gateway.production.svc.cluster.local:8080/v2/hooks 202 in 34ms, resolved the fully-qualified name to 10.96.58.20"
     },
     {
       "ts": "2026-09-13T09:29:04Z",

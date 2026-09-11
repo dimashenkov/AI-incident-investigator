@@ -68,7 +68,7 @@
   "events": [
     {
       "type": "Warning",
-      "reason": "PacketDropped",
+      "reason": "EgressDrop",
       "count": 1284,
       "last_seen": "2026-09-13T15:12:44Z",
       "involved_object": "pod/report-exporter-6c8d5f9b47-k4wzn",
@@ -87,9 +87,9 @@
     "name": "report-exporter",
     "namespace": "production",
     "replicas": {
-      "desired": 2,
-      "ready": 2,
-      "available": 2
+      "desired": 1,
+      "ready": 1,
+      "available": 1
     },
     "image": "registry.internal/report-exporter:3.2.0"
   }

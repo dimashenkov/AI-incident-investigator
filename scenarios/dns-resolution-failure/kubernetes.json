@@ -87,9 +87,9 @@
     "name": "webhook-dispatcher",
     "namespace": "production",
     "replicas": {
-      "desired": 3,
-      "ready": 3,
-      "available": 3
+      "desired": 1,
+      "ready": 1,
+      "available": 1
     },
     "image": "registry.internal/webhook-dispatcher:2.4.1"
   }

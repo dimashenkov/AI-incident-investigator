@@ -13,13 +13,13 @@
       "message": "session summary: 1187 partner sessions established in the last 5 minutes"
     },
     {
-      "ts": "2026-09-14T02:14:27Z",
+      "ts": "2026-09-14T02:16:20Z",
       "level": "warn",
       "container": "partner-gateway",
       "message": "tls: handshake error from 10.2.9.31:51044: remote error: tls: bad certificate"
     },
     {
-      "ts": "2026-09-14T02:16:02Z",
+      "ts": "2026-09-14T02:17:02Z",
       "level": "warn",
       "container": "partner-gateway",
       "message": "tls: handshake error from 10.2.9.44:38210: remote error: tls: bad certificate"

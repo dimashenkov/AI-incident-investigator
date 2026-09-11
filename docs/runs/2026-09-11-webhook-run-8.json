@@ -1,0 +1,77 @@
+{
+  "note": "Issued by scripts/run-scenarios.mjs against the deployed workflow's webhook. The reply carries the chain's report; it does not carry the model's token usage, because the Collect nodes keep only the reply. Token counts and cost are therefore UNESTABLISHED on this path, not zero — read them from the n8n execution and add them with a second edit if they are wanted, and say that they were added by hand.",
+  "recorded": "at the moment the answers arrived, by the script that issued them",
+  "when": "2026-09-11",
+  "webhook_host": "dimitarshenkov.app.n8n.cloud",
+  "keys": [
+    "node-not-ready",
+    "volume-full",
+    "dependency-unavailable",
+    "connection-pool-exhausted",
+    "dns-resolution-failure",
+    "network-policy-blocked",
+    "certificate-expired"
+  ],
+  "outcomes": {
+    "node-not-ready": "called, no reply recorded — this key may have been charged (accepted, awaiting collection: token sub-0fd3b865511546f1886da2ae45ae4248)",
+    "volume-full": "called, no reply recorded — this key may have been charged (accepted, awaiting collection: token sub-83461c7978ff4a06b43d81d972ce4ab4)",
+    "dependency-unavailable": "called, no reply recorded — this key may have been charged (accepted, awaiting collection: token sub-a2f8672ab0da4e849d0361ef56d53c72)",
+    "connection-pool-exhausted": "called, no reply recorded — this key may have been charged (accepted, awaiting collection: token sub-d5cc2d23f10a4d5e8a3b2810cdde8995)",
+    "dns-resolution-failure": "called, no reply recorded — this key may have been charged (accepted, awaiting collection: token sub-a0550f24e0e347ada08b631e8312f5b7)",
+    "network-policy-blocked": "called, no reply recorded — this key may have been charged (unreachable: HTTP 524 | body: <!DOCTYPE html>\n<!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 7]>    <html class=\"no-js ie7 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 8]>    <html class=\"no-js ie8 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if gt IE 8]><!--> <html class=\"no-js\" lang=\"en-US\"> <!--<![endif]-->\n<head>\n\n<title>n8n.cloud | 524: A timeout occurred</title>\n<meta charset=\"UTF-8\" />\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />\n<meta http-equiv=\"X-UA-Compatib)"
+  },
+  "submissions": {
+    "node-not-ready": {
+      "token": "sub-0fd3b865511546f1886da2ae45ae4248",
+      "bound": "before the call was made",
+      "claim": "/Users/dimitar/PROJECTS/AI-incident-investigator/docs/claims/node-not-ready.json"
+    },
+    "volume-full": {
+      "token": "sub-83461c7978ff4a06b43d81d972ce4ab4",
+      "bound": "before the call was made",
+      "claim": "/Users/dimitar/PROJECTS/AI-incident-investigator/docs/claims/volume-full.json"
+    },
+    "dependency-unavailable": {
+      "token": "sub-a2f8672ab0da4e849d0361ef56d53c72",
+      "bound": "before the call was made",
+      "claim": "/Users/dimitar/PROJECTS/AI-incident-investigator/docs/claims/dependency-unavailable.json"
+    },
+    "connection-pool-exhausted": {
+      "token": "sub-d5cc2d23f10a4d5e8a3b2810cdde8995",
+      "bound": "before the call was made",
+      "claim": "/Users/dimitar/PROJECTS/AI-incident-investigator/docs/claims/connection-pool-exhausted.json"
+    },
+    "dns-resolution-failure": {
+      "token": "sub-a0550f24e0e347ada08b631e8312f5b7",
+      "bound": "before the call was made",
+      "claim": "/Users/dimitar/PROJECTS/AI-incident-investigator/docs/claims/dns-resolution-failure.json"
+    },
+    "network-policy-blocked": {
+      "token": "sub-23418398d7f6405dbf37844bb715ea56",
+      "bound": "before the call was made",
+      "claim": "/Users/dimitar/PROJECTS/AI-incident-investigator/docs/claims/network-policy-blocked.json"
+    }
+  },
+  "totals": {
+    "input_tokens": null,
+    "output_tokens": null,
+    "why": "the webhook reply carries no usage; nothing here could read it"
+  },
+  "scored": {
+    "application-startup-failure": "unasked",
+    "certificate-expired": "unasked",
+    "conflicting-evidence": "unasked",
+    "connection-pool-exhausted": "correct",
+    "container-oom": "unasked",
+    "cpu-throttling": "unasked",
+    "dependency-unavailable": "correct-without-its-evidence",
+    "deployment-regression": "unasked",
+    "dns-resolution-failure": "correct",
+    "image-pull-failure": "unasked",
+    "insufficient-evidence": "unasked",
+    "network-policy-blocked": "correct",
+    "node-not-ready": "correct-without-its-evidence",
+    "readiness-probe-failure": "unasked",
+    "volume-full": "correct"
+  }
+}
