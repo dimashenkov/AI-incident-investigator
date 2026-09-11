@@ -633,7 +633,25 @@ export function compareConfidences(results, answers, root = SCENARIOS) {
     if (other === null || other === undefined) return r;
 
     const mine = confidenceOf(r.scenario);
-    const theirs = confidenceOf(other);
+    /*
+     * The comparable is declared by scenario NAME (`container-oom`), but a run
+     * carries an attempt (`container-oom#5`). Look the comparable up at THIS
+     * run's attempt first. Grok, 2026-09-11, before the paid pair: the lookup
+     * read the bare name, so conflicting-evidence#5 was compared with a bare
+     * container-oom that this run never produced — absent, so unqualified and
+     * the pair wasted; or worse, a stale bare container-oom left in the file
+     * from an earlier prompt, a number from a different measurement.
+     *
+     * So: an attempted run compares only with the comparable AT THE SAME
+     * attempt. If that is absent it stays null — a bare comparable of unknown
+     * provenance does not stand in for it. A bare run (the unit tests, and any
+     * single-attempt scoring) keeps comparing bare-with-bare.
+     */
+    const attempt = attemptOf(r.scenario);
+    const otherKey = attempt === null
+      ? other
+      : (answers?.[`${other}#${attempt}`] !== undefined ? `${other}#${attempt}` : null);
+    const theirs = otherKey === null ? null : confidenceOf(otherKey);
     /*
      * A refusal has no confidence to compare, and it is an accepted answer for
      * exactly this scenario — so the comparison does not apply to it.
@@ -642,8 +660,10 @@ export function compareConfidences(results, answers, root = SCENARIOS) {
 
     if (mine === null || theirs === null) {
       return { ...r, state: "correct-but-unqualified",
-        why: [`the confidence here cannot be compared with ${other}: `
-          + `${mine === null ? "this run states none" : `${other} was not answered in this run`}`] };
+        why: [`the confidence here cannot be compared with ${other}`
+          + `${attempt === null ? "" : ` at attempt ${attempt}`}: `
+          + `${mine === null ? "this run states none"
+              : `${otherKey ?? other} was not answered in this run`}`] };
     }
     if (!(mine < theirs)) {
       return { ...r, state: "correct-but-unqualified",
