@@ -99,7 +99,7 @@
               "type": "string",
               "minLength": 1
             },
-            "description": "Recorded, not dropped. It is what the AGENT calls a contradiction, and since 2026-09-07 that is the only thing written into the incident as evidence against the conclusion \u2014 before that, any finding the verdict happened not to cite was rendered as dissent, which invented a stance the agent never took. It does NOT lower any score: nothing computes a confidence from it, and this sentence said otherwise for three chunks. The number is the model\u2019s own; what judges it is scripts/score-run.mjs, against a ceiling a scenario declares in advance. Each entry is a non-empty source_ref and is traced back to a finding exactly like supported_by: Codex, chunk 0 round 11 — only the supporting side was checked, so a hypothesis could be weakened by contradictions that no finding reports, or by an empty string."
+            "description": "Recorded, not dropped. It is what the AGENT calls a contradiction, and since 2026-09-07 that is the only thing written into the incident as evidence against the conclusion — before that, any finding the verdict happened not to cite was rendered as dissent, which invented a stance the agent never took. It does NOT lower any score: nothing computes a confidence from it, and this sentence said otherwise for three chunks. The number is the model’s own; what judges it is scripts/score-run.mjs, against a ceiling a scenario declares in advance. Each entry is a non-empty source_ref and is traced back to a finding exactly like supported_by: Codex, chunk 0 round 11 — only the supporting side was checked, so a hypothesis could be weakened by contradictions that no finding reports, or by an empty string."
           }
         }
       }
@@ -109,6 +109,11 @@
       "minimum": 0.0,
       "maximum": 1.0,
       "description": "How much this agent trusts its own hypotheses. 0.0 is a legitimate answer."
+    },
+    "confidence_because": {
+      "type": "string",
+      "minLength": 12,
+      "description": "One sentence saying what the confidence figure stands on. Added 2026-09-11, after the owner asked why an answer said 90% and nothing in the record could say. Counted across 49 recorded answers: every one carried a figure, none carried a reason, and the hypothesis itself carried no figure of its own in 40 of them. OPTIONAL on purpose, and the reason is a cost rather than a preference: requiring it was written and then withdrawn the same hour, because a schema that refuses an answer for a missing SENTENCE throws away a paid measurement whose code and citations were both there. The prompt asks for it and scripts/score-run.mjs reports whether it arrived, so a model that ignores it is visible without a run being lost. A minimum length rather than a pattern, because the shape of a reason cannot be validated and its absence can."
     }
   },
   "allOf": [

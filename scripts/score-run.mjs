@@ -581,7 +581,8 @@ export function scoreAll(answers, root = SCENARIOS) {
   const extra = keys
     .filter((k) => attemptOf(k) !== null)
     .sort()
-    .map((k) => ({ ...score(k, answers[k], root), gathering: gathering(answers[k]) }));
+    .map((k) => ({ ...score(k, answers[k], root), gathering: gathering(answers[k]),
+      figure: figureLine(whatTheFigureStandsOn(answers[k])) }));
   /*
    * A scenario answered ONLY under numbered attempts was still answered.
    *
@@ -662,6 +663,87 @@ export function compareConfidences(results, answers, root = SCENARIOS) {
  * It is reported beside the verdict, never folded into it: this does not change
  * whether an answer is correct, it says what the answer was reached from.
  */
+/**
+ * What a confidence figure STANDS ON, counted rather than argued.
+ *
+ * The owner asked why one answer said 90%, and the honest reply was that
+ * nothing in the record says. Counted across all 49 recorded answers on
+ * 2026-09-11: the figure is carried faithfully from the concluding agent in 47
+ * of them, the hypothesis carries no figure of its own in 40, and `0.8` exactly
+ * accounts for 22. So the number is not arbitrary at the coarsest grain —
+ * insufficient-evidence answered 0 six times out of six — and it is arbitrary
+ * at the fine grain, which is where a 0.6 ceiling gets compared against it.
+ *
+ * This does not invent a rule connecting the two. It puts them side by side, so
+ * "0.9" is read as "0.9, standing on nine citations and no contradiction"
+ * rather than as a number with nothing behind it. Deterministic, from the
+ * recorded answer, and it costs no run.
+ */
+export function whatTheFigureStandsOn(answer) {
+  const conf = answer?.incident?.analysis?.confidence;
+  if (typeof conf !== "number" || !Number.isFinite(conf)) return null;
+  const ev = answer?.incident?.analysis?.evidence;
+  const rows = Array.isArray(ev) ? ev : [];
+  /*
+   * Counted by what each entry SAYS it does, not by its position. An entry
+   * with no `supports` is neither for nor against, and it is counted as
+   * neither — folding it into "for" would inflate exactly the number this is
+   * meant to make readable.
+   */
+  let forIt = 0;
+  let against = 0;
+  let unstated = 0;
+  for (const e of rows) {
+    const side = e === null || typeof e !== "object" ? undefined : e.supports;
+    if (side === "for") forIt += 1;
+    else if (side === "against") against += 1;
+    else unstated += 1;
+  }
+  const sources = new Set(rows
+    .filter((e) => e !== null && typeof e === "object" && typeof e.source === "string")
+    .map((e) => e.source));
+  /*
+   * Whether the concluder said WHY, carried beside the count.
+   *
+   * The schema does not demand it: refusing an answer for a missing sentence
+   * throws away a paid measurement whose code and citations were both there.
+   * So the absence is reported instead of being fatal, and a model that
+   * ignores the prompt is visible without a run being lost.
+   */
+  const raw = answer?.raw_answers?.["root-cause"];
+  let said = null;
+  if (typeof raw === "string") { try { said = JSON.parse(raw)?.confidence_because ?? null; } catch { said = null; } }
+  else if (raw !== null && typeof raw === "object") said = raw.confidence_because ?? null;
+  const because = typeof said === "string" && said.trim().length >= 12 ? said.trim() : null;
+  return { confidence: conf, for: forIt, against, unstated, because, sources: [...sources].sort() };
+}
+
+/** One line saying what the figure stands on, or null when there is no figure. */
+export function figureLine(stands) {
+  if (stands === null) return null;
+  const pct = `${Math.round(stands.confidence * 100)}%`;
+  const bits = [`${stands.for} for`];
+  if (stands.against > 0) bits.push(`${stands.against} against`);
+  if (stands.unstated > 0) bits.push(`${stands.unstated} taking no side`);
+  const from = stands.sources.length > 0 ? `, from ${stands.sources.join(" and ")}` : "";
+  /*
+   * An answer with a figure and NO evidence is the one worth naming out loud:
+   * a number standing on nothing is the shape this whole line exists to expose.
+   */
+  /*
+   * The model's own sentence, when it gave one, and the fact that it did not
+   * when it did not. Both are readings of the same record and neither is a
+   * verdict.
+   */
+  const why = stands.because === null
+    ? " · the concluder gave no reason, which the prompt asks for and the schema does not enforce"
+    : ` · it says: ${stands.because}`;
+  if (stands.for === 0 && stands.against === 0 && stands.unstated === 0) {
+    return `${pct}, standing on no cited evidence at all${why}`;
+  }
+  return `${pct}, standing on ${bits.join(", ")}${from}${why}`;
+}
+
 export function gathering(answer) {
   const c = answer?.incident?.collection;
   if (c === null || typeof c !== "object" || Array.isArray(c)) return [];
@@ -714,6 +796,11 @@ export function format(results) {
   lines.push("", `  ${correct} correct, ${ungrounded} right code on other ground, ` +
     `${unqualified} right code held wrongly, ${wrong} wrong, ` +
     `${unestablished} not established, of ${results.length}`);
+  const standing = results.filter((r) => typeof r.figure === "string" && r.figure.length > 0);
+  if (standing.length > 0) {
+    lines.push("", "  WHAT EACH CONFIDENCE FIGURE STANDS ON — counted, not a rule:");
+    for (const r of standing) lines.push(`    ${r.scenario}: ${r.figure}`);
+  }
   const partial = results.filter((r) => Array.isArray(r.gathering) && r.gathering.length > 0);
   if (partial.length > 0) {
     lines.push("", "  WHAT THE ANSWERS WERE REACHED FROM — not a verdict, and not folded into one:");

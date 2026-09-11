@@ -906,7 +906,7 @@ export const LIMITATIONS = [
   //
   // So it is said instead: the number is what the model said, and a reader who
   // takes it for a measurement is taking it for something it is not.
-  "that a confidence figure means anything beyond what the model asserted — the prompt asks for bands and nothing enforces them",
+  "that a confidence figure means anything beyond what the model asserted — the prompt asks for bands and nothing enforces them. Counted across all 49 recorded answers on 2026-09-11: the hypothesis carries no confidence of its own in 40 of them, and no field anywhere connects the number to how much evidence resolved. What the count also REFUTED, and it was my own claim: the figure is carried faithfully — the report equals the concluding agent's own number in 47 of 49. And it is not arbitrary at the coarsest grain: insufficient-evidence answered 0 six times out of six. It is arbitrary at the fine grain, which is where it gets read: 0.8 exactly, in 22 of 49. So the distance between 0.8 and 0.9 carries nothing, and the ceiling of 0.6 that one scenario declares is compared against a number with no scale behind it. The owner was told and chose to leave it: a stated limitation, not a defect awaiting a fix",
   // Codex, 2026-09-06, listing what local and live can still differ in after
   // the harness was made to walk the real connections: n8n's item-linking
   // semantics for $().item, which a name map does not reproduce; node and

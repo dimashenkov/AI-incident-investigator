@@ -201,6 +201,24 @@ nobody can trace back is an opinion, and it is refused.
 has to resolve. The path stored in the incident is the one that resolves, so a
 human following your citation lands on the value that was checked.
 
+**Point at the FIELD, not at the object that contains it.** Measured on
+2026-09-11: a finding said "container last termination exit_code is 1" and cited
+`pods[0].containers[0].last_state.terminated` — the object. The value the fact
+states lives at `.exit_code` inside it, and the citation has to land on that
+value. A path that resolves to an object while the fact names one of its fields
+is refused: a human following it sees a block of JSON and has to guess which
+line you meant.
+
+So: `pods[0].containers[0].last_state.terminated.reason`, never
+`pods[0].containers[0].last_state.terminated`, when the fact is about the
+reason. If a finding is about two fields, it is two findings.
+
+This is not "always point at the deepest thing". It is "point at what the fact
+is about". A fact about a whole object cites the object — a measurement that
+names both a time and a value legitimately cites the point that holds them. The
+defect is the MISMATCH: a fact naming one field while the path stops at its
+parent.
+
 **Every hypothesis needs `supported_by`**, and each entry must be the
 `source_ref` of a finding you actually reported in this same answer. Citing
 something you did not report is refused.

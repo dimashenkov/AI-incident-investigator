@@ -154,6 +154,21 @@ against it.
 Every entry of `contradicted_by`, exactly like `supported_by`, must be the
 `source_ref` of a finding **you** reported in this same answer.
 
+**Say in one sentence what the figure stands on.** Put it in
+`confidence_because`: one sentence, naming what moved the number. Counted across
+49 recorded answers on 2026-09-11, every one of them returned a figure and NONE
+of them said why — and the owner asked, reasonably, why one answer said 90%.
+
+Write what a reader can check against your own findings: how many of them point
+the same way, whether anything contradicts, and how many different agents they
+came from. "Nine findings from three agents agree and nothing contradicts" is a
+sentence somebody can verify. "I am fairly confident" is not, and it is refused.
+
+The same counting showed what the figure already tracks, so this is not a new
+rule invented for you — it is the reason you already have, written down: 90% came
+with nine citations from three agents, 80% with three from two, and every answer
+that found nothing said 0.
+
 **Confidence is a reading of the evidence, not a habit of caution.** Measured on
 2026-09-05, on the first live run: nine findings from three agents all pointed
 at the same terminated container, none contradicted it, and the answer came back

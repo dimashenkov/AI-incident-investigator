@@ -1043,8 +1043,11 @@ export const MUTATIONS = [
     // no_data, taken through the door that has no confidence rule.
     id: "empty-ok-result-allowed-to-claim-confidence",
     file: "schemas/agent-result.schema.json",
-    from: '      "then": {\n        "type": "object",\n        "properties": {\n          "confidence": {\n            "const": 0\n          }\n        }\n      }\n    }\n  ]',
-    to: '      "then": {\n        "type": "object"\n      }\n    }\n  ]',
+    // Re-anchored on 2026-09-11: the old text ended with the closing bracket
+    // of the allOf array, so appending a sixth rule made it stale. An anchor
+    // that depends on being LAST breaks the next time anything is added.
+    from: '"then": {\n        "type": "object",\n        "properties": {\n          "confidence": {\n            "const": 0\n          }\n        }\n      }',
+    to: '"then": {\n        "type": "object"\n      }',
     mustFail: "16 ok with nothing found and confidence anyway",
   },
   {
@@ -2828,5 +2831,49 @@ export const MUTATIONS = [
     from: '  const { rows } = await page(workflowId, 20, undefined, "running");',
     to: "  const { rows } = await page(workflowId, 20, undefined, undefined);",
     mustFail: "asks the executions endpoint for the running ones by status",
+  },
+  {
+    // Reporting the absence is the whole substitute for enforcing it. Drop the
+    // report and a model that ignores the prompt becomes invisible.
+    id: "a-missing-reason-is-not-reported",
+    file: "scripts/score-run.mjs",
+    from: '    ? " · the concluder gave no reason, which the prompt asks for and the schema does not enforce"',
+    to: '    ? ""',
+    mustFail: "says the reason is missing, naming whose job it was",
+  },
+  {
+    // An empty string wearing the field's name is absence, not a reason.
+    id: "an-empty-reason-passes-as-a-reason",
+    file: "schemas/agent-result.schema.json",
+    from: '      "minLength": 12,',
+    to: '      "minLength": 0,',
+    mustFail: "still refuses a reason short enough to be a shrug, when one is given",
+  },
+  {
+    // Folding an entry that takes no side into the supporting count inflates
+    // the very number this line exists to make readable.
+    id: "evidence-taking-no-side-counts-as-support",
+    file: "scripts/score-run.mjs",
+    from: '    if (side === "for") forIt += 1;',
+    to: '    if (side !== "against") forIt += 1;',
+    mustFail: "counts an entry that takes no side as neither, not as support",
+  },
+  {
+    // Absent is not zero. A line that renders a missing figure as 0% invents
+    // one.
+    id: "a-missing-figure-is-rendered-as-zero",
+    file: "scripts/score-run.mjs",
+    from: "  if (typeof conf !== \"number\" || !Number.isFinite(conf)) return null;",
+    to: "  if (false) return null;",
+    mustFail: "has nothing to say when there is no figure",
+  },
+  {
+    // A field the validator demands and the prompt never mentions is a run
+    // that fails for a reason the model was never told.
+    id: "the-prompt-never-asks-for-the-reason",
+    file: "prompts/root-cause-agent.md",
+    from: "**Say in one sentence what the figure stands on.** Put it in\n`confidence_because`:",
+    to: "**Say in one sentence what the figure stands on.** Put it in\nthe answer somewhere:",
+    mustFail: "is asked for in the prompt, not only enforced by the schema",
   },
 ];
