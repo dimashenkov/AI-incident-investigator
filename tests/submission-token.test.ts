@@ -12,7 +12,7 @@ import { describe, it, expect } from "vitest";
 // @ts-expect-error — plain .mjs, the same file node runs.
 import { submissionToken, callOnce, recordShape, classifyReply, claimKey, claimPathFor, releaseClaim, ledgerFrom, liveCallFromTestLedger, liveCallAllowed, hostOf, canonical, isInside, ensureDurableDir, writeClaimFile, writeAtomic, CLAIM_CREATED, LEDGER, TOKEN_HEADER } from "../scripts/run-scenarios.mjs";
 // @ts-expect-error — plain .mjs, the same file node runs.
-import { tokenOf, matchByToken, scanForToken, tokenInRecord, parseReaderArgv, TOKEN_HEADER as READ_HEADER } from "../scripts/collect-execution.mjs";
+import { tokenOf, matchByToken, scanForToken, tokenInRecord, parseReaderArgv, runningExecutions, TOKEN_HEADER as READ_HEADER } from "../scripts/collect-execution.mjs";
 import { readFileSync, writeFileSync, mkdtempSync, realpathSync, existsSync, symlinkSync, openSync, closeSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
@@ -913,5 +913,80 @@ describe("the floor that does not depend on what a test happens to set", () => {
     expect(flag).toBeGreaterThan(-1);
     expect(plan).toBeGreaterThan(flag);
     expect(call).toBeGreaterThan(flag);
+  });
+});
+
+describe("a submission whose execution has not finished", () => {
+  const web = (h: unknown) => ({
+    status: "success", finished: true,
+    data: { resultData: { runData: { "Incident Webhook": [{ data: { main: [[{ json: { headers: h } }]] } }] } } },
+  });
+
+  it("says pending, not none, when something is still running", async () => {
+    /*
+     * Measured on 2026-09-11: the default execution list DOES NOT SHOW running
+     * executions. A submission made a minute earlier was absent from a list of
+     * the newest six, while a direct read of its id returned it — and so did
+     * `?status=running`.
+     *
+     * So a scan over the default list can answer "no execution carries this
+     * token" about a token whose execution is running in front of it. That is
+     * safe, because `none` is never permission to submit again, but it is the
+     * wrong answer and sends somebody hunting for a submission that is simply
+     * not done.
+     */
+    const r = await scanForToken("w", "sub-mine", {
+      page: async () => ({ rows: [{ id: 1 }], cursor: undefined }),
+      one: async () => web({ [TOKEN_HEADER]: "sub-someone-else" }),
+      runningRows: async () => [330],
+    });
+    expect(r.state).toBe("pending");
+    expect(r.running).toEqual([330]);
+    expect(r.why).toContain("cannot be read until they finish");
+  });
+
+  it("still says none when nothing is running", async () => {
+    // Otherwise every miss would become "come back later" and a genuinely
+    // absent submission would never be reported as absent.
+    const r = await scanForToken("w", "sub-mine", {
+      page: async () => ({ rows: [{ id: 1 }], cursor: undefined }),
+      one: async () => web({ [TOKEN_HEADER]: "sub-someone-else" }),
+      runningRows: async () => [],
+    });
+    expect(r.state).toBe("none");
+  });
+
+  it("does not turn a match into pending", async () => {
+    const r = await scanForToken("w", "sub-mine", {
+      page: async () => ({ rows: [{ id: 1 }], cursor: undefined }),
+      one: async () => web({ [TOKEN_HEADER]: "sub-mine" }),
+      runningRows: async () => [330],
+    });
+    expect(r.state, "a found answer is not a pending one").toBe("one");
+  });
+
+  it("treats a failure to list running executions as nothing running, and says none", async () => {
+    /*
+     * The one place where "could not look" falls to the plainer answer on
+     * purpose: `none` already means "not permission to submit again", so
+     * nothing is risked, and inventing a pending state out of a failed read
+     * would hide a genuinely missing submission behind "try later" forever.
+     */
+    const r = await scanForToken("w", "sub-mine", {
+      page: async () => ({ rows: [{ id: 1 }], cursor: undefined }),
+      one: async () => web({ [TOKEN_HEADER]: "sub-someone-else" }),
+      runningRows: async () => { throw new Error("HTTP 500"); },
+    });
+    expect(r.state).toBe("none");
+  });
+
+  it("asks the executions endpoint for the running ones by status", async () => {
+    let asked: unknown[] = [];
+    const ids = await runningExecutions("w", async (...args: unknown[]) => {
+      asked = args;
+      return { rows: [{ id: 7 }, {}, { id: 9 }], cursor: undefined };
+    });
+    expect(asked[3], "the status filter is what makes them visible at all").toBe("running");
+    expect(ids, "a row with no id is not an execution").toEqual([7, 9]);
   });
 });

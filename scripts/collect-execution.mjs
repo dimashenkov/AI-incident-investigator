@@ -219,11 +219,12 @@ export async function executionWithData(id) {
 }
 
 /** One page of executions, newest first, with the cursor to continue. A read. */
-export async function executionPage(workflowId, limit = 20, cursor = undefined) {
+export async function executionPage(workflowId, limit = 20, cursor = undefined, status = undefined) {
   const q = [];
   if (workflowId !== undefined) q.push(`workflowId=${encodeURIComponent(workflowId)}`);
   q.push(`limit=${Number(limit)}`);
   if (typeof cursor === "string" && cursor.length > 0) q.push(`cursor=${encodeURIComponent(cursor)}`);
+  if (typeof status === "string" && status.length > 0) q.push(`status=${encodeURIComponent(status)}`);
   const body = await get(`/executions?${q.join("&")}`);
   return {
     rows: Array.isArray(body?.data) ? body.data : [],
@@ -231,6 +232,23 @@ export async function executionPage(workflowId, limit = 20, cursor = undefined) 
     // through as "continue here" would ask for page one again, forever.
     cursor: typeof body?.nextCursor === "string" && body.nextCursor.length > 0 ? body.nextCursor : undefined,
   };
+}
+
+/**
+ * The executions of this workflow that have not finished.
+ *
+ * Measured on 2026-09-11: the default execution list DOES NOT SHOW running
+ * executions. A submission made a minute ago was invisible in a list of the
+ * newest six, while a direct GET on its id returned it — and `?status=running`
+ * returned it too. So a scan over the default list can answer "no execution
+ * carries this token" about a token whose execution is running in front of it.
+ *
+ * That answer is safe — `none` is never permission to submit again — but it is
+ * the WRONG answer, and the right one exists: still going.
+ */
+export async function runningExecutions(workflowId, page = executionPage) {
+  const { rows } = await page(workflowId, 20, undefined, "running");
+  return rows.map((r) => r?.id).filter((id) => id !== undefined && id !== null);
 }
 
 /**
@@ -245,7 +263,8 @@ export async function executionPage(workflowId, limit = 20, cursor = undefined) 
  * edge, and "not found" is the answer that costs money.
  */
 export async function scanForToken(workflowId, token, opts = {}) {
-  const { pages = 5, perPage = 20, page = executionPage, one = executionWithData } = opts;
+  const { pages = 5, perPage = 20, page = executionPage, one = executionWithData,
+    runningRows = runningExecutions } = opts;
   const scanned = [];
   const seen = new Set();
   let cursor;
@@ -323,6 +342,24 @@ export async function scanForToken(workflowId, token, opts = {}) {
    * the only hit, and this is the third way that distinction was being lost.
    */
   const exhausted = cursor !== undefined;
+  /*
+   * Nothing matched, and something is still running.
+   *
+   * A running execution has no node data yet, so its token cannot be READ —
+   * which means the honest answer is neither "not found" nor "found", but
+   * "come back when it has finished". Answering `none` here is what would send
+   * somebody looking for a lost submission that is simply not done.
+   */
+  if (found.state === "none" || found.state === "uncertain") {
+    let running = [];
+    try { running = await runningRows(workflowId); }
+    catch { running = []; }                 // cannot look is not "nothing is running"
+    if (running.length > 0) {
+      return { state: "pending", running, pagesWalked: walked,
+        why: `no finished execution carries the token, and ${running.length} execution(s) are still `
+          + "running, whose tokens cannot be read until they finish" };
+    }
+  }
   if (exhausted && found.state === "one") {
     return { state: "one-unverified", id: found.id, unreadable: [],
       why: `one execution carried the token, and the scan stopped at its ${pages}-page bound with more `
@@ -428,6 +465,12 @@ if (process.argv[1] !== undefined && import.meta.url.endsWith(process.argv[1].sp
           + `  the execution that carried it is ${found.id}.\n`
           + `  read it deliberately with:  node scripts/collect-execution.mjs ${found.id} `
           + `${answersPath}${keyArg ? ` ${keyArg}` : ""}\n`);
+        process.exit(3);
+      }
+      if (found.state === "pending") {
+        process.stdout.write(`pending: ${found.why}\n`
+          + `  still running: ${found.running.join(", ")}\n`
+          + "  nothing is lost; read it again when it has finished\n");
         process.exit(3);
       }
       if (found.state !== "one") {

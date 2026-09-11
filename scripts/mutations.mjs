@@ -2811,4 +2811,22 @@ export const MUTATIONS = [
     to: "      if (smallest === null) smallest = { f, bytes };",
     mustFail: "picks the smallest test file rather than a named one",
   },
+  {
+    // The default execution list hides running executions, so a scan over it
+    // answers "no execution carries this token" about one running in front of
+    // it.
+    id: "a-running-submission-reads-as-absent",
+    file: "scripts/collect-execution.mjs",
+    from: '  if (found.state === "none" || found.state === "uncertain") {',
+    to: "  if (false) {",
+    mustFail: "says pending, not none, when something is still running",
+  },
+  {
+    // Without the status filter the running ones stay invisible.
+    id: "the-running-list-is-asked-without-a-status",
+    file: "scripts/collect-execution.mjs",
+    from: '  const { rows } = await page(workflowId, 20, undefined, "running");',
+    to: "  const { rows } = await page(workflowId, 20, undefined, undefined);",
+    mustFail: "asks the executions endpoint for the running ones by status",
+  },
 ];
