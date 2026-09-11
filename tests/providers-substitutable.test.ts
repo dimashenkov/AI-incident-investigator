@@ -11,6 +11,7 @@
  * never run, and says so; these tests are about the ones that do run.
  */
 import { describe, it, expect } from "vitest";
+import { checkNamespacesInContent } from "../src/core/assemble.js";
 import { allProviders, unexercised } from "../src/providers/registry.js";
 import { ROGUE_BEHAVIOURS, rogueProvider } from "../src/providers/rogue.js";
 import { fixtureProvider, newCollectionRequest, SLOTS } from "../src/providers/fixtures.js";
@@ -78,6 +79,72 @@ describe("more than one implementation answers the same question", () => {
     const text = JSON.stringify(o.data);
     expect(text, "the foreign fixture is not foreign, so this test proves nothing").toContain("acme-bank");
     expect(text, "and it carries our stamp, which is the whole problem").toContain(REQUEST.collection_id);
+  });
+
+  it("is caught one level up, because a kubernetes pod says whose namespace it is in", () => {
+    /*
+     * The limitation above is now NARROWER than it was, and this is the line
+     * that says how far.
+     *
+     * Provenance still cannot tell whose data this is — the provider above
+     * still returns `collected`. But a kubernetes payload carries
+     * `pods[].namespace`, and the assembler compares it against the namespace
+     * that was asked for. So unstamped foreign data is refused when it is a
+     * kubernetes observation, and still gets through for logs and metrics,
+     * which carry no field that says whose they are.
+     *
+     * The gate listed this as "a gap rather than an impossibility" every run
+     * until it was closed. Half of it is closed; the sentence now has to say
+     * which half.
+     */
+    const o = rogueProvider("unstamped-foreign", ROOT).read("container-oom", "kubernetes", REQUEST);
+    expect(o.state, "the provider still accepts it; the check is not there").toBe("collected");
+    const bad = checkNamespacesInContent(
+      { kubernetes: o, logs: { state: "failed", slot: "logs", kind: "absent", reason: "not part of this test" },
+        metrics: { state: "failed", slot: "metrics", kind: "absent", reason: "not part of this test" } } as never,
+      REQUEST);
+    /*
+     * Which CARRIER refused it, not merely that something did.
+     *
+     * The another-tenant fixture has a foreign pod AND a foreign deployment,
+     * and both refusals name `acme-bank`. So a test asserting only the name
+     * passed with the pod comparison switched off — the deployment check had
+     * silently taken over, and a mutation survived the gate saying so.
+     *
+     * Third time this pattern has appeared today: a check added in front of
+     * another makes the older one unreachable, and the test that covers it
+     * keeps passing for the wrong reason.
+     */
+    expect(bad, "the POD comparison is what refuses it here").toContain("a pod in namespace acme-bank");
+    expect(bad).toContain(REQUEST.namespace);
+  });
+
+  it("refuses a pod that does not say which namespace it is in", () => {
+    // Three answers, not two: a pod with no namespace is not a pod from the
+    // right one. Unstamped content is exactly what cannot be attributed, and
+    // calling it clean is the defect this project catches everywhere else.
+    const o = { state: "collected", slot: "kubernetes",
+      data: { pods: [{ name: "p", phase: "Running" }] } };
+    const bad = checkNamespacesInContent(
+      { kubernetes: o, logs: { state: "failed", slot: "logs", kind: "absent", reason: "n/a" },
+        metrics: { state: "failed", slot: "metrics", kind: "absent", reason: "n/a" } } as never,
+      REQUEST);
+    expect(bad).toContain("carries no namespace");
+  });
+
+  it("says nothing about a slot that carries no namespace to compare", () => {
+    /*
+     * Three answers, not two. Logs and metrics are not "clean" — they are
+     * unestablished, and the check must not report them as either. A check
+     * that answered "no problem found" for a payload it cannot read would be
+     * the defect this project catches everywhere else.
+     */
+    const logs = rogueProvider("unstamped-foreign", ROOT).read("container-oom", "logs", REQUEST);
+    const bad = checkNamespacesInContent(
+      { logs, kubernetes: { state: "failed", slot: "kubernetes", kind: "absent", reason: "not part of this test" },
+        metrics: { state: "failed", slot: "metrics", kind: "absent", reason: "not part of this test" } } as never,
+      REQUEST);
+    expect(bad, "it has nothing to say here, and says nothing rather than clean").toBe(null);
   });
 
   it("says which implementations have never been run, rather than counting them as working", () => {

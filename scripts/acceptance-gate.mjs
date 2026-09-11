@@ -801,7 +801,7 @@ export const LIMITATIONS = [
    * and metrics genuinely carry no such field. An overclaim of impossibility is
    * how a closable gap stays open.
    */
-  "that a legitimately collected observation contains nothing belonging to anyone else. Provenance says it was asked for, not that its contents are clean. For logs and metrics there is no field to compare; for kubernetes there is one — pods[].namespace — and it is NOT yet compared, which is a gap rather than an impossibility",
+  "that an observation contains nothing belonging to anyone else. Provenance says it was asked for, not that its contents are clean. What IS compared, as of 2026-09-11: every pods[].namespace and deployment.namespace in a kubernetes observation, against the namespace the collection was requested under — so another tenant's pod or deployment is refused even when the payload is unstamped and carries our own stamp, and one with no namespace is refused too. What is NOT: log lines and metric series, which carry no field that says whose they are, and events[].involved_object, which is one unstructured string with no namespace in it, so a foreign pod NAME can still ride in there. And the boundary of the check itself: comparing a namespace field establishes that it AGREES with the request, never that it is truthful — foreign content relabelled with the namespace we asked about still passes",
   // Moved here from DEBT on 2026-09-05. Codex: "the DEBT trigger is not
   // checkable — it describes an external permission condition while enforcement
   // is an unrelated dueFromChunk. Nothing detects the second pusher arriving."

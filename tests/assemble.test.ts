@@ -1046,13 +1046,18 @@ describe("the isolation refusals, through the entry point that actually assemble
     expect(a.reason).not.toContain("every observation failed");
   });
 
-  it("carries the namespace the caller asked for into the stamp, not just into the incident", () => {
+  it("refuses production fixtures asked about another namespace, and the request still reached the provider", () => {
     /*
-     * The first version of this asserted `"staging"` appeared anywhere in the
-     * incident. `assembleIncident` writes `namespace` on the incident itself,
-     * so it passed whether or not the request ever reached a provider. Grok,
-     * 2026-09-10. The stamp is what the isolation check compares, so the stamp
-     * is what this reads — and `cluster` too, which nothing read before.
+     * This test used to expect `assembled`, and it was right to until the
+     * CONTENT of a kubernetes observation started being compared. The fixture
+     * set describes `production`; being handed production pods after asking
+     * about `staging` is exactly the contamination the content check exists
+     * for, so the honest answer is a refusal.
+     *
+     * The original property is still asserted: the request the caller made is
+     * the request the provider is given. Grok, 2026-09-10, strengthened it
+     * from "staging appears somewhere in the incident", which passed whether
+     * or not the request ever reached a provider.
      */
     let sawCluster: string | undefined;
     let sawNamespace: string | undefined;
@@ -1069,25 +1074,106 @@ describe("the isolation refusals, through the entry point that actually assemble
     });
     expect(sawNamespace, "the request the caller made is the request the provider is given").toBe("staging");
     expect(sawCluster, "cluster is read too, and nothing read it before").toBe("test-eu");
-    expect(a.state).toBe("assembled");
-    if (a.state !== "assembled") return;
+    expect(a.state, "and the content does not match what was asked for").toBe("refused");
+    if (a.state !== "refused") return;
+    expect(a.reason).toContain("another tenant's data inside a legitimately collected observation");
+    expect(a.reason).toContain("production");
+  });
+
+  it("carries the namespace the caller asked for into the incident and into every stamp", () => {
     /*
-     * And the STAMP, which is what the isolation check compares against.
+     * Grok added this property on 2026-09-10 and the split nearly lost it:
+     * asserting the STAMP against the default `production` would pass even if
+     * the incident document hardcoded `production` while the request carried
+     * something else.
      *
-     * This test used to assert only what the provider was handed. Grok,
-     * 2026-09-10: "Test 3 never opens a.incident. If the document still wrote
-     * namespace production while the request carried staging, all three expects
-     * would pass." A test whose comment claims more than its assertions is the
-     * defect this file exists to refuse.
+     * It needs content in the namespace being asked about, because the content
+     * check now refuses production pods handed back for a staging request —
+     * correctly. So the provider here serves what it was asked for, which is
+     * what a real provider does.
      */
+    const serving: Provider = {
+      name: "serves-what-was-asked", exercised: true, unexercisedBecause: "",
+      read(scenario: string, slot: string, request: CollectionRequest) {
+        const o = fixtureProvider(SCENARIOS).read(scenario, slot as never, request);
+        if (slot !== "kubernetes" || o.state !== "collected") return o;
+        const d = JSON.parse(JSON.stringify(o.data)) as Record<string, unknown>;
+        for (const pod of (d["pods"] as Record<string, unknown>[]) ?? []) pod["namespace"] = request.namespace;
+        const dep = d["deployment"] as Record<string, unknown> | undefined;
+        if (dep !== undefined) dep["namespace"] = request.namespace;
+        return { ...o, data: d };
+      },
+    } as unknown as Provider;
+    const a = assembleIncident("cpu-throttling", 1, {
+      root: SCENARIOS, namespace: "staging", cluster: "test-eu", provider: serving,
+    });
+    expect(a.state, "content in the namespace that was asked for assembles").toBe("assembled");
+    if (a.state !== "assembled") return;
     const inc = a.incident as Record<string, unknown>;
     expect(inc["namespace"], "the incident is about the namespace that was asked for").toBe("staging");
-    expect(inc["cluster"]).toBe("test-eu");
     const obs = inc["observations"] as Record<string, { provenance?: Record<string, unknown> }>;
+    let stamps = 0;
     for (const [slot, o] of Object.entries(obs)) {
       if (o?.provenance === undefined) continue;
-      expect(o.provenance["namespace"], `the ${slot} stamp carries the namespace of the request`)
-        .toBe("staging");
+      stamps += 1;
+      expect(o.provenance["namespace"], `the ${slot} stamp carries the namespace of the request`).toBe("staging");
     }
+    expect(stamps, "there were stamps to read").toBeGreaterThan(0);
   });
+
+  it("refuses a deployment from another namespace even when every pod is ours", () => {
+    /*
+     * One rule, two carriers. `deployment.namespace` is required by the schema
+     * and was not compared, so production pods beside a foreign DEPLOYMENT
+     * assembled cleanly. Astra, 2026-09-11, by running it.
+     */
+    const tainted: Provider = {
+      name: "foreign-deployment", exercised: true, unexercisedBecause: "",
+      read(scenario: string, slot: string, request: CollectionRequest) {
+        const o = fixtureProvider(SCENARIOS).read(scenario, slot as never, request);
+        if (slot !== "kubernetes" || o.state !== "collected") return o;
+        const d = JSON.parse(JSON.stringify(o.data)) as Record<string, unknown>;
+        (d["deployment"] as Record<string, unknown>)["namespace"] = "acme-bank";
+        return { ...o, data: d };
+      },
+    } as unknown as Provider;
+    const a = assembleIncident("cpu-throttling", 1, { root: SCENARIOS, provider: tainted });
+    expect(a.state).toBe("refused");
+    if (a.state !== "refused") return;
+    expect(a.reason).toContain("a deployment in namespace acme-bank");
+  });
+
+  it("carries what the caller asked for into the stamp, not just into the incident", () => {
+    /*
+     * The stamp is what the isolation check compares against, so the stamp is
+     * what this reads. Grok, 2026-09-10: "Test 3 never opens a.incident. If
+     * the document still wrote namespace production while the request carried
+     * staging, all three expects would pass."
+     *
+     * `cluster` carries that property here, because it is not in the pods and
+     * so can differ from the default without the content check having anything
+     * to say about it. The namespace half is asserted by the test above, which
+     * watches the request arrive.
+     */
+    const a = assembleIncident("cpu-throttling", 1, {
+      root: SCENARIOS, cluster: "test-eu", provider: fixtureProvider(SCENARIOS),
+    });
+    expect(a.state).toBe("assembled");
+    if (a.state !== "assembled") return;
+    const inc = a.incident as Record<string, unknown>;
+    expect(inc["cluster"], "the incident is about the cluster that was asked for").toBe("test-eu");
+    const obs = inc["observations"] as Record<string, { provenance?: Record<string, unknown> }>;
+    let stamps = 0;
+    for (const [slot, o] of Object.entries(obs)) {
+      if (o?.provenance === undefined) continue;
+      stamps += 1;
+      expect(o.provenance["cluster"], `the ${slot} stamp carries the cluster of the request`).toBe("test-eu");
+      expect(o.provenance["namespace"], `the ${slot} stamp carries the namespace of the request`)
+        .toBe("production");
+    }
+    // Otherwise the loop above passes on an empty set, which is the defect
+    // this file exists to refuse.
+    expect(stamps, "there were stamps to read").toBeGreaterThan(0);
+  });
+
 });

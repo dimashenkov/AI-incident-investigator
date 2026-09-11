@@ -175,6 +175,19 @@ export function assembleIncident(
   const provenance = checkProvenance(obs, request);
   if (provenance !== null) return { state: "refused", reason: provenance };
 
+  /*
+   * The stamp says it was asked for; this says its contents are ours.
+   *
+   * A legitimately collected observation can carry another tenant's pod, and
+   * the gate has been listing that as a GAP rather than an impossibility:
+   * `pods[].namespace` exists and nothing compared it. It does now, for
+   * kubernetes only — logs and metrics carry no field that says whose they
+   * are, and that half stays unestablished rather than being checked against
+   * nothing.
+   */
+  const foreign = checkNamespacesInContent(obs, request);
+  if (foreign !== null) return { state: "refused", reason: foreign };
+
   const alertObj = alert as Record<string, unknown>;
   const incident = {
     incident_id: incidentId,
@@ -232,6 +245,87 @@ export function assembleIncident(
  * What it does not: that the provider answered honestly. That is recorded among
  * the things this repository cannot check.
  */
+/**
+ * Does the kubernetes observation's CONTENT name only the namespace we asked
+ * about?
+ *
+ * Provenance says the observation was asked for. It does not say its contents
+ * are clean: a stamp for `production` can sit on a payload carrying a pod from
+ * `staging`. The gate has been listing this as a gap rather than an
+ * impossibility since it was found — `pods[].namespace` exists and nothing
+ * compared it.
+ *
+ * Only kubernetes, and deliberately so. Log lines and metric series carry no
+ * field that says whose they are, and inventing one would be a check that
+ * passes because there is nothing to compare. That half stays listed as
+ * unestablished.
+ *
+ * Three answers, not two. A pod with NO namespace is not a pod from the right
+ * one: unstamped content is exactly what cannot be attributed, and calling it
+ * clean is the defect this project catches everywhere else.
+ */
+export function checkNamespacesInContent(
+  obs: Record<Slot, Observation>,
+  request: CollectionRequest,
+): string | null {
+  const o = obs["kubernetes"];
+  if (o === undefined || o.state !== "collected") return null;
+  const data = o.data;
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return null;
+  const pods = (data as Record<string, unknown>)["pods"];
+  if (!Array.isArray(pods)) return null;
+  for (const [i, pod] of pods.entries()) {
+    if (typeof pod !== "object" || pod === null || Array.isArray(pod)) {
+      return `the kubernetes observation's pod ${i} is not an object, so whose it is cannot be established`;
+    }
+    const ns = (pod as Record<string, unknown>)["namespace"];
+    if (typeof ns !== "string" || ns.length === 0) {
+      return `the kubernetes observation's pod ${i} carries no namespace, so it cannot be said to belong to `
+        + `${request.namespace}`;
+    }
+    if (ns !== request.namespace) {
+      return `the kubernetes observation carries a pod in namespace ${ns}, and ${request.namespace} is what `
+        + "was asked for — this is another tenant's data inside a legitimately collected observation";
+    }
+  }
+  return checkDeploymentNamespace(data as Record<string, unknown>, request);
+}
+
+/**
+ * The same field, on the other object that carries it.
+ *
+ * Astra, 2026-09-11, by running it: `deployment.namespace` is required by the
+ * schema and was not compared, so a payload with production pods and a foreign
+ * DEPLOYMENT assembled cleanly. One rule, two carriers, and only one of them
+ * was being read — which is the defect this repository fixes most often.
+ *
+ * `events[].involved_object` is deliberately NOT compared. It is one
+ * unstructured string, `pod/name`, with no namespace in it, so there is
+ * nothing to compare against; a foreign pod NAME can still ride in there. That
+ * stays a limitation the gate prints, not a check pretending to cover it.
+ */
+function checkDeploymentNamespace(
+  data: Record<string, unknown>,
+  request: CollectionRequest,
+): string | null {
+  const dep = data["deployment"];
+  if (dep === undefined) return null;
+  if (typeof dep !== "object" || dep === null || Array.isArray(dep)) {
+    return "the kubernetes observation's deployment is not an object, so whose it is cannot be established";
+  }
+  const ns = (dep as Record<string, unknown>)["namespace"];
+  if (ns === undefined) return null;             // the schema requires it elsewhere; absence is not a claim here
+  if (typeof ns !== "string" || ns.length === 0) {
+    return `the kubernetes observation's deployment carries no readable namespace, so it cannot be said to `
+      + `belong to ${request.namespace}`;
+  }
+  if (ns !== request.namespace) {
+    return `the kubernetes observation carries a deployment in namespace ${ns}, and ${request.namespace} is `
+      + "what was asked for — this is another tenant's data inside a legitimately collected observation";
+  }
+  return null;
+}
+
 export function checkProvenance(
   obs: Record<Slot, Observation>,
   request: CollectionRequest,

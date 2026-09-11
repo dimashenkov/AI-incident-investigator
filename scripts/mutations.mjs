@@ -2638,4 +2638,45 @@ export const MUTATIONS = [
     to: "    if (false) {",
     mustFail: "says out loud when the claim's durability could not be confirmed",
   },
+  {
+    // The stamp says it was asked for; the content says whose it is. Another
+    // tenant's pod inside a legitimately collected observation was the case
+    // the gate listed as a gap for weeks.
+    id: "foreign-content-passes-a-clean-stamp",
+    file: "src/core/assemble.ts",
+    from: "    if (ns !== request.namespace) {",
+    to: "    if (false) {",
+    mustFail: "is caught one level up, because a kubernetes pod says whose namespace it is in",
+  },
+  {
+    // An unstamped pod is not a pod from the right namespace.
+    // Astra, 2026-09-11: this one is narrower than it looks. With it applied
+    // the observation is still REFUSED, by the `ns !== request.namespace`
+    // branch below — the named test fails on the diagnostic, not on
+    // acceptance. It protects the distinction between "missing" and "foreign",
+    // which is a real property, and not an independent barrier. Said here so
+    // the kill is not read as more than it is.
+    id: "an-unstamped-pod-reads-as-ours",
+    file: "src/core/assemble.ts",
+    from: '    if (typeof ns !== "string" || ns.length === 0) {',
+    to: "    if (false) {",
+    mustFail: "refuses a pod that does not say which namespace it is in",
+  },
+  {
+    // Wired into the entry point, or it is a function nothing calls.
+    id: "the-content-check-is-never-called",
+    file: "src/core/assemble.ts",
+    from: "  const foreign = checkNamespacesInContent(obs, request);",
+    to: "  const foreign = null;",
+    mustFail: "refuses production fixtures asked about another namespace, and the request still reached the provider",
+  },
+  {
+    // One rule, two carriers. Production pods beside a foreign DEPLOYMENT
+    // assembled cleanly while only the pods were compared.
+    id: "the-deployments-namespace-is-not-compared",
+    file: "src/core/assemble.ts",
+    from: "  return checkDeploymentNamespace(data as Record<string, unknown>, request);",
+    to: "  return null;",
+    mustFail: "refuses a deployment from another namespace even when every pod is ours",
+  },
 ];
