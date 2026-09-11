@@ -27,9 +27,9 @@ export const DEFINITION_OF_DONE = [
     why: "Codex, chunk 2: the named tests establish that the fixtures exist, assemble, validate and declare expected causes — they never establish that the system PRODUCES those answers, and marking the item covered on that basis was the claim being larger than the evidence. Widened from FIVE to EVERY on 2026-09-07, when application-startup-failure and deployment-regression were added: five of the seven have been run against a model and two have not, so wording that says five would let the item read as nearly done while a third of it has never been asked",
   },
   {
-    n: 3, claim: "Confidence reduction under conflicting evidence.", covered: false,
-    needs: "a model call",
-    why: "the schema permits a low confidence and requires evidence to state its direction, but whether a model actually lowers the number when findings conflict can only be seen by asking one. Codex and Grok, 2026-09-06, independently: NONE of the five scenarios poses conflicting evidence, so no run over them can close this — the only live movement was upward, from 0.6 to 0.8, after the prompt stopped pointing only downwards. Closing it needs a scenario built to conflict, and a comparable one that does not",
+    n: 3, claim: "Confidence reduction under conflicting evidence.", covered: true,
+    by: ["confidence came back reduced under conflicting evidence, measured"],
+    why: "the schema permits a low confidence and requires evidence to state its direction, but whether a model actually lowers the number when findings conflict can only be seen by asking one. Codex and Grok, 2026-09-06, independently: NONE of the five scenarios poses conflicting evidence, so no run over them can close this — the only live movement was upward, from 0.6 to 0.8, after the prompt stopped pointing only downwards. Closing it needed a scenario built to conflict and a comparable one that does not. Measured 2026-09-11 against the deployed webhook: conflicting-evidence returned CONTAINER_OOM at 0.55 — below its 0.6 ceiling AND below container-oom's 0.92 under the same prompt — citing the OOMKilled reason and the memory series that argues against it. Both scored correct, the comparison qualified. The reduction is the scored verdict, not a flag: compareConfidences returns correct for this scenario only when the number is under both bounds. In docs/runs/2026-09-11-conflicting-vs-oom-pair.json",
   },
   {
     n: 4, claim: "risk and requires_approval.", covered: true,

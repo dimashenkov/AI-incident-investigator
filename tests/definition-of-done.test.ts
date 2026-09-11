@@ -81,13 +81,15 @@ describe("the ten Definition-of-Done items", () => {
      */
     const covered = DEFINITION_OF_DONE.filter((i) => i.covered).map((i) => i.n);
     const outstanding = DEFINITION_OF_DONE.filter((i) => !i.covered).map((i) => i.n);
-    // 2 and 10 closed on 2026-09-11: every scenario was measured and the
-    // deployed workflow produced scored results; tests/dod-measured.test.ts
-    // carries the evidence. 3 (confidence reduction under dissent) and 6
-    // (no cross-incident data) remain — one a model behaviour, one a data
-    // shape that does not exist yet.
-    expect(covered).toEqual([1, 2, 4, 5, 7, 8, 9, 10]);
-    expect(outstanding).toEqual([3, 6]);
+    // 2, 3 and 10 closed on 2026-09-11: every scenario was measured, the
+    // deployed workflow produced scored results, and confidence came back
+    // reduced under conflicting evidence (0.55 against container-oom's 0.92);
+    // tests/dod-measured.test.ts carries the evidence for all three. 6 (no
+    // cross-incident data) remains — a data shape whose ownership for logs and
+    // metrics is the provenance query, not a per-line field, so it is a
+    // boundary rather than pending work (see the item's own note).
+    expect(covered).toEqual([1, 2, 3, 4, 5, 7, 8, 9, 10]);
+    expect(outstanding).toEqual([6]);
   });
 
   it("names only dependencies that provably do not exist yet", () => {

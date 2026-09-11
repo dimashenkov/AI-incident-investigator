@@ -55,4 +55,44 @@ describe("the model has actually produced the answers", () => {
     expect(proven, "no run record from the deployed cloud webhook carries a correct verdict").toBe(true);
     expect(where).toContain(".n8n.cloud");
   });
+
+  it("confidence came back reduced under conflicting evidence, measured", () => {
+    /*
+     * dod-3 "confidence reduction under conflicting evidence" needed a model
+     * call: whether the model LOWERS the number when findings conflict cannot
+     * be seen from a schema. conflicting-evidence declares both a ceiling
+     * (max_confidence 0.6) and must_be_less_confident_than: container-oom, so
+     * compareConfidences returns "correct" for it ONLY when the number is below
+     * the ceiling AND below the comparable's. recordInto stores the raw state,
+     * "correct-but-unqualified" and all — so a scored "correct" for the
+     * conflicting-evidence attempt IS the reduction, not a flag over it.
+     *
+     * The comparable must have been scored in the SAME record: a comparison
+     * nobody could make has not been made. This reads docs/runs, committed, so
+     * the claim rests on the measurement of 2026-09-11 (0.55 against 0.92), and
+     * goes red the moment that record leaves the tree.
+     */
+    const runs = join(ROOT, "docs", "runs");
+    let proven = false;
+    let where = "";
+    for (const f of readdirSync(runs).filter((n) => n.endsWith(".json"))) {
+      let rec: { scored?: Record<string, string> };
+      try { rec = JSON.parse(readFileSync(join(runs, f), "utf8")); } catch { continue; }
+      const scored = rec.scored ?? {};
+      const conflictKey = Object.keys(scored).find(
+        (k) => k.replace(/#.*/, "") === "conflicting-evidence" && scored[k] === "correct");
+      if (!conflictKey) continue;
+      const attempt = conflictKey.includes("#") ? conflictKey.slice(conflictKey.indexOf("#")) : "";
+      const comparableKey = `container-oom${attempt}`;
+      if (scored[comparableKey] === "correct") {
+        proven = true;
+        where = `${f} (${conflictKey} qualified against ${comparableKey})`;
+        break;
+      }
+    }
+    expect(proven,
+      "no committed run scored conflicting-evidence 'correct' alongside its comparable at the same "
+      + "attempt — the reduction the scenario is built to measure is unmeasured, or scored unqualified").toBe(true);
+    expect(where).toContain("conflicting-evidence");
+  });
 });

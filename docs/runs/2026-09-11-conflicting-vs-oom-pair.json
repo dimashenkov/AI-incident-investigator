@@ -1,0 +1,42 @@
+{
+  "note": "Issued by scripts/run-scenarios.mjs against the deployed workflow's webhook. The reply carries the chain's report; it does not carry the model's token usage, because the Collect nodes keep only the reply. Token counts and cost are therefore UNESTABLISHED on this path, not zero \u2014 read them from the n8n execution and add them with a second edit if they are wanted, and say that they were added by hand.",
+  "recorded": "at the moment the answers arrived, by the script that issued them",
+  "when": "2026-09-11",
+  "webhook_host": "dimitarshenkov.app.n8n.cloud",
+  "keys": [
+    "conflicting-evidence#5",
+    "container-oom#5"
+  ],
+  "outcomes": {
+    "conflicting-evidence#5": "called, no reply recorded \u2014 this key may have been charged (accepted, awaiting collection: token sub-a5d66ba450af48a497e6b60a66a88d54)"
+  },
+  "submissions": {
+    "conflicting-evidence#5": {
+      "token": "sub-a5d66ba450af48a497e6b60a66a88d54",
+      "bound": "before the call was made",
+      "claim": "/Users/dimitar/PROJECTS/AI-incident-investigator/docs/claims/conflicting-evidence_5.json"
+    }
+  },
+  "totals": {
+    "input_tokens": null,
+    "output_tokens": null,
+    "why": "the webhook reply carries no usage; nothing here could read it"
+  },
+  "scored": {
+    "application-startup-failure": "unasked",
+    "certificate-expired": "unasked",
+    "connection-pool-exhausted": "unasked",
+    "cpu-throttling": "unasked",
+    "dependency-unavailable": "unasked",
+    "deployment-regression": "unasked",
+    "dns-resolution-failure": "unasked",
+    "image-pull-failure": "unasked",
+    "insufficient-evidence": "unasked",
+    "network-policy-blocked": "unasked",
+    "node-not-ready": "unasked",
+    "readiness-probe-failure": "unasked",
+    "volume-full": "unasked",
+    "conflicting-evidence#5": "correct",
+    "container-oom#5": "correct"
+  }
+}
