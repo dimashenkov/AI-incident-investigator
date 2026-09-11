@@ -913,6 +913,14 @@ export const LIMITATIONS = [
    * the file's existence as evidence the prototype HAS human ground truth — it
    * has a library for it and no path to it.
    */
+  /*
+   * Added 2026-09-11, the hour the model changed. Every comparison in this
+   * project so far rested on temperature 0 — two runs of the same input were
+   * the same question. gpt-5 refuses that value outright, HTTP 400, so the
+   * field is not sent and the default of 1 applies.
+   */
+  "that two runs on this model are comparable — gpt-5 refuses temperature 0, so the "
+    + "default of 1 applies and a difference between two runs can be the sampling",
   "that anyone has recorded a human verdict — src/core/review.ts can build and "
     + "read a review log, and nothing in the project writes one",
   "that every diff went through external review before commit",

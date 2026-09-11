@@ -41,7 +41,18 @@ describe("the request that spends the money, evaluated rather than matched", () 
       expect(typeof text, `${name} must send a JSON string`).toBe("string");
       const body = JSON.parse(text as string);
       expect(body.model, `${name} asks the pinned model`).toBe(MODEL);
-      expect(body.temperature, "a run that cannot be repeated is not a measurement").toBe(0);
+      /*
+       * The sentence that stood here — „a run that cannot be repeated is not a
+       * measurement" — is still true, and since 2026-09-11 this project cannot
+       * have it. `gpt-5` refuses `temperature: 0` with HTTP 400, so the field is
+       * not sent and the default of 1 applies.
+       *
+       * What is asserted now is the only thing that remains checkable: the
+       * refused parameter is ABSENT, not present with some other value. The
+       * loss of repeatability is in LIMITATIONS, where a reader of the number
+       * will see it.
+       */
+      expect(body.temperature, "the parameter gpt-5 refuses is not sent at all").toBeUndefined();
       expect(body.response_format).toEqual({ type: "json_object" });
       expect(body.messages).toHaveLength(2);
       expect(body.messages[0].role).toBe("system");

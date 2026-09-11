@@ -228,11 +228,37 @@ describe("the shape of the deployed chain", () => {
      * decision. It cannot establish that the decision was earned. The evidence
      * for that is the recorded comparison, not this assertion.
      */
+    /*
+     * `gpt-5` since 2026-09-11, by the owner's decision, and the first attempt
+     * failed for a reason worth keeping.
+     *
+     * The question: thirty recorded hypotheses across two models and eight
+     * rounds of prompts carry `contradicted_by` in none, while the contract
+     * permits dissent and the prompt teaches where it goes. Capacity is the one
+     * explanation left, and computing the contradiction in code is forbidden by
+     * a rule already taken.
+     *
+     * The first run came back HTTP 400 — „Unsupported value: 'temperature' does
+     * not support 0 with this model. Only the default (1) value is supported."
+     * Read out of execution 296 by the owner's local n8n agent, who also
+     * established it was NOT billed: OpenAI rejects at validation, before any
+     * inference, so the runner's „may have been charged" resolved to nothing.
+     */
     expect(MODEL, "the model this project measures against, spelled out once")
-      .toBe("gpt-4o");
+      .toBe("gpt-5");
     const ask = node("Ask kubernetes");
     expect(ask.parameters.jsonBody).toContain(MODEL);
-    expect(ask.parameters.jsonBody).toContain("temperature: 0");
+    /*
+     * NO temperature, and this test says what that costs.
+     *
+     * It asserted `temperature: 0` so that two runs could be compared. `gpt-5`
+     * refuses the value outright, so the field is gone and the model's default
+     * of 1 applies. Runs on this model are therefore NOT repeatable, and a
+     * difference between two of them can be the sampling rather than the
+     * change. Stated in LIMITATIONS as well.
+     */
+    expect(ask.parameters.jsonBody, "the refused parameter is not sent at all")
+      .not.toContain("temperature");
     // Every agent call is the same model, or the runs are not comparable.
     for (const name of ["Ask kubernetes", "Ask logs", "Ask metrics", "Ask root-cause"]) {
       expect(node(name).parameters.jsonBody, `${name} asks the same model`).toContain(MODEL);

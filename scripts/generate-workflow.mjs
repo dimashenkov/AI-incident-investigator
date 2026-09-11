@@ -66,7 +66,23 @@ function askNode(agent, position) {
       nodeCredentialType: "openAiApi",
       sendBody: true,
       specifyBody: "json",
-      jsonBody: "={{ JSON.stringify({ model: " + JSON.stringify(MODEL) + ", temperature: 0, "
+      /*
+       * NO `temperature` since 2026-09-11, and it is a loss, not a tidy-up.
+       *
+       * The body sent `temperature: 0` so that two runs could be compared. On
+       * `gpt-5` OpenAI refuses it outright — HTTP 400, „Unsupported value:
+       * 'temperature' does not support 0 with this model. Only the default (1)
+       * value is supported." Read out of execution 296 by the owner's local
+       * n8n agent; the call was rejected at validation, before any inference,
+       * so nothing was billed.
+       *
+       * Omitting the field takes the model's default, which is 1. So runs on
+       * this model are NOT repeatable in the way every comparison so far
+       * assumed, and a difference between two of them can be the sampling
+       * rather than the change. That is stated in LIMITATIONS rather than
+       * papered over, and it is the price of asking this model anything.
+       */
+      jsonBody: "={{ JSON.stringify({ model: " + JSON.stringify(MODEL) + ", "
         + "response_format: { type: 'json_object' }, messages: [ "
         + "{ role: 'system', content: $json.prompt }, "
         + "{ role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
@@ -225,7 +241,7 @@ function collectNode(agent, from, position) {
 }
 
 /** The model every agent is asked with, named once. */
-export const MODEL = "gpt-4o";
+export const MODEL = "gpt-5";
 
 /**
  * Which stored credential the HTTP nodes use.
