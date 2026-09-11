@@ -36,6 +36,10 @@ const KEY = process.env.N8N_API_KEY ?? "";
  * intermediate output and the shape drifts without anyone deciding to change it.
  */
 export const FINAL_NODE = "Report";
+/** The node the alert arrives at. Its item is where request headers land. */
+const ENTRY_NODE = "Incident Webhook";
+/** Lowercase, because every HTTP stack in the path lowercases it. */
+export const TOKEN_HEADER = "x-submission-token";
 
 /**
  * What one execution holds, in four states rather than two.
@@ -97,6 +101,99 @@ export function keyFor(document, given) {
   return typeof scenario === "string" && scenario.length > 0 ? scenario : null;
 }
 
+/**
+ * The submission token this execution was called with.
+ *
+ * It travels as a request HEADER, not in the alert body, for one reason: the
+ * body is the model's input, and a token in there would become part of what the
+ * chain is asked to reason about. The header lands in the entry node's item,
+ * which was established by reading a real execution rather than assumed.
+ *
+ * Three states, because "I could not read this execution" is not "this
+ * execution carries no token". Folding the two turns a retention gap into a
+ * confident no-match, and a confident no-match is what would authorise paying
+ * for the same question twice.
+ */
+export function tokenOf(execution) {
+  if (execution === null || typeof execution !== "object" || Array.isArray(execution)) {
+    return { state: "unreadable", why: "the execution could not be read as an object" };
+  }
+  const data = execution["data"];
+  const resultData = data === null || typeof data !== "object" ? undefined : data["resultData"];
+  const runData = resultData === null || typeof resultData !== "object" ? undefined : resultData["runData"];
+  if (runData === null || typeof runData !== "object" || Array.isArray(runData)) {
+    return { state: "unreadable",
+      why: "the execution carries no runData — n8n may not be saving it, or includeData=true was omitted" };
+  }
+  const runs = runData[ENTRY_NODE];
+  if (!Array.isArray(runs) || runs.length === 0) {
+    return { state: "unreadable", why: `the execution has no ${ENTRY_NODE} run to read headers from` };
+  }
+  const headers = runs[0]?.data?.main?.[0]?.[0]?.json?.headers;
+  if (headers === null || typeof headers !== "object" || Array.isArray(headers)) {
+    return { state: "unreadable", why: `${ENTRY_NODE} recorded no headers` };
+  }
+  // n8n lowercases incoming header names, and so does every HTTP stack in the
+  // path. The lookup is case-insensitive anyway, because a header that arrived
+  // in another case is the same header and not a missing one.
+  for (const [name, value] of Object.entries(headers)) {
+    if (String(name).toLowerCase() !== TOKEN_HEADER) continue;
+    return typeof value === "string" && value.length > 0
+      ? { state: "token", token: value }
+      : { state: "none", why: `${TOKEN_HEADER} was present but empty` };
+  }
+  return { state: "none", why: `${TOKEN_HEADER} was not sent with this execution` };
+}
+
+/**
+ * Which scanned execution belongs to one submission token.
+ *
+ * Four answers, and the fourth is the one that matters. `many` refuses rather
+ * than picking: two executions carrying one token means the reconciliation
+ * itself is wrong, and answering with either would hide that. `uncertain` is
+ * zero matches where something could not be read — it is NOT permission to
+ * submit again, which is exactly what a plain zero would become.
+ */
+export function matchByToken(scanned, token) {
+  if (typeof token !== "string" || token.length === 0) {
+    return { state: "uncertain", why: "no submission token was given to look for", unreadable: [] };
+  }
+  const hits = [];
+  const unreadable = [];
+  for (const { id, result } of Array.isArray(scanned) ? scanned : []) {
+    if (result?.state === "token") { if (result.token === token) hits.push(id); continue; }
+    if (result?.state === "unreadable") unreadable.push(id);
+  }
+  if (hits.length > 1) return { state: "many", ids: hits };
+  if (hits.length === 1) {
+    /*
+     * One hit is not uniqueness while part of the window is unread.
+     *
+     * Astra, 2026-09-11: this returned `one` with unreadable executions in the
+     * same window, so the promise to refuse a duplicate was unearned — the
+     * duplicate could be sitting in the execution that could not be read. And
+     * the answer it hands back would be another attempt's measurement, scored
+     * as this one's.
+     *
+     * So the id is still reported, because it is real and a person may want
+     * it, but the STATE says uniqueness was not established. Deciding to use
+     * it anyway is a decision, not a default.
+     */
+    if (unreadable.length > 0) {
+      return { state: "one-unverified", id: hits[0], unreadable,
+        why: `one execution carried the token, and ${unreadable.length} in the same window could not be read, `
+          + "so nothing here establishes that it is the only one" };
+    }
+    return { state: "one", id: hits[0], scanned: (scanned ?? []).length };
+  }
+  if (unreadable.length > 0) {
+    return { state: "uncertain",
+      why: `no execution in the scanned window carried the token, and ${unreadable.length} could not be read`,
+      unreadable };
+  }
+  return { state: "none", scanned: (scanned ?? []).length };
+}
+
 async function get(path) {
   if (API === "" || KEY === "") {
     throw new Error("N8N_API_URL and N8N_API_KEY must be set. Source ~/.config/ai-sre/n8n.env first.");
@@ -121,17 +218,231 @@ export async function executionWithData(id) {
   return get(`/executions/${encodeURIComponent(String(id))}?includeData=true`);
 }
 
+/** One page of executions, newest first, with the cursor to continue. A read. */
+export async function executionPage(workflowId, limit = 20, cursor = undefined) {
+  const q = [];
+  if (workflowId !== undefined) q.push(`workflowId=${encodeURIComponent(workflowId)}`);
+  q.push(`limit=${Number(limit)}`);
+  if (typeof cursor === "string" && cursor.length > 0) q.push(`cursor=${encodeURIComponent(cursor)}`);
+  const body = await get(`/executions?${q.join("&")}`);
+  return {
+    rows: Array.isArray(body?.data) ? body.data : [],
+    // A cursor that is not a non-empty string ends the walk. Passing a null
+    // through as "continue here" would ask for page one again, forever.
+    cursor: typeof body?.nextCursor === "string" && body.nextCursor.length > 0 ? body.nextCursor : undefined,
+  };
+}
+
+/**
+ * Find the execution a submission token belongs to, by reading only.
+ *
+ * The list endpoint does not return execution data, so each candidate is
+ * fetched with `includeData=true` to read its headers. Every call here is a
+ * GET: nothing in this function can execute a workflow or spend anything.
+ *
+ * The window is bounded and the bound is REPORTED. A scan that quietly stopped
+ * after one page would answer "not found" for an execution one row below the
+ * edge, and "not found" is the answer that costs money.
+ */
+export async function scanForToken(workflowId, token, opts = {}) {
+  const { pages = 5, perPage = 20, page = executionPage, one = executionWithData } = opts;
+  const scanned = [];
+  const seen = new Set();
+  let cursor;
+  let walked = 0;
+  for (let i = 0; i < pages; i += 1) {
+    let got;
+    try { got = await page(workflowId, perPage, cursor); }
+    catch (e) {
+      /*
+       * A page that could not be listed leaves the window short, and a short
+       * window is never a clean miss.
+       *
+       * The first version returned `matchByToken` as it stood, so a failure on
+       * page ONE — nothing scanned at all — came back `none`: "no execution
+       * carries this token", stated after reading zero executions. `none` is
+       * the answer that authorises paying again, so a failed listing falls to
+       * `uncertain` unless something was actually matched.
+       */
+      const partial = matchByToken(scanned, token);
+      const state = partial.state === "many" ? partial
+        : partial.state === "one" || partial.state === "one-unverified" ? {
+          // The listing stopped, so the rest of the window was never looked
+          // at. A single hit inside a window that was not read to its end does
+          // not establish that it is single.
+          state: "one-unverified", id: partial.id, unreadable: partial.unreadable ?? [],
+          why: `one execution carried the token, but the listing stopped after ${walked} page(s), `
+            + "so the window was not read to its end",
+        } : {
+        state: "uncertain",
+        why: `the listing stopped after ${walked} page(s), so the window was not read to its end`,
+        unreadable: partial.unreadable ?? [],
+      };
+      return { ...state, pagesWalked: walked, listingStopped: e.message };
+    }
+    walked += 1;
+    for (const row of got.rows) {
+      const id = row?.id;
+      if (id === undefined || id === null) {
+        /*
+         * A row with no id is coverage that was NOT checked, and skipping it
+         * silently made the scan report uniqueness over a window it had not
+         * read. Astra, 2026-09-11, by running it rather than reading it.
+         */
+        scanned.push({ id: null, result: { state: "unreadable", why: "the listing row carried no id" } });
+        continue;
+      }
+      /*
+       * The same execution can appear on two pages.
+       *
+       * n8n pages by cursor over a list that is still growing, so an overlap is
+       * ordinary — and counting one execution twice reported a DUPLICATE TOKEN
+       * where there was none, which refuses a collection that should have
+       * succeeded. Astra, 2026-09-11.
+       */
+      if (seen.has(String(id))) continue;
+      seen.add(String(id));
+      let full;
+      try { full = await one(id); }
+      catch (e) { scanned.push({ id, result: { state: "unreadable", why: e.message } }); continue; }
+      const result = tokenOf(full);
+      scanned.push({ id, result });
+      // A match does not end the walk. Stopping at the first hit is what makes
+      // a duplicated token look unique, and `many` exists precisely to refuse
+      // that case rather than pick a side of it.
+    }
+    cursor = got.cursor;
+    if (cursor === undefined) break;
+  }
+  const found = matchByToken(scanned, token);
+  /*
+   * Running out of PAGES is not running out of executions.
+   *
+   * `cursor` still holding a value means n8n had more rows to give and the
+   * bound stopped the walk. A hit inside a bounded window is a hit; it is not
+   * the only hit, and this is the third way that distinction was being lost.
+   */
+  const exhausted = cursor !== undefined;
+  if (exhausted && found.state === "one") {
+    return { state: "one-unverified", id: found.id, unreadable: [],
+      why: `one execution carried the token, and the scan stopped at its ${pages}-page bound with more `
+        + "executions unread, so nothing here establishes that it is the only one",
+      pagesWalked: walked, windowExhausted: true };
+  }
+  return { ...found, pagesWalked: walked, ...(exhausted ? { windowExhausted: true } : {}) };
+}
+
+/**
+ * The token one key was submitted under, out of a run record.
+ *
+ * Three answers, because a record with no `submissions` field at all was
+ * written by an older runner and cannot be reconciled — which is not the same
+ * as a record that says this key was never submitted. Reported as such, so a
+ * recovery that is impossible does not read as a key that was never bought.
+ */
+export function tokenInRecord(record, key) {
+  const subs = record?.["submissions"];
+  if (subs === undefined) {
+    return { state: "unreconcilable",
+      why: "this run record carries no submissions field; it predates token binding" };
+  }
+  if (subs === null || typeof subs !== "object" || Array.isArray(subs)) {
+    return { state: "unreconcilable", why: "the submissions field is not an object of bindings" };
+  }
+  const bound = subs[key];
+  const token = bound === null || typeof bound !== "object" ? undefined : bound["token"];
+  if (typeof token !== "string" || token.length === 0) {
+    return { state: "unbound", why: `the record binds no token to ${key}` };
+  }
+  return { state: "token", token };
+}
+
+/**
+ * Which of the three modes was asked for, and with what.
+ *
+ * Exported because the shifting is where a silent mistake lives: read the
+ * token where the answers path should be and the script writes an answer file
+ * named `sub-...`, reporting success. Three modes, one shape out, so each can
+ * be checked without running anything.
+ */
+export function parseReaderArgv(argv) {
+  const a = argv.slice(2);
+  if (a[0] === "--token") {
+    return { mode: "token", token: a[1], answersPath: a[2], key: a[3] };
+  }
+  if (a[0] === "--record") {
+    return { mode: "record", recordPath: a[1], key: a[2], answersPath: a[3] };
+  }
+  return { mode: "id", id: a[0], answersPath: a[1], key: a[2] };
+}
+
 if (process.argv[1] !== undefined && import.meta.url.endsWith(process.argv[1].split("/").pop())) {
-  const [, , idArg, answersPath, keyArg] = process.argv;
+  /*
+   * `--record` is the whole point of the mechanism: a key the runner marked
+   * "may have been charged" is resolved by READING, instead of by a human
+   * opening the n8n interface or — worse — by paying for the question again.
+   */
+  const asked = parseReaderArgv(process.argv);
+  let idArg = asked.mode === "id" ? asked.id : asked.mode;
+  const answersPath = asked.answersPath;
+  const keyArg = asked.key;
+  let tokenArg = asked.mode === "token" ? asked.token : undefined;
+  const recordArg = asked.mode === "record"
+    ? { recordPath: asked.recordPath, recordKey: asked.key } : undefined;
   if (idArg === undefined || answersPath === undefined) {
     process.stdout.write(
       "usage: node scripts/collect-execution.mjs <execution-id|latest> <answers.json> [key]\n"
+      + "       node scripts/collect-execution.mjs --token <sub-...> <answers.json> [key]\n"
+      + "       node scripts/collect-execution.mjs --record <run.json> <key> <answers.json>\n"
       + "  reads a FINISHED execution and writes its Report document into the answers file\n"
-      + "  two GETs, no webhook, no retry: it cannot spend anything\n");
+      + "  --token finds the execution a submission was made under, by reading only\n"
+      + "  --record reads that token out of a run record, for a key marked may-have-been-charged\n"
+      + "  GETs only, no webhook, no retry: it cannot spend anything\n");
     process.exit(2);
   }
   const run = async () => {
     let id = idArg;
+    if (recordArg !== undefined) {
+      if (recordArg.recordKey === undefined) {
+        process.stdout.write("--record needs a key and an answers path\n"); process.exit(2);
+      }
+      let record;
+      try { record = JSON.parse(readFileSync(recordArg.recordPath, "utf8")); }
+      catch (e) { process.stdout.write(`cannot read ${recordArg.recordPath}: ${e.message}\n`); process.exit(2); }
+      const held = tokenInRecord(record, recordArg.recordKey);
+      if (held.state !== "token") {
+        // Not an answer about the execution. It is an answer about the RECORD,
+        // and reporting it as "nothing found" would blame the wrong thing.
+        process.stdout.write(`${held.state}: ${held.why}\n`);
+        process.exit(2);
+      }
+      tokenArg = held.token;
+      process.stdout.write(`${recordArg.recordKey} was submitted as ${tokenArg}\n`);
+    }
+    if (tokenArg !== undefined) {
+      const found = await scanForToken(process.env.N8N_WORKFLOW_ID, tokenArg, {});
+      if (found.state === "one-unverified") {
+        // The id is printed because it is real. Collecting it is a decision
+        // someone takes by passing it, not one this script takes for them.
+        process.stdout.write(`one-unverified: ${found.why}\n`
+          + `  the execution that carried it is ${found.id}.\n`
+          + `  read it deliberately with:  node scripts/collect-execution.mjs ${found.id} `
+          + `${answersPath}${keyArg ? ` ${keyArg}` : ""}\n`);
+        process.exit(3);
+      }
+      if (found.state !== "one") {
+        process.stdout.write(`${found.state}: ${found.why ?? ""}`
+          + `${found.ids ? ` executions ${found.ids.join(", ")}` : ""}`
+          + ` (scanned ${found.pagesWalked} page(s))\n`
+          + (found.state === "none"
+            ? "  nothing in the window carried that token. That is not permission to submit again:\n"
+            + "  widen the window or read the executions before spending anything.\n"
+            : ""));
+        process.exit(found.state === "many" ? 2 : 3);
+      }
+      id = found.id;
+      process.stdout.write(`that token was carried by execution ${id}\n`);
+    }
     if (idArg === "latest") {
       const rows = await recentExecutions(process.env.N8N_WORKFLOW_ID, 1);
       if (rows.length === 0) { process.stdout.write("no executions to read\n"); process.exit(2); }

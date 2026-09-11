@@ -326,7 +326,21 @@ export function buildWorkflow(runtime, { name = "AI SRE — incident investigati
       type: "n8n-nodes-base.webhook",
       typeVersion: 2,
       position: [0, 0],
-      parameters: { path: WEBHOOK_PATH, httpMethod: "POST", responseMode: "lastNode" },
+      /*
+       * The webhook answers on RECEIPT, not at the end of the chain.
+       *
+       * With `lastNode` the HTTP response waited for the whole investigation,
+       * and n8n Cloud's gateway cuts at about 100 seconds. Measured on
+       * 2026-09-11: a four-model chain finished at ~183s and the caller got
+       * HTTP 524 while the execution was `status: success` — the answer was
+       * bought, produced, and unreachable. Twice.
+       *
+       * `onReceived` removes the deadline instead of racing it. The cost is
+       * that a 200 now means accepted rather than answered, so the runner
+       * binds a submission token before the call and reads the finished report
+       * out of the execution afterwards. See docs/async-shape.md.
+       */
+      parameters: { path: WEBHOOK_PATH, httpMethod: "POST", responseMode: "onReceived" },
     },
     code("assemble", "Assemble", assembleNodeCode(), [220, 0]),
   ];

@@ -2468,5 +2468,174 @@ export const MUTATIONS = [
     to: '    "rationale"',
     mustFail: "refuses an action that simply omits executed",
   },
+  {
+    // Astra, 2026-09-11. One hit inside a window that was not fully read is not
+    // uniqueness, and the duplicate it promises to refuse could be sitting in
+    // the execution nobody could read.
+    id: "one-hit-passes-for-uniqueness",
+    file: "scripts/collect-execution.mjs",
+    from: '      return { state: "one-unverified", id: hits[0], unreadable,',
+    to: '      return { state: "one", id: hits[0], unreadable,',
+    mustFail: "does not call one hit unique while part of the window is unread",
+  },
+  {
+    // An acknowledgement counted as a written answer prints "1 answer(s)
+    // written" with nothing saved. The exit code stays 2; the sentence is what
+    // a person reads.
+    id: "an-acknowledgement-counts-as-a-measurement",
+    file: "scripts/run-scenarios.mjs",
+    from: '    if (r.state === "answered" && kind.state === "report" && saved) written += 1;',
+    to: '    if (r.state === "answered" && saved) written += 1;',
+    // Astra, 2026-09-11: this was anchored to a test that asserts the SOURCE
+    // when the runner can be run against a server answering the way n8n now
+    // does. It is answered by behaviour instead.
+    mustFail: "does not count an acknowledgement as an answer it wrote",
+  },
+  {
+    // Without the exclusive flag two runners both write the claim, both pass,
+    // and both pay for the same question.
+    id: "the-claim-stops-being-exclusive",
+    file: "scripts/run-scenarios.mjs",
+    from: '  const fd = open(path, "wx");',
+    to: '  const fd = open(path, "w");',
+    mustFail: "claims a key exclusively, and the second claim is refused rather than allowed",
+  },
+  {
+    // The bytes surviving is not the entry surviving. This is asserted at the
+    // source, because no test here can pull the power.
+    id: "the-directory-entry-is-not-fsynced",
+    file: "scripts/run-scenarios.mjs",
+    from: '    const dir = openSync(dirname(path), "r");',
+    to: '    const dir = openSync(path, "r");',
+    mustFail: "confirms the directory entry, and reports the write either way",
+  },
+  {
+    // A token in the body becomes part of what the chain reasons about, and a
+    // run with different inputs is not comparable with the runs already scored.
+    id: "the-token-never-reaches-the-request",
+    file: "scripts/run-scenarios.mjs",
+    from: '        ...(typeof token === "string" && token.length > 0 ? { [TOKEN_HEADER]: token } : {}),',
+    to: '        ...(typeof token === "string" && token.length > 0 ? {} : {}),',
+    mustFail: "reaches the request as a header and never as part of the alert",
+  },
+  {
+    // The ledger of bought keys is exclusive per PATH. Move it and two runners
+    // claim in different places, both succeed, and both pay.
+    // Astra, 2026-09-11: the earlier version of this mutation moved the
+    // default from one fixed directory to another, which its named test caught
+    // on the literal — but a fixed ledger somewhere else is still fixed. This
+    // one reproduces the ACTUAL defect: a ledger that follows --record.
+    id: "the-ledger-follows-the-record-path",
+    file: "scripts/run-scenarios.mjs",
+    from: "    const claim = claimKey(key, token);",
+    to: "    const claim = claimKey(key, token, { dir: dirname(recordAt) });",
+    mustFail: "does not let the ledger move with --record",
+  },
+  {
+    // A listing row with no id is coverage that was not checked. Skipping it
+    // silently let the scan report uniqueness over a window it had not read.
+    id: "a-row-with-no-id-is-skipped-silently",
+    file: "scripts/collect-execution.mjs",
+    from: '        scanned.push({ id: null, result: { state: "unreadable", why: "the listing row carried no id" } });',
+    to: '        void 0;',
+    mustFail: "counts a listing row with no id as unread, not as nothing",
+  },
+  {
+    // n8n pages over a growing list, so an overlap is ordinary. Counting one
+    // execution twice reports a duplicate token where there is none.
+    id: "one-execution-counted-twice-across-pages",
+    file: "scripts/collect-execution.mjs",
+    from: "      if (seen.has(String(id))) continue;",
+    to: "      if (false) continue;",
+    mustFail: "counts one execution once, however many pages it appears on",
+  },
+  {
+    // A claim never given back blocks a key nobody bought, and points the next
+    // attempt at a submission that does not exist.
+    id: "a-claim-is-never-given-back",
+    file: "scripts/run-scenarios.mjs",
+    from: "  const { dir = CLAIMS_DIR, remove = unlinkSync } = io;",
+    to: "  const { dir = CLAIMS_DIR, remove = () => {} } = io;",
+    mustFail: "gives a claim back when nothing was called under it",
+  },
+  {
+    // An override accepted anywhere is an override: two runners with different
+    // ledgers both claim and both pay.
+    id: "the-ledger-override-is-accepted-anywhere",
+    file: "scripts/run-scenarios.mjs",
+    from: "  if (!isInside(at, tmp, real)) {",
+    to: "  if (false) {",
+    mustFail: "refuses a ledger pointed anywhere a real run could point it",
+  },
+  {
+    // macOS answers /var/folders for a directory whose real path is under
+    // /private. Text comparison alone refused the very directory the rule
+    // allows, for a caller that had resolved its own path.
+    id: "one-spelling-of-the-temp-directory",
+    file: "scripts/run-scenarios.mjs",
+    from: "    try { return join(real(at), ...[...rest].reverse()); }",
+    to: "    try { return resolve(path); }",
+    mustFail: "accepts both spellings of the temp directory, because macOS has two",
+  },
+  {
+    // A string prefix says /tmp-elsewhere is inside /tmp. Components do not.
+    id: "containment-by-text-instead-of-components",
+    file: "scripts/run-scenarios.mjs",
+    from: "  return b.every((seg, i) => a[i] === seg);",
+    to: "  return canonical(child, real).startsWith(canonical(parent, real));",
+    mustFail: "refuses a ledger pointed anywhere a real run could point it",
+  },
+  {
+    // The exclusive create can succeed with the write failing after it. Left
+    // behind, that file claims a key nobody bought, forever.
+    id: "cleanup-runs-on-a-claim-that-is-not-ours",
+    file: "scripts/run-scenarios.mjs",
+    from: "      if (mine) {",
+    to: "      if (true) {",
+    mustFail: "never removes a claim it cannot establish it created",
+  },
+  {
+    // mkdir creates a chain and only the leaf was confirmed. A name nobody can
+    // reach is the same as no name.
+    id: "only-the-leaf-directory-is-confirmed",
+    file: "scripts/run-scenarios.mjs",
+    from: "  for (let at = resolve(dir); ; at = dirname(at)) {",
+    to: "  for (let at = resolve(dir); first !== undefined; at = dirname(at)) {",
+    mustFail: "confirms every directory it created, and the entry that links them in",
+  },
+  {
+    // The mark on the RETURN value alone left the real case — a write that
+    // fails after the file was created — impossible to clean up. It worked in
+    // the test, where the error was hand-made, and not in life.
+    id: "a-real-failure-after-create-is-not-marked",
+    file: "scripts/run-scenarios.mjs",
+    from: "    if (e !== null && typeof e === \"object\") e[CLAIM_CREATED] = true;",
+    to: "    if (false) e[CLAIM_CREATED] = true;",
+    mustFail: "marks a failure that happened after it created the file",
+  },
+  {
+    // A plain property is trusted from any error carrying it. A symbol cannot
+    // be set by accident.
+    id: "the-ownership-mark-becomes-a-plain-field",
+    file: "scripts/run-scenarios.mjs",
+    from: "    mine = e?.[CLAIM_CREATED] === true;",
+    to: "    mine = e?.created === true;",
+    mustFail: "cannot be fooled by a foreign error that happens to carry a field",
+  },
+  {
+    // Reported and then discarded is the same as never established.
+    id: "unconfirmed-directories-are-dropped",
+    file: "scripts/run-scenarios.mjs",
+    from: "      ...(made?.skipped !== undefined ? { unconfirmed: made.skipped } : {}) };",
+    to: "      ...(false ? { unconfirmed: made.skipped } : {}) };",
+    mustFail: "carries the directories it could not confirm, instead of dropping them",
+  },
+  {
+    // Reported and never read is the same as never established, one level out.
+    id: "unconfirmed-durability-is-never-printed",
+    file: "scripts/run-scenarios.mjs",
+    from: "    if (Array.isArray(claim.unconfirmed) && claim.unconfirmed.length > 0) {",
+    to: "    if (false) {",
+    mustFail: "says out loud when the claim's durability could not be confirmed",
+  },
 ];
-

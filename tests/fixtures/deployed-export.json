@@ -3,12 +3,12 @@
   "name": "AI SRE — incident investigation",
   "description": null,
   "active": true,
-  "activeVersionId": "5bb67731-5667-407f-a93e-78ac2ac037b8",
+  "activeVersionId": "8224d75f-64de-4cb3-8664-0ce0e24154b3",
   "createdAt": "2026-09-04T13:44:43.103Z",
-  "updatedAt": "2026-09-11T06:54:57.280Z",
+  "updatedAt": "2026-09-11T07:49:05.424Z",
   "isArchived": false,
-  "versionId": "5bb67731-5667-407f-a93e-78ac2ac037b8",
-  "versionCounter": 71,
+  "versionId": "8224d75f-64de-4cb3-8664-0ce0e24154b3",
+  "versionCounter": 72,
   "sourceWorkflowId": null,
   "triggerCount": 1,
   "nodes": [
@@ -24,9 +24,9 @@
       "parameters": {
         "path": "ai-sre-incident",
         "httpMethod": "POST",
-        "responseMode": "lastNode"
+        "responseMode": "onReceived"
       },
-      "webhookId": "c30e1049-b87f-4041-b578-a006f4a5d572"
+      "webhookId": "34db1859-08b5-4d10-9225-7eda2b4c9673"
     },
     {
       "id": "assemble",
@@ -700,7 +700,7 @@
   "meta": null,
   "tags": [],
   "activeVersion": {
-    "versionId": "5bb67731-5667-407f-a93e-78ac2ac037b8",
+    "versionId": "8224d75f-64de-4cb3-8664-0ce0e24154b3",
     "workflowId": "49T3pwFvfumqTdo7",
     "nodes": [
       {
@@ -715,9 +715,9 @@
         "parameters": {
           "path": "ai-sre-incident",
           "httpMethod": "POST",
-          "responseMode": "lastNode"
+          "responseMode": "onReceived"
         },
-        "webhookId": "c30e1049-b87f-4041-b578-a006f4a5d572"
+        "webhookId": "34db1859-08b5-4d10-9225-7eda2b4c9673"
       },
       {
         "id": "assemble",
@@ -1365,16 +1365,16 @@
     "name": null,
     "description": null,
     "autosaved": false,
-    "createdAt": "2026-09-11T06:54:57.315Z",
-    "updatedAt": "2026-09-11T06:54:57.315Z",
+    "createdAt": "2026-09-11T07:49:05.455Z",
+    "updatedAt": "2026-09-11T07:49:05.455Z",
     "workflowPublishHistory": [
       {
-        "id": 135,
+        "id": 137,
         "workflowId": "49T3pwFvfumqTdo7",
-        "versionId": "5bb67731-5667-407f-a93e-78ac2ac037b8",
+        "versionId": "8224d75f-64de-4cb3-8664-0ce0e24154b3",
         "event": "activated",
         "userId": "6e8e3eb9-d8db-4e7f-bdb3-3318d80dee5a",
-        "createdAt": "2026-09-11T06:54:57.894Z"
+        "createdAt": "2026-09-11T07:49:06.043Z"
       }
     ]
   },

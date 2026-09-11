@@ -149,3 +149,104 @@ The executions behind today's two HTTP 524 timeouts are **`status: success`**.
 The answers this project paid for and never received **exist**, and they are
 readable. So B is not only the way to remove the deadline — it is also the way
 to collect what has already been bought. Nothing is re-run to get them.
+
+## Built on 2026-09-11, and the four defects the build carried
+
+The shape above was reviewed once more after it existed rather than only as a
+plan. Astra found four, all of them in code written the same hour, and all four
+were true when checked against the source.
+
+| Found | Why it mattered | What answers it |
+|---|---|---|
+| a single hit was reported as unique even with unread executions in the window, after a listing failure, and after the page bound cut the walk | the duplicate the scan promises to refuse could be in the execution nobody could read — and the answer handed back would be another attempt's measurement, scored as this one's | a fourth state, `one-unverified`: the id is reported because it is real, and uniqueness is stated as unestablished. The CLI prints the id and exits 3 rather than collecting |
+| two runners could both pass the guard and both pay | reading a state is not holding it. Different record paths, different tokens, one key, two charges — and each record overwriting the other's evidence | an exclusive claim per key, `wx`, written before the call. The filesystem decides who wins, once, and the loser is told to collect instead |
+| the file was fsynced and the directory entry was not | a host crash could keep the bytes and lose the entry that names them — and the entry is the charged guard and the token. Killing a process and killing a machine were being treated as one guarantee | the directory is fsynced too, and a filesystem that refuses says so on stderr instead of the word „durable" being claimed for something unconfirmed |
+| an acknowledgement incremented the written-answers counter | „1 answer(s) written" printed with nothing written. The exit code stayed 2, so this was a false sentence rather than a false success — and the sentence is the part a person reads | the counter counts reports, and a mutation holds it there |
+
+**Five mutations were added**, so each of these fails the gate if it comes back.
+Four of the tests assert behaviour; two assert an ORDER OF STATEMENTS in the
+runner, because the loop that spends money is not exported and refactoring it to
+be testable is a larger change than the property being protected. That is said
+in the tests themselves rather than implied — a source-order test proves source
+order, and nothing more.
+
+**And one test was rewritten because it could not fail.** The first version of
+the durability test asserted `{ durable: true }` on a successful write, which
+stays true with the directory fsync deleted. It now asserts the fsync is on the
+directory of the path, and says in its own comment that no test here can pull
+the power.
+
+### And a fifth, found in the fix itself, while the gate was running
+
+The claim directory was `dirname(recordAt)`, and `--record` accepts any path. So
+two runners with different record paths would claim in different directories,
+both succeed, and both pay. `wx` is exclusive per PATH, and the path had been
+made variable — the same defect the claim was written to remove, one level up.
+
+It is closed by the SIGNATURE, not by discipline: `claimKey(key, token)` has no
+argument a caller can vary, and the ledger is `docs/runs/claims`. The one
+override, `AI_SRE_CLAIMS_DIR`, exists so tests do not write into the real ledger
+of bought keys, and the runner prints where it is pointing on every run —
+an override nobody can see is the same hole wearing a different name.
+
+**And the claim hid an older guard.** With the claims directory inside the
+record's directory, a test that made that directory read-only stopped at the
+claim instead of at the failed write — so the mutation that removes the
+failed-write guard survived the gate. Fixing where the ledger lives fixed that
+too, and it was checked by applying the mutation by hand and watching the named
+test fail again.
+
+This is the shape of the whole session: a guard added in front of an older guard
+makes the older one unreachable, and the test that proves the older one still
+passes — for the wrong reason.
+
+## The review of B, in six rounds · 2026-09-11
+
+B was built in about an hour. Reviewing it took longer, and the number worth
+keeping is **18 defects in code written the same day**, every one of them mine.
+
+| Round | Found | The worst one in it |
+|---|---|---|
+| 1 | 4 | one hit passed for uniqueness while part of the window was unread |
+| 2 | 5 | the ledger of bought keys moved with `--record`, so it guarded nothing |
+| 3 | 5 | containment by text: `/private/tmp` was refused against `/tmp` |
+| 4 | 2 | **the cleanup could delete another runner's paid claim** |
+| 5 | 2 | a real filesystem error carried no ownership mark, so the case the cleanup existed for could not be cleaned up |
+| 6 | 4 | `unconfirmed` was returned and nothing read it |
+
+**Round 4 is the one to remember.** `openSync` with `wx` can fail for reasons
+that say nothing about the path — out of file descriptors — and the cleanup ran
+anyway, unlinking a claim another runner had paid for, taking its recovery token
+with it. A guard against paying twice that could delete the evidence of having
+paid once.
+
+The rule that came out of it: **unknown falls to not touching anything.** A
+stranded half-claim is a key refused until a person looks. A deleted claim is a
+second charge nobody can see.
+
+### Three of the eighteen I found myself, and how
+
+The review reads; I can run things. The difference produced a different kind of
+finding.
+
+| Found | How |
+|---|---|
+| the ledger moves with `--record` | reading my own hour-old code while the gate ran |
+| a mutation that does not kill its test | applying it by hand — a second branch covered the same case |
+| a real error carries no `created` field | following who throws what in production, not in the test |
+
+The last one is the exact shape of the defect this project catches everywhere
+else: **the test handed in an error with the mark on it, and the real filesystem
+error has no such field.** So the fix worked in the test and not in life. The
+answer was to export the writer that actually runs, and test that one.
+
+### Why six rounds and not three
+
+Each round read code the previous round had not seen, because each round's
+findings produced new code. That is the pattern Grok warned about on 2026-09-08
+— „a generator of refusals" — and it is the right pattern HERE, because nothing
+in these six rounds blocked a paid run. It blocked a commit, which is free.
+
+The signal that it was converging is not the count but the KIND: rounds 1–3
+found defects that lose money, round 6 found one production defect and three
+tests that assert too little.

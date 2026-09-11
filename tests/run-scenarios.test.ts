@@ -433,7 +433,15 @@ describe("running the script for real, against a server that is not n8n", () => 
   const run = (url: string, args: string[], d: string) =>
     new Promise<{ status: number; stdout: string; stderr: string }>((ok) => {
       const c = spawn(process.execPath, [RUNNER, ...args], {
-        cwd: ROOT, env: { ...process.env, N8N_WEBHOOK_URL: url, HOME: d },
+        /*
+         * The claims ledger is pointed at this test's own directory.
+         *
+         * It lives in `docs/runs/claims` for real runs, and a test that used
+         * that would write into the ledger of paid keys — after which the next
+         * real run would refuse a key no money was ever spent on. The override
+         * exists for exactly this, and the runner prints where it is pointing.
+         */
+        cwd: ROOT, env: { ...process.env, N8N_WEBHOOK_URL: url, HOME: d, AI_SRE_CLAIMS_DIR: join(d, "claims") },
       });
       let stdout = ""; let stderr = "";
       c.stdout.on("data", (b) => { stdout += String(b); });
@@ -524,6 +532,54 @@ describe("running the script for real, against a server that is not n8n", () => 
       chmodSync(box, 0o700);
       expect(s.calls(), "nothing is called when the evidence cannot be saved").toBe(0);
       expect(r.status, "and it is not a success").toBe(2);
+      /*
+       * The claim is given back, because nothing was called under it. Keeping
+       * it would block a key nobody bought and point the next attempt at a
+       * submission that does not exist.
+       */
+      expect(r.stderr).toMatch(/the claim on container-oom#1 was given back/);
+      /*
+       * And the record cannot be corrected here, because the record is exactly
+       * what could not be written — so the run SAYS so, naming the file.
+       *
+       * The other branch, where the correction succeeds, is not reachable from
+       * a test: the pre-flight proves the answers file is writable before
+       * anything is called, so the only write that can fail inside the loop is
+       * the record's own.
+       */
+      expect(r.stderr).toMatch(/may still say container-oom#1 may have been charged\. It was NOT called/);
+    } finally { await s.close(); rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it("does not count an acknowledgement as an answer it wrote", async () => {
+    /*
+     * With the webhook answering on receipt, a 200 carries n8n's acceptance
+     * and not the chain's report. The counter used to increment for any parsed
+     * 200, so the ordinary asynchronous case printed "1 answer(s) written"
+     * with nothing written — and the record must say the key may have been
+     * charged, because it was.
+     *
+     * Behaviour, not spelling: this runs the real script against a server that
+     * answers the way n8n now does.
+     */
+    const s = await serve(() => ({ status: 200, body: JSON.stringify({ message: "Workflow was started" }) }));
+    const d = mkdtempSync(join(tmpdir(), "e2e-"));
+    try {
+      const answers = join(d, "answers.json");
+      const record = join(d, "rec.json");
+      const r = await run(s.url, ["container-oom#1", "cpu-throttling#1", "--answers", answers, "--record", record], d);
+      expect(s.calls(), "one submission, then it stops and lets a person look").toBe(1);
+      expect(r.stdout).toMatch(/0 answer\(s\) written/);
+      expect(r.stdout, "and it says where the answer actually is").toMatch(/collect it with/);
+      expect(r.status, "an accepted submission is not a finished measurement").toBe(2);
+      const got = JSON.parse(readFileSync(answers, "utf8"));
+      expect(got, "an acknowledgement is never saved as a measurement").toEqual({});
+      const rec = JSON.parse(readFileSync(record, "utf8"));
+      expect(rec.outcomes["container-oom#1"]).toMatch(/^called,/);
+      expect(rec.outcomes["container-oom#1"]).toMatch(/awaiting collection/);
+      expect(rec.submissions["container-oom#1"].token, "the token is bound, so it can be found")
+        .toMatch(/^sub-[0-9a-f]{32}$/);
+      expect(rec.outcomes["cpu-throttling#1"], "the second key was never called").toBeUndefined();
     } finally { await s.close(); rmSync(d, { recursive: true, force: true }); }
   });
 
