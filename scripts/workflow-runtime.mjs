@@ -407,6 +407,22 @@ return items.map(function (item, index) {
       j.raw_answers = Object.assign({}, j.raw_answers || {});
       j.raw_answers[AGENT] = raw;
     }
+    /*
+     * And the cost, assigned back onto the carried object, which the first
+     * version forgot.
+     *
+     * costSoFar was built at the top and carried by the two REFUSAL returns,
+     * which build a fresh object. This path mutates the carried one instead,
+     * and nothing put the cost back — so every later return read a field
+     * nobody had written. A live run came back with an empty usage_by_agent
+     * while the expression that reads usage sat in the deployed node looking
+     * correct.
+     *
+     * It had no test because the harness envelope could not produce a usage
+     * field at all. That is fixed too: a helper that cannot produce a field
+     * hides every defect in reading it.
+     */
+    j.usage_by_agent = costSoFar;
   }
 
   if (NEXT === null) {

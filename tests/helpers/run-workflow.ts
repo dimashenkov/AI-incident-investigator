@@ -108,8 +108,19 @@ type Item = { json: Record<string, unknown> };
  * Written here rather than assumed by the Set node: if the envelope changes,
  * this is the one place that has to change, and every test notices.
  */
-export function envelope(answer: Reply): Record<string, unknown> {
-  return { choices: [{ message: { content: answer === null ? "not json at all" : JSON.stringify(answer) } }] };
+export function envelope(answer: Reply, usage?: Record<string, unknown>): Record<string, unknown> {
+  /*
+   * `usage` is part of what the API returns, and the harness could not carry it
+   * until 2026-09-11 — so the expression that reads it had no test, and a live
+   * run came back with `usage_by_agent` empty while the expression sat in the
+   * deployed node looking correct. A helper that cannot produce a field is a
+   * helper that hides every defect in reading it.
+   */
+  const out: Record<string, unknown> = {
+    choices: [{ message: { content: answer === null ? "not json at all" : JSON.stringify(answer) } }],
+  };
+  if (usage !== undefined) out["usage"] = usage;
+  return out;
 }
 
 /**
@@ -283,9 +294,24 @@ export async function runScenario(
        * test can put a shape through that is not the OpenAI envelope at all.
        * The marker is deliberately ugly: a real agent result never carries it.
        */
+      /*
+       * A stub that wants to say what the call cost returns `__usage` beside
+       * its answer, and the harness lifts it into the envelope where the API
+       * puts it. Without this the expression that reads `usage` could not be
+       * exercised at all, which is how a live run came back with an empty
+       * `usage_by_agent` while the code looked right.
+       */
+      let spokenUsage: Record<string, unknown> | undefined = undefined;
+      let spokenAnswer: Reply = answered;
+      if (answered !== null && typeof answered === "object" && "__usage" in answered) {
+        const copy: Record<string, unknown> = { ...(answered as Record<string, unknown>) };
+        spokenUsage = copy["__usage"] as Record<string, unknown>;
+        delete copy["__usage"];
+        spokenAnswer = copy as Reply;
+      }
       item = (answered !== null && typeof answered === "object" && "__rawBody" in answered)
         ? (answered as { __rawBody: Record<string, unknown> }).__rawBody
-        : envelope(answered);
+        : envelope(spokenAnswer, spokenUsage);
     } else if (next.type === "n8n-nodes-base.set") {
       item = runSetExpression(next, item, lastOf);
     } else if (next.type === "n8n-nodes-base.code") {
