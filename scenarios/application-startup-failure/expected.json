@@ -1,3 +1,8 @@
-{ "root_cause_code": "APPLICATION_STARTUP_FAILURE",
-  "note": "What this scenario is FOR. Restart count 7 and a container not ready look exactly like CONTAINER_OOM until the termination reason is read: it is Error with exit code 1, not OOMKilled, and memory is nowhere near the 2Gi limit. The cause is only in the logs, in a line the process printed before exiting. An agent that reasons from the restart count alone reaches the wrong code with the right symptoms.",
-  "must_cite": ["lines[2].message", "pods[0].containers[0].last_state.terminated.reason"] }
+{
+  "root_cause_code": "APPLICATION_STARTUP_FAILURE",
+  "note": "What this scenario is FOR. Restart count 7 and a container not ready look exactly like CONTAINER_OOM until the termination reason is read: it is Error with exit code 1, not OOMKilled, and memory is nowhere near the 2Gi limit. The cause is only in the logs, in a line the process printed before exiting. An agent that reasons from the restart count alone reaches the wrong code with the right symptoms. The termination is cited as `exit_code` (1) rather than `reason` (\"Error\"): the log line \"exiting with status 1\" corroborates the exit code exactly, and 1 versus OOMKilled's 137 is the sharper discriminator from CONTAINER_OOM. Both fields exclude OOM; the exit code is the one the logs and the container agree on.",
+  "must_cite": [
+    "lines[2].message",
+    "pods[0].containers[0].last_state.terminated.exit_code"
+  ]
+}

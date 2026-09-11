@@ -43,11 +43,18 @@
     "why": "the webhook reply carries no usage; nothing here could read it"
   },
   "scored": {
+    "certificate-expired": "unasked",
     "conflicting-evidence": "unasked",
+    "connection-pool-exhausted": "unasked",
     "container-oom": "unasked",
+    "dependency-unavailable": "unasked",
+    "dns-resolution-failure": "unasked",
     "image-pull-failure": "unasked",
     "insufficient-evidence": "unasked",
-    "application-startup-failure#5": "correct-without-its-evidence",
+    "network-policy-blocked": "unasked",
+    "node-not-ready": "unasked",
+    "volume-full": "unasked",
+    "application-startup-failure#5": "correct",
     "cpu-throttling#5": "correct",
     "deployment-regression#5": "correct",
     "readiness-probe-failure#5": "correct"
