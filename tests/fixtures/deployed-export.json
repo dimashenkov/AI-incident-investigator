@@ -3,12 +3,12 @@
   "name": "AI SRE — incident investigation",
   "description": null,
   "active": true,
-  "activeVersionId": "15e1d07b-68b8-4b8c-8c02-5b175c16becc",
+  "activeVersionId": "7e4382c1-2cc5-4ea9-9f52-3ef8e70954de",
   "createdAt": "2026-09-04T13:44:43.103Z",
-  "updatedAt": "2026-09-11T11:42:37.552Z",
+  "updatedAt": "2026-09-11T11:58:17.470Z",
   "isArchived": false,
-  "versionId": "15e1d07b-68b8-4b8c-8c02-5b175c16becc",
-  "versionCounter": 76,
+  "versionId": "7e4382c1-2cc5-4ea9-9f52-3ef8e70954de",
+  "versionCounter": 77,
   "sourceWorkflowId": null,
   "triggerCount": 1,
   "nodes": [
@@ -26,7 +26,7 @@
         "httpMethod": "POST",
         "responseMode": "onReceived"
       },
-      "webhookId": "e51ba531-6a4d-4df7-8e48-2e0dbf84b8a4"
+      "webhookId": "0a298435-cabc-49d8-add8-991125735305"
     },
     {
       "id": "assemble",
@@ -700,7 +700,7 @@
   "meta": null,
   "tags": [],
   "activeVersion": {
-    "versionId": "15e1d07b-68b8-4b8c-8c02-5b175c16becc",
+    "versionId": "7e4382c1-2cc5-4ea9-9f52-3ef8e70954de",
     "workflowId": "49T3pwFvfumqTdo7",
     "nodes": [
       {
@@ -717,7 +717,7 @@
           "httpMethod": "POST",
           "responseMode": "onReceived"
         },
-        "webhookId": "e51ba531-6a4d-4df7-8e48-2e0dbf84b8a4"
+        "webhookId": "0a298435-cabc-49d8-add8-991125735305"
       },
       {
         "id": "assemble",
@@ -1365,16 +1365,16 @@
     "name": null,
     "description": null,
     "autosaved": false,
-    "createdAt": "2026-09-11T11:42:37.599Z",
-    "updatedAt": "2026-09-11T11:42:37.599Z",
+    "createdAt": "2026-09-11T11:58:17.503Z",
+    "updatedAt": "2026-09-11T11:58:17.503Z",
     "workflowPublishHistory": [
       {
-        "id": 145,
+        "id": 147,
         "workflowId": "49T3pwFvfumqTdo7",
-        "versionId": "15e1d07b-68b8-4b8c-8c02-5b175c16becc",
+        "versionId": "7e4382c1-2cc5-4ea9-9f52-3ef8e70954de",
         "event": "activated",
         "userId": "6e8e3eb9-d8db-4e7f-bdb3-3318d80dee5a",
-        "createdAt": "2026-09-11T11:42:38.209Z"
+        "createdAt": "2026-09-11T11:58:18.169Z"
       }
     ]
   },
