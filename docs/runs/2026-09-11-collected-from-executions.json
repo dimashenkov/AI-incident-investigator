@@ -1,0 +1,21 @@
+{
+  "when": "2026-09-11",
+  "tool": "n8n",
+  "model_asked": "gpt-5 concluding, gpt-5-mini collecting for 313; four x gpt-5 for 303",
+  "kind": "collected-not-bought",
+  "outcome": "Two answers that were paid for and never delivered are now in docs/answers, read out of the executions with two GETs. Execution 303: conflicting-evidence, CONTAINER_OOM at confidence 0.35, contradicted_by on two metric points. Execution 313: the same scenario at 0.88. Nothing was re-run to get either.",
+  "why_it_matters": "Both runs came back HTTP 524 and both executions were status success. The gateway cut the connection; n8n finished. Before the reader existed those answers were unreachable and the money was spent for nothing.",
+  "third_data_point": "Three confidences now exist for conflicting-evidence on gpt-5: 0.35, 0.75, 0.88. Two of the three are above the declared ceiling of 0.6. That is not a sample, and the thirteenth limitation applies: this model cannot be pinned to temperature 0, so the spread IS part of the answer rather than noise around it.",
+  "unaccounted_executions": {
+    "what": "Nine executions of container-oom in n8n between 06:29 and 06:55 today, all mode webhook, all reaching Report.",
+    "established": "They are paid calls made through the webhook, outside this project's runner.",
+    "not_established": "Who made them. Most likely the owner's local n8n agent, which offered to run a check.",
+    "why_recorded": "An unrecorded call makes every total a floor while looking like an answer. They are named here so the counter's silence about them is visible."
+  },
+  "totals": {
+    "input_tokens": null,
+    "output_tokens": null,
+    "why": "Each collected document carries its own usage_by_agent, measured at the nodes. No dollar figure: the rate for these models at this date is not established here."
+  },
+  "scored": {}
+}

@@ -15,6 +15,25 @@
  */
 export const MUTATIONS = [
   {
+    // A finished execution whose data is missing is reported as collected, so a
+    // reader that forgot includeData=true would write an empty answer over a
+    // paid one.
+    id: "an-execution-with-no-data-called-collected",
+    file: "scripts/collect-execution.mjs",
+    from: '      why: "the execution carries no data — n8n may not be saving it, or the request omitted includeData=true" };',
+    to: '      why: "no data" };',
+    mustFail: "calls a finished run with no data UNAVAILABLE, and says why",
+  },
+  {
+    // A run still in flight is reported as absent, which is how a retention
+    // window becomes a lost measurement.
+    id: "a-running-execution-reported-as-unavailable",
+    file: "scripts/collect-execution.mjs",
+    from: '    return { state: "pending", why: `the execution is ${String(status ?? "still going")}` };',
+    to: '    return { state: "unavailable", why: "not finished" };',
+    mustFail: "calls a run that is still going PENDING, not absent",
+  },
+  {
     // The times come out sorted, which is a comparison the extractor is not
     // allowed to make: the ordering is the judgement being measured.
     id: "the-times-sorted-by-the-extractor",

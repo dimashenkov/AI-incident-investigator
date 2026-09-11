@@ -1,0 +1,821 @@
+{
+  "conflicting-evidence": {
+    "index": 0,
+    "state": "concluded",
+    "scenario": "conflicting-evidence",
+    "normalised": 6,
+    "raw_answers": {
+      "kubernetes": "{\n  \"agent\": \"kubernetes\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"the event says: Container ledger-writer exceeded its memory limit and was killed\",\n      \"source_ref\": \"events[0].message\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"the event last_seen is 2026-09-07T11:19:48Z\",\n      \"source_ref\": \"events[0].last_seen\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"the container's last termination reason is OOMKilled (exit_code 137, started_at 2026-09-07T11:12:30Z, finished_at 2026-09-07T11:19:48Z)\",\n      \"source_ref\": \"pods[0].containers[0].last_state.terminated\",\n      \"severity\": \"critical\"\n    },\n    {\n      \"fact\": \"pod phase is Running\",\n      \"source_ref\": \"pods[0].phase\",\n      \"severity\": \"info\"\n    },\n    {\n      \"fact\": \"container ready is false\",\n      \"source_ref\": \"pods[0].containers[0].ready\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"pod restart_count is 2\",\n      \"source_ref\": \"pods[0].restart_count\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"the container memory limit is 512Mi\",\n      \"source_ref\": \"pods[0].containers[0].limits.memory\",\n      \"severity\": \"info\"\n    },\n    {\n      \"fact\": \"the container cpu limit is 500m\",\n      \"source_ref\": \"pods[0].containers[0].limits.cpu\",\n      \"severity\": \"info\"\n    }\n  ],\n  \"hypotheses\": [\n    {\n      \"code\": \"CONTAINER_OOM\",\n      \"statement\": \"The container was OOMKilled\",\n      \"supported_by\": [\n        \"pods[0].containers[0].last_state.terminated\",\n        \"events[0].message\"\n      ]\n    }\n  ],\n  \"confidence\": 0.9\n}",
+      "logs": "{\n  \"agent\": \"logs\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"flush cycle complete, 1204 entries, heap 148Mi\",\n      \"source_ref\": \"lines[0].message\"\n    },\n    {\n      \"fact\": \"flush cycle complete, 1187 entries, heap 151Mi\",\n      \"source_ref\": \"lines[1].message\"\n    },\n    {\n      \"fact\": \"flush cycle complete, 1230 entries, heap 149Mi\",\n      \"source_ref\": \"lines[2].message\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+      "metrics": "{\n  \"agent\": \"metrics\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"container_memory_working_set_bytes was 161480704 bytes at 2026-09-07T11:13:00Z.\",\n      \"source_ref\": \"observation.series[0].points[0].value\"\n    },\n    {\n      \"fact\": \"container_memory_working_set_bytes was 158334976 bytes at 2026-09-07T11:15:00Z.\",\n      \"source_ref\": \"observation.series[0].points[1].value\"\n    },\n    {\n      \"fact\": \"container_memory_working_set_bytes was 163577856 bytes at 2026-09-07T11:18:00Z.\",\n      \"source_ref\": \"observation.series[0].points[2].value\"\n    },\n    {\n      \"fact\": \"container_memory_working_set_bytes was 160432128 bytes at 2026-09-07T11:19:00Z.\",\n      \"source_ref\": \"observation.series[0].points[3].value\"\n    },\n    {\n      \"fact\": \"container_cpu_cfs_throttled_seconds_total was 0 seconds at 2026-09-07T11:12:00Z.\",\n      \"source_ref\": \"observation.series[1].points[0].value\"\n    },\n    {\n      \"fact\": \"container_cpu_cfs_throttled_seconds_total was 0 seconds at 2026-09-07T11:18:00Z.\",\n      \"source_ref\": \"observation.series[1].points[1].value\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.9\n}",
+      "root-cause": "{\n  \"agent\": \"root_cause\",\n  \"status\": \"ok\",\n  \"findings\": [\n    { \"fact\": \"the event says: Container ledger-writer exceeded its memory limit and was killed\", \"source_ref\": \"events[0].message\" },\n    { \"fact\": \"the container's last termination reason is OOMKilled (exit_code 137, started_at 2026-09-07T11:12:30Z, finished_at 2026-09-07T11:19:48Z)\", \"source_ref\": \"pods[0].containers[0].last_state.terminated\" },\n    { \"fact\": \"the container memory limit is 512Mi\", \"source_ref\": \"pods[0].containers[0].limits.memory\" },\n    { \"fact\": \"container_memory_working_set_bytes was 160432128 bytes at 2026-09-07T11:19:00Z.\", \"source_ref\": \"series[0].points[3].value\" }\n  ],\n  \"hypotheses\": [\n    {\n      \"code\": \"CONTAINER_OOM\",\n      \"statement\": \"The ledger-writer container was killed by the OOM killer after exceeding its 512Mi memory limit, as indicated by the Kubernetes event and the container’s last termination reason OOMKilled at 2026-09-07T11:19:48Z.\",\n      \"supported_by\": [\"events[0].message\", \"pods[0].containers[0].last_state.terminated\", \"pods[0].containers[0].limits.memory\"],\n      \"contradicted_by\": [\"series[0].points[3].value\"]\n    }\n  ],\n  \"confidence\": 0.88\n}"
+    },
+    "usage_by_agent": {
+      "kubernetes": {
+        "prompt_tokens": 3492,
+        "completion_tokens": 2909,
+        "cached_tokens": 3328
+      },
+      "logs": {
+        "prompt_tokens": 1848,
+        "completion_tokens": 538,
+        "cached_tokens": 1792
+      },
+      "metrics": {
+        "prompt_tokens": 1930,
+        "completion_tokens": 1469,
+        "cached_tokens": 1792
+      },
+      "root-cause": {
+        "prompt_tokens": 4458,
+        "completion_tokens": 3508,
+        "cached_tokens": 2944
+      }
+    },
+    "payloads_sent": {
+      "root-cause": {
+        "incident_id": "INC-2026-0801",
+        "agent_results": [
+          {
+            "agent": "kubernetes",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the event says: Container ledger-writer exceeded its memory limit and was killed",
+                "source_ref": "events[0].message",
+                "severity": "warning"
+              },
+              {
+                "fact": "the event last_seen is 2026-09-07T11:19:48Z",
+                "source_ref": "events[0].last_seen",
+                "severity": "warning"
+              },
+              {
+                "fact": "the container's last termination reason is OOMKilled (exit_code 137, started_at 2026-09-07T11:12:30Z, finished_at 2026-09-07T11:19:48Z)",
+                "source_ref": "pods[0].containers[0].last_state.terminated",
+                "severity": "critical"
+              },
+              {
+                "fact": "pod phase is Running",
+                "source_ref": "pods[0].phase",
+                "severity": "info"
+              },
+              {
+                "fact": "container ready is false",
+                "source_ref": "pods[0].containers[0].ready",
+                "severity": "warning"
+              },
+              {
+                "fact": "pod restart_count is 2",
+                "source_ref": "pods[0].restart_count",
+                "severity": "warning"
+              },
+              {
+                "fact": "the container memory limit is 512Mi",
+                "source_ref": "pods[0].containers[0].limits.memory",
+                "severity": "info"
+              },
+              {
+                "fact": "the container cpu limit is 500m",
+                "source_ref": "pods[0].containers[0].limits.cpu",
+                "severity": "info"
+              }
+            ],
+            "hypotheses": [
+              {
+                "code": "CONTAINER_OOM",
+                "statement": "The container was OOMKilled",
+                "supported_by": [
+                  "pods[0].containers[0].last_state.terminated",
+                  "events[0].message"
+                ]
+              }
+            ],
+            "confidence": 0.9
+          },
+          {
+            "agent": "logs",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "flush cycle complete, 1204 entries, heap 148Mi",
+                "source_ref": "lines[0].message"
+              },
+              {
+                "fact": "flush cycle complete, 1187 entries, heap 151Mi",
+                "source_ref": "lines[1].message"
+              },
+              {
+                "fact": "flush cycle complete, 1230 entries, heap 149Mi",
+                "source_ref": "lines[2].message"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "metrics",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "container_memory_working_set_bytes was 161480704 bytes at 2026-09-07T11:13:00Z.",
+                "source_ref": "series[0].points[0].value"
+              },
+              {
+                "fact": "container_memory_working_set_bytes was 158334976 bytes at 2026-09-07T11:15:00Z.",
+                "source_ref": "series[0].points[1].value"
+              },
+              {
+                "fact": "container_memory_working_set_bytes was 163577856 bytes at 2026-09-07T11:18:00Z.",
+                "source_ref": "series[0].points[2].value"
+              },
+              {
+                "fact": "container_memory_working_set_bytes was 160432128 bytes at 2026-09-07T11:19:00Z.",
+                "source_ref": "series[0].points[3].value"
+              },
+              {
+                "fact": "container_cpu_cfs_throttled_seconds_total was 0 seconds at 2026-09-07T11:12:00Z.",
+                "source_ref": "series[1].points[0].value"
+              },
+              {
+                "fact": "container_cpu_cfs_throttled_seconds_total was 0 seconds at 2026-09-07T11:18:00Z.",
+                "source_ref": "series[1].points[1].value"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0.9
+          }
+        ],
+        "configuration_read_by_code": [
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].limits.memory",
+            "value": "512Mi",
+            "kind": "resource-limit"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].limits.cpu",
+            "value": "500m",
+            "kind": "resource-limit"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].requests.memory",
+            "value": "256Mi",
+            "kind": "resource-request"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].requests.cpu",
+            "value": "250m",
+            "kind": "resource-request"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].ready",
+            "value": "false",
+            "kind": "container-readiness"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].last_state.terminated.reason",
+            "value": "OOMKilled",
+            "kind": "last-termination"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].last_state.terminated.exit_code",
+            "value": "137",
+            "kind": "last-termination"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].last_state.terminated.started_at",
+            "value": "2026-09-07T11:12:30Z",
+            "kind": "last-termination"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "pods[0].containers[0].last_state.terminated.finished_at",
+            "value": "2026-09-07T11:19:48Z",
+            "kind": "last-termination"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "deployment.image",
+            "value": "registry.internal/ledger-writer:3.1.4",
+            "kind": "deployment-image"
+          },
+          {
+            "slot": "kubernetes",
+            "ref": "events[0].last_seen",
+            "value": "2026-09-07T11:19:48Z",
+            "kind": "observed-at"
+          },
+          {
+            "slot": "logs",
+            "ref": "lines[0].ts",
+            "value": "2026-09-07T11:13:02Z",
+            "kind": "observed-at"
+          },
+          {
+            "slot": "logs",
+            "ref": "lines[1].ts",
+            "value": "2026-09-07T11:16:40Z",
+            "kind": "observed-at"
+          },
+          {
+            "slot": "logs",
+            "ref": "lines[2].ts",
+            "value": "2026-09-07T11:19:44Z",
+            "kind": "observed-at"
+          },
+          {
+            "slot": "metrics",
+            "ref": "series[0].points[0].value",
+            "value": "161480704",
+            "kind": "series-endpoint",
+            "ts": "2026-09-07T11:13:00Z",
+            "series": "container_memory_working_set_bytes",
+            "unit": "bytes"
+          },
+          {
+            "slot": "metrics",
+            "ref": "series[0].points[3].value",
+            "value": "160432128",
+            "kind": "series-endpoint",
+            "ts": "2026-09-07T11:19:00Z",
+            "series": "container_memory_working_set_bytes",
+            "unit": "bytes"
+          },
+          {
+            "slot": "metrics",
+            "ref": "series[1].points[0].value",
+            "value": "0",
+            "kind": "series-endpoint",
+            "ts": "2026-09-07T11:12:00Z",
+            "series": "container_cpu_cfs_throttled_seconds_total",
+            "unit": "seconds"
+          },
+          {
+            "slot": "metrics",
+            "ref": "series[1].points[1].value",
+            "value": "0",
+            "kind": "series-endpoint",
+            "ts": "2026-09-07T11:18:00Z",
+            "series": "container_cpu_cfs_throttled_seconds_total",
+            "unit": "seconds"
+          }
+        ]
+      }
+    },
+    "root_cause_code": "CONTAINER_OOM",
+    "root_cause": "The ledger-writer container was killed by the OOM killer after exceeding its 512Mi memory limit, as indicated by the Kubernetes event and the container’s last termination reason OOMKilled at 2026-09-07T11:19:48Z.",
+    "confidence": 0.88,
+    "evidence": [
+      {
+        "source": "kubernetes",
+        "fact": "the event says: Container ledger-writer exceeded its memory limit and was killed",
+        "supports": "for"
+      },
+      {
+        "source": "kubernetes",
+        "fact": "the container's last termination reason is OOMKilled (exit_code 137, started_at 2026-09-07T11:12:30Z, finished_at 2026-09-07T11:19:48Z)",
+        "supports": "for"
+      },
+      {
+        "source": "kubernetes",
+        "fact": "the container memory limit is 512Mi",
+        "supports": "for"
+      },
+      {
+        "source": "metrics",
+        "fact": "container_memory_working_set_bytes was 160432128 bytes at 2026-09-07T11:19:00Z.",
+        "supports": "against"
+      }
+    ],
+    "incident": {
+      "incident_id": "INC-2026-0801",
+      "status": "diagnosed",
+      "service": "ledger-writer",
+      "namespace": "production",
+      "cluster": "prod-eu",
+      "started_at": "2026-09-07T11:20:00Z",
+      "scenario": "conflicting-evidence",
+      "source": {
+        "provider": "fake-datadog",
+        "alert": {
+          "id": "alert-5e93",
+          "title": "ledger-writer killed, cause unclear",
+          "triggered_at": "2026-09-07T11:20:00Z",
+          "severity": "critical",
+          "monitor_id": "mon-8815",
+          "tags": [
+            "service:ledger-writer",
+            "env:production"
+          ]
+        }
+      },
+      "observations": {
+        "kubernetes": {
+          "collected_at": "2026-09-07T11:21:05Z",
+          "pods": [
+            {
+              "name": "ledger-writer-849f6d7bc4-tq5nv",
+              "namespace": "production",
+              "phase": "Running",
+              "restart_count": 2,
+              "containers": [
+                {
+                  "name": "ledger-writer",
+                  "ready": false,
+                  "restart_count": 2,
+                  "limits": {
+                    "memory": "512Mi",
+                    "cpu": "500m"
+                  },
+                  "requests": {
+                    "memory": "256Mi",
+                    "cpu": "250m"
+                  },
+                  "last_state": {
+                    "terminated": {
+                      "reason": "OOMKilled",
+                      "exit_code": 137,
+                      "started_at": "2026-09-07T11:12:30Z",
+                      "finished_at": "2026-09-07T11:19:48Z"
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "events": [
+            {
+              "type": "Warning",
+              "reason": "Killing",
+              "message": "Container ledger-writer exceeded its memory limit and was killed",
+              "count": 2,
+              "last_seen": "2026-09-07T11:19:48Z",
+              "involved_object": "pod/ledger-writer-849f6d7bc4-tq5nv"
+            }
+          ],
+          "deployment": {
+            "name": "ledger-writer",
+            "namespace": "production",
+            "image": "registry.internal/ledger-writer:3.1.4",
+            "replicas": {
+              "desired": 2,
+              "ready": 1,
+              "available": 1
+            }
+          },
+          "provenance": {
+            "collection_id": "37343e8a-21e7-4eed-85da-fa669d660f65",
+            "requested_for": "INC-2026-0801",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-kubernetes"
+          }
+        },
+        "logs": {
+          "collected_at": "2026-09-07T11:21:07Z",
+          "window": {
+            "from": "2026-09-07T11:10:00Z",
+            "to": "2026-09-07T11:21:00Z"
+          },
+          "truncated": false,
+          "lines": [
+            {
+              "ts": "2026-09-07T11:13:02Z",
+              "level": "info",
+              "container": "ledger-writer",
+              "message": "flush cycle complete, 1204 entries, heap 148Mi"
+            },
+            {
+              "ts": "2026-09-07T11:16:40Z",
+              "level": "info",
+              "container": "ledger-writer",
+              "message": "flush cycle complete, 1187 entries, heap 151Mi"
+            },
+            {
+              "ts": "2026-09-07T11:19:44Z",
+              "level": "info",
+              "container": "ledger-writer",
+              "message": "flush cycle complete, 1230 entries, heap 149Mi"
+            }
+          ],
+          "provenance": {
+            "collection_id": "37343e8a-21e7-4eed-85da-fa669d660f65",
+            "requested_for": "INC-2026-0801",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-logs"
+          }
+        },
+        "metrics": {
+          "collected_at": "2026-09-07T11:21:09Z",
+          "window": {
+            "from": "2026-09-07T11:10:00Z",
+            "to": "2026-09-07T11:21:00Z"
+          },
+          "series": [
+            {
+              "name": "container_memory_working_set_bytes",
+              "unit": "bytes",
+              "container": "ledger-writer",
+              "points": [
+                {
+                  "ts": "2026-09-07T11:13:00Z",
+                  "value": 161480704
+                },
+                {
+                  "ts": "2026-09-07T11:15:00Z",
+                  "value": 158334976
+                },
+                {
+                  "ts": "2026-09-07T11:18:00Z",
+                  "value": 163577856
+                },
+                {
+                  "ts": "2026-09-07T11:19:00Z",
+                  "value": 160432128
+                }
+              ]
+            },
+            {
+              "name": "container_cpu_cfs_throttled_seconds_total",
+              "unit": "seconds",
+              "container": "ledger-writer",
+              "points": [
+                {
+                  "ts": "2026-09-07T11:12:00Z",
+                  "value": 0
+                },
+                {
+                  "ts": "2026-09-07T11:18:00Z",
+                  "value": 0
+                }
+              ]
+            }
+          ],
+          "provenance": {
+            "collection_id": "37343e8a-21e7-4eed-85da-fa669d660f65",
+            "requested_for": "INC-2026-0801",
+            "cluster": "prod-eu",
+            "namespace": "production",
+            "provider": "fake-metrics"
+          }
+        }
+      },
+      "collection": {
+        "kubernetes": {
+          "state": "collected"
+        },
+        "logs": {
+          "state": "collected"
+        },
+        "metrics": {
+          "state": "collected"
+        }
+      },
+      "analysis": {
+        "agents": [
+          {
+            "agent": "kubernetes",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the event says: Container ledger-writer exceeded its memory limit and was killed",
+                "source_ref": "events[0].message",
+                "severity": "warning"
+              },
+              {
+                "fact": "the event last_seen is 2026-09-07T11:19:48Z",
+                "source_ref": "events[0].last_seen",
+                "severity": "warning"
+              },
+              {
+                "fact": "the container's last termination reason is OOMKilled (exit_code 137, started_at 2026-09-07T11:12:30Z, finished_at 2026-09-07T11:19:48Z)",
+                "source_ref": "pods[0].containers[0].last_state.terminated",
+                "severity": "critical"
+              },
+              {
+                "fact": "pod phase is Running",
+                "source_ref": "pods[0].phase",
+                "severity": "info"
+              },
+              {
+                "fact": "container ready is false",
+                "source_ref": "pods[0].containers[0].ready",
+                "severity": "warning"
+              },
+              {
+                "fact": "pod restart_count is 2",
+                "source_ref": "pods[0].restart_count",
+                "severity": "warning"
+              },
+              {
+                "fact": "the container memory limit is 512Mi",
+                "source_ref": "pods[0].containers[0].limits.memory",
+                "severity": "info"
+              },
+              {
+                "fact": "the container cpu limit is 500m",
+                "source_ref": "pods[0].containers[0].limits.cpu",
+                "severity": "info"
+              }
+            ],
+            "hypotheses": [
+              {
+                "code": "CONTAINER_OOM",
+                "statement": "The container was OOMKilled",
+                "supported_by": [
+                  "pods[0].containers[0].last_state.terminated",
+                  "events[0].message"
+                ]
+              }
+            ],
+            "confidence": 0.9
+          },
+          {
+            "agent": "logs",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "flush cycle complete, 1204 entries, heap 148Mi",
+                "source_ref": "lines[0].message"
+              },
+              {
+                "fact": "flush cycle complete, 1187 entries, heap 151Mi",
+                "source_ref": "lines[1].message"
+              },
+              {
+                "fact": "flush cycle complete, 1230 entries, heap 149Mi",
+                "source_ref": "lines[2].message"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0
+          },
+          {
+            "agent": "metrics",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "container_memory_working_set_bytes was 161480704 bytes at 2026-09-07T11:13:00Z.",
+                "source_ref": "series[0].points[0].value"
+              },
+              {
+                "fact": "container_memory_working_set_bytes was 158334976 bytes at 2026-09-07T11:15:00Z.",
+                "source_ref": "series[0].points[1].value"
+              },
+              {
+                "fact": "container_memory_working_set_bytes was 163577856 bytes at 2026-09-07T11:18:00Z.",
+                "source_ref": "series[0].points[2].value"
+              },
+              {
+                "fact": "container_memory_working_set_bytes was 160432128 bytes at 2026-09-07T11:19:00Z.",
+                "source_ref": "series[0].points[3].value"
+              },
+              {
+                "fact": "container_cpu_cfs_throttled_seconds_total was 0 seconds at 2026-09-07T11:12:00Z.",
+                "source_ref": "series[1].points[0].value"
+              },
+              {
+                "fact": "container_cpu_cfs_throttled_seconds_total was 0 seconds at 2026-09-07T11:18:00Z.",
+                "source_ref": "series[1].points[1].value"
+              }
+            ],
+            "hypotheses": [],
+            "confidence": 0.9
+          },
+          {
+            "agent": "root_cause",
+            "status": "ok",
+            "findings": [
+              {
+                "fact": "the event says: Container ledger-writer exceeded its memory limit and was killed",
+                "source_ref": "events[0].message"
+              },
+              {
+                "fact": "the container's last termination reason is OOMKilled (exit_code 137, started_at 2026-09-07T11:12:30Z, finished_at 2026-09-07T11:19:48Z)",
+                "source_ref": "pods[0].containers[0].last_state.terminated"
+              },
+              {
+                "fact": "the container memory limit is 512Mi",
+                "source_ref": "pods[0].containers[0].limits.memory"
+              },
+              {
+                "fact": "container_memory_working_set_bytes was 160432128 bytes at 2026-09-07T11:19:00Z.",
+                "source_ref": "series[0].points[3].value"
+              }
+            ],
+            "hypotheses": [
+              {
+                "code": "CONTAINER_OOM",
+                "statement": "The ledger-writer container was killed by the OOM killer after exceeding its 512Mi memory limit, as indicated by the Kubernetes event and the container’s last termination reason OOMKilled at 2026-09-07T11:19:48Z.",
+                "supported_by": [
+                  "events[0].message",
+                  "pods[0].containers[0].last_state.terminated",
+                  "pods[0].containers[0].limits.memory"
+                ],
+                "contradicted_by": [
+                  "series[0].points[3].value"
+                ]
+              }
+            ],
+            "confidence": 0.88
+          }
+        ],
+        "root_cause_code": "CONTAINER_OOM",
+        "root_cause": "The ledger-writer container was killed by the OOM killer after exceeding its 512Mi memory limit, as indicated by the Kubernetes event and the container’s last termination reason OOMKilled at 2026-09-07T11:19:48Z.",
+        "confidence": 0.88,
+        "evidence": [
+          {
+            "source": "kubernetes",
+            "fact": "the event says: Container ledger-writer exceeded its memory limit and was killed",
+            "supports": "for"
+          },
+          {
+            "source": "kubernetes",
+            "fact": "the container's last termination reason is OOMKilled (exit_code 137, started_at 2026-09-07T11:12:30Z, finished_at 2026-09-07T11:19:48Z)",
+            "supports": "for"
+          },
+          {
+            "source": "kubernetes",
+            "fact": "the container memory limit is 512Mi",
+            "supports": "for"
+          },
+          {
+            "source": "metrics",
+            "fact": "container_memory_working_set_bytes was 160432128 bytes at 2026-09-07T11:19:00Z.",
+            "supports": "against"
+          }
+        ]
+      },
+      "remediation": {
+        "recommended_actions": []
+      },
+      "conversation": {
+        "provider": "fake-slack",
+        "channel_id": "fake-prod-incidents",
+        "thread_id": "thread-INC-2026-0801",
+        "incident_id": "INC-2026-0801",
+        "messages": [
+          {
+            "role": "system",
+            "text": "INC-2026-0801: ledger-writer in production — investigating.",
+            "ts": "2026-09-07T11:20:00Z",
+            "incident_id": "INC-2026-0801"
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0801",
+            "ts": "2026-09-07T11:20:00Z",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the event says: Container ledger-writer exceeded its memory limit and was killed"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the event last_seen is 2026-09-07T11:19:48Z"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container's last termination reason is OOMKilled (exit_code 137, started_at 2026-09-07T11:12:30Z, finished_at 2026-09-07T11:19:48Z)"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "pod phase is Running"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "container ready is false"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "pod restart_count is 2"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container memory limit is 512Mi"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container cpu limit is 500m"
+              }
+            ],
+            "text": "kubernetes: the event says: Container ledger-writer exceeded its memory limit and was killed; the event last_seen is 2026-09-07T11:19:48Z; the container's last termination reason is OOMKilled (exit_code 137, started_at 2026-09-07T11:12:30Z, finished_at 2026-09-07T11:19:48Z); pod phase is Running; container ready is false; pod restart_count is 2; the container memory limit is 512Mi; the container cpu limit is 500m."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0801",
+            "ts": "2026-09-07T11:20:00Z",
+            "cited_evidence": [
+              {
+                "source": "logs",
+                "fact": "flush cycle complete, 1204 entries, heap 148Mi"
+              },
+              {
+                "source": "logs",
+                "fact": "flush cycle complete, 1187 entries, heap 151Mi"
+              },
+              {
+                "source": "logs",
+                "fact": "flush cycle complete, 1230 entries, heap 149Mi"
+              }
+            ],
+            "text": "logs: flush cycle complete, 1204 entries, heap 148Mi; flush cycle complete, 1187 entries, heap 151Mi; flush cycle complete, 1230 entries, heap 149Mi."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0801",
+            "ts": "2026-09-07T11:20:00Z",
+            "cited_evidence": [
+              {
+                "source": "metrics",
+                "fact": "container_memory_working_set_bytes was 161480704 bytes at 2026-09-07T11:13:00Z."
+              },
+              {
+                "source": "metrics",
+                "fact": "container_memory_working_set_bytes was 158334976 bytes at 2026-09-07T11:15:00Z."
+              },
+              {
+                "source": "metrics",
+                "fact": "container_memory_working_set_bytes was 163577856 bytes at 2026-09-07T11:18:00Z."
+              },
+              {
+                "source": "metrics",
+                "fact": "container_memory_working_set_bytes was 160432128 bytes at 2026-09-07T11:19:00Z."
+              },
+              {
+                "source": "metrics",
+                "fact": "container_cpu_cfs_throttled_seconds_total was 0 seconds at 2026-09-07T11:12:00Z."
+              },
+              {
+                "source": "metrics",
+                "fact": "container_cpu_cfs_throttled_seconds_total was 0 seconds at 2026-09-07T11:18:00Z."
+              }
+            ],
+            "text": "metrics: container_memory_working_set_bytes was 161480704 bytes at 2026-09-07T11:13:00Z.; container_memory_working_set_bytes was 158334976 bytes at 2026-09-07T11:15:00Z.; container_memory_working_set_bytes was 163577856 bytes at 2026-09-07T11:18:00Z.; container_memory_working_set_bytes was 160432128 bytes at 2026-09-07T11:19:00Z.; container_cpu_cfs_throttled_seconds_total was 0 seconds at 2026-09-07T11:12:00Z.; container_cpu_cfs_throttled_seconds_total was 0 seconds at 2026-09-07T11:18:00Z.."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0801",
+            "ts": "2026-09-07T11:20:00Z",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the event says: Container ledger-writer exceeded its memory limit and was killed"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container's last termination reason is OOMKilled (exit_code 137, started_at 2026-09-07T11:12:30Z, finished_at 2026-09-07T11:19:48Z)"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container memory limit is 512Mi"
+              },
+              {
+                "source": "metrics",
+                "fact": "container_memory_working_set_bytes was 160432128 bytes at 2026-09-07T11:19:00Z."
+              }
+            ],
+            "text": "root_cause: the event says: Container ledger-writer exceeded its memory limit and was killed; the container's last termination reason is OOMKilled (exit_code 137, started_at 2026-09-07T11:12:30Z, finished_at 2026-09-07T11:19:48Z); the container memory limit is 512Mi; container_memory_working_set_bytes was 160432128 bytes at 2026-09-07T11:19:00Z.."
+          },
+          {
+            "role": "agent",
+            "incident_id": "INC-2026-0801",
+            "ts": "2026-09-07T11:20:00Z",
+            "text": "Root cause: CONTAINER_OOM. The ledger-writer container was killed by the OOM killer after exceeding its 512Mi memory limit, as indicated by the Kubernetes event and the container’s last termination reason OOMKilled at 2026-09-07T11:19:48Z. The agent puts its confidence at 88%, which is its own estimate and nothing here checks it. Against it: metrics says container_memory_working_set_bytes was 160432128 bytes at 2026-09-07T11:19:00Z..",
+            "cited_evidence": [
+              {
+                "source": "kubernetes",
+                "fact": "the event says: Container ledger-writer exceeded its memory limit and was killed"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container's last termination reason is OOMKilled (exit_code 137, started_at 2026-09-07T11:12:30Z, finished_at 2026-09-07T11:19:48Z)"
+              },
+              {
+                "source": "kubernetes",
+                "fact": "the container memory limit is 512Mi"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "thread": [
+      "INC-2026-0801: ledger-writer in production — investigating.",
+      "kubernetes: the event says: Container ledger-writer exceeded its memory limit and was killed; the event last_seen is 2026-09-07T11:19:48Z; the container's last termination reason is OOMKilled (exit_code 137, started_at 2026-09-07T11:12:30Z, finished_at 2026-09-07T11:19:48Z); pod phase is Running; container ready is false; pod restart_count is 2; the container memory limit is 512Mi; the container cpu limit is 500m.",
+      "logs: flush cycle complete, 1204 entries, heap 148Mi; flush cycle complete, 1187 entries, heap 151Mi; flush cycle complete, 1230 entries, heap 149Mi.",
+      "metrics: container_memory_working_set_bytes was 161480704 bytes at 2026-09-07T11:13:00Z.; container_memory_working_set_bytes was 158334976 bytes at 2026-09-07T11:15:00Z.; container_memory_working_set_bytes was 163577856 bytes at 2026-09-07T11:18:00Z.; container_memory_working_set_bytes was 160432128 bytes at 2026-09-07T11:19:00Z.; container_cpu_cfs_throttled_seconds_total was 0 seconds at 2026-09-07T11:12:00Z.; container_cpu_cfs_throttled_seconds_total was 0 seconds at 2026-09-07T11:18:00Z..",
+      "root_cause: the event says: Container ledger-writer exceeded its memory limit and was killed; the container's last termination reason is OOMKilled (exit_code 137, started_at 2026-09-07T11:12:30Z, finished_at 2026-09-07T11:19:48Z); the container memory limit is 512Mi; container_memory_working_set_bytes was 160432128 bytes at 2026-09-07T11:19:00Z..",
+      "Root cause: CONTAINER_OOM. The ledger-writer container was killed by the OOM killer after exceeding its 512Mi memory limit, as indicated by the Kubernetes event and the container’s last termination reason OOMKilled at 2026-09-07T11:19:48Z. The agent puts its confidence at 88%, which is its own estimate and nothing here checks it. Against it: metrics says container_memory_working_set_bytes was 160432128 bytes at 2026-09-07T11:19:00Z.."
+    ]
+  }
+}
