@@ -1,9 +1,8 @@
 {
   "root_cause_code": "NODE_NOT_READY",
-  "note": "The fault is UNDER the pods, and every field says so rather than omitting something. Restart counts are zero and the one termination names ContainerStatusUnknown — not OOMKilled, not an application Error — so CONTAINER_OOM and APPLICATION_STARTUP_FAILURE are excluded by evidence, not by silence. No probe is mentioned and neither pod is Running, which is what separates this from READINESS_PROBE_FAILURE. The failed-request ratio never moves, which separates it from DEPLOYMENT_REGRESSION. The logs simply STOP at 14:01:04: a node whose kubelet has stopped reporting ships no further lines, and an answer of INSUFFICIENT_EVIDENCE has read that silence as nothing rather than as the shape of the fault.",
+  "note": "The fault is UNDER the pods, and every field says so rather than omitting something. Restart counts are zero and the one termination names ContainerStatusUnknown — not OOMKilled, not an application Error — so CONTAINER_OOM and APPLICATION_STARTUP_FAILURE are excluded by evidence, not by silence. No probe is mentioned and neither pod is Running, which is what separates this from READINESS_PROBE_FAILURE. The failed-request ratio never moves, which separates it from DEPLOYMENT_REGRESSION. The logs simply STOP at 14:01:04: a node whose kubelet has stopped reporting ships no further lines, and an answer of INSUFFICIENT_EVIDENCE has read that silence as nothing rather than as the shape of the fault. The two cited events pin the diagnosis; the stopped logs corroborate it and are not required, which is why only the events are in must_cite.",
   "must_cite": [
     "events[0].message",
-    "events[2].message",
-    "lines[2].ts"
+    "events[2].message"
   ]
 }

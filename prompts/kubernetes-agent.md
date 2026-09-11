@@ -214,7 +214,12 @@ So: `pods[0].containers[0].last_state.terminated.reason`, never
 reason. If a finding is about two fields, it is two findings.
 
 This is not "always point at the deepest thing". It is "point at what the fact
-is about". A fact about a whole object cites the object — a measurement that
+is about". An EVENT is the clearest case: a fact about what an event says cites
+`events[N].message`, never the bare `events[N]` — the object holds a type, a
+reason, a count and a message, and a citation to the whole object does not say
+which of them your fact came from. Measured on 2026-09-11: a node-not-ready
+answer cited `events[0]` and `events[2]` and was scored right-code-wrong-ground
+because the scenario asks for `events[0].message`. A fact about a whole object cites the object — a measurement that
 names both a time and a value legitimately cites the point that holds them. The
 defect is the MISMATCH: a fact naming one field while the path stops at its
 parent.
