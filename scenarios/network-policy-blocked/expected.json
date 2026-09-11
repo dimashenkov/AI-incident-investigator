@@ -1,0 +1,8 @@
+{
+  "root_cause_code": "NETWORK_POLICY_BLOCKED",
+  "note": "The log carries a resolved address, dial tcp 10.96.71.4:8443, so NOT DNS_RESOLUTION_FAILURE. The failure is i/o timeout not connection refused: nothing answered, which is a dropped packet, not an absent listener. NOT DEPENDENCY_UNAVAILABLE twice over: both warehouse-api pods are Running and ready, and warehouse-api's own failure ratio sits at 0.001 the whole window, so it serves other callers while this one cannot reach it. The event reports only that packets were dropped - it does NOT name a policy, so the code cannot be reached from the event alone. The decisive fact is in the metric, and only there: the drop counter is labelled policy-denied-egress and goes 0 to 1284 while other egress from the same pod keeps flowing - a silent NetworkPolicy, which is what makes this failure hard. NOT DEPLOYMENT_REGRESSION: the Scheduled event is nine hours old. This scenario FORCES the combination of the timeout log, the healthy callee, and the drop metric; none of the three alone reaches the code.",
+  "must_cite": [
+    "events[0].message",
+    "series[0].points[3].value"
+  ]
+}

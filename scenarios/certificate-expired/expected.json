@@ -1,0 +1,8 @@
+{
+  "root_cause_code": "CERTIFICATE_EXPIRED",
+  "note": "Kubernetes says the service is healthy and it is telling the truth: 3/3 replicas available, all containers ready, restart_count 0, no probe failing. The process listens and accepts TCP; what it cannot do is complete a handshake. The server logs remote error: tls: bad certificate, which is the CLIENT rejecting what the server presented and never says why. The decisive pair: the event states the served certificate partner-gateway-tls EXPIRED at 02:16 (not merely that renewal failed), cited with the metric where seconds-until-expiry falls 1:1 with the clock to a single expiry at 02:16, crossing zero exactly there and reaching -180 by 02:19 as handshake failures climb. NOT READINESS_PROBE_FAILURE: every container is ready and there is no Unhealthy event; the probe does not speak TLS. NOT DEPLOYMENT_REGRESSION: the only ScalingReplicaSet is eight days before and the image never changed.",
+  "must_cite": [
+    "events[0].message",
+    "series[0].points[3].value"
+  ]
+}

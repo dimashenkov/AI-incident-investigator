@@ -1,0 +1,12 @@
+{
+  "id": "alert-8a4d",
+  "title": "media-archiver write failures climbing",
+  "triggered_at": "2026-09-12T03:41:00Z",
+  "severity": "critical",
+  "monitor_id": "mon-5140",
+  "tags": [
+    "service:media-archiver",
+    "env:production",
+    "cluster:prod-eu"
+  ]
+}

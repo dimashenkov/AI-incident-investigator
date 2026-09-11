@@ -1,0 +1,34 @@
+{
+  "collected_at": "2026-09-12T16:49:05Z",
+  "window": {
+    "from": "2026-09-12T16:40:00Z",
+    "to": "2026-09-12T16:49:00Z"
+  },
+  "truncated": false,
+  "lines": [
+    {
+      "ts": "2026-09-12T16:42:07Z",
+      "level": "info",
+      "container": "billing-api",
+      "message": "pool: 20 of 20 connections in use, 0 idle"
+    },
+    {
+      "ts": "2026-09-12T16:44:33Z",
+      "level": "warn",
+      "container": "billing-api",
+      "message": "acquire from pool waited 4812ms (limit 20, in use 20, waiters 63)"
+    },
+    {
+      "ts": "2026-09-12T16:46:12Z",
+      "level": "error",
+      "container": "billing-api",
+      "message": "POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms"
+    },
+    {
+      "ts": "2026-09-12T16:48:26Z",
+      "level": "error",
+      "container": "billing-api",
+      "message": "POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms"
+    }
+  ]
+}

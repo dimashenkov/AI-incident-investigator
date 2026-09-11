@@ -1,0 +1,55 @@
+{
+  "collected_at": "2026-09-12T11:27:08Z",
+  "window": {
+    "from": "2026-09-12T11:18:00Z",
+    "to": "2026-09-12T11:27:00Z"
+  },
+  "series": [
+    {
+      "name": "http_requests_failed_ratio",
+      "unit": "ratio",
+      "container": "cart-api",
+      "points": [
+        {
+          "ts": "2026-09-12T11:19:00Z",
+          "value": 0.001
+        },
+        {
+          "ts": "2026-09-12T11:22:00Z",
+          "value": 0.004
+        },
+        {
+          "ts": "2026-09-12T11:24:00Z",
+          "value": 0.52
+        },
+        {
+          "ts": "2026-09-12T11:27:00Z",
+          "value": 0.61
+        }
+      ]
+    },
+    {
+      "name": "kube_endpoint_address_available:pricing-api",
+      "unit": "count",
+      "container": "cart-api",
+      "points": [
+        {
+          "ts": "2026-09-12T11:19:00Z",
+          "value": 3
+        },
+        {
+          "ts": "2026-09-12T11:22:00Z",
+          "value": 3
+        },
+        {
+          "ts": "2026-09-12T11:23:00Z",
+          "value": 0
+        },
+        {
+          "ts": "2026-09-12T11:27:00Z",
+          "value": 0
+        }
+      ]
+    }
+  ]
+}

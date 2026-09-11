@@ -1,0 +1,12 @@
+{
+  "id": "alert-6d02",
+  "title": "webhook-dispatcher cannot reach events-gateway",
+  "triggered_at": "2026-09-13T09:33:00Z",
+  "severity": "critical",
+  "monitor_id": "mon-4802",
+  "tags": [
+    "service:webhook-dispatcher",
+    "env:production",
+    "cluster:prod-eu"
+  ]
+}

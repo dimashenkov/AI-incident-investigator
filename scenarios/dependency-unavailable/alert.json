@@ -1,0 +1,12 @@
+{
+  "id": "alert-4b19",
+  "title": "cart-api checkout failures while cart-api itself is healthy",
+  "triggered_at": "2026-09-12T11:26:00Z",
+  "severity": "critical",
+  "monitor_id": "mon-7210",
+  "tags": [
+    "service:cart-api",
+    "env:production",
+    "cluster:prod-eu"
+  ]
+}

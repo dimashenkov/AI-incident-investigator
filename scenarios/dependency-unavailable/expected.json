@@ -1,0 +1,8 @@
+{
+  "root_cause_code": "DEPENDENCY_UNAVAILABLE",
+  "note": "cart-api is healthy: two pods Running and ready, no throttling, no termination. The errors are about somebody else. NOT DEPLOYMENT_REGRESSION: the recent ScalingReplicaSet is on a DIFFERENT deployment, and cart-api's own scaling is two days old with the image unchanged. NOT DNS_RESOLUTION_FAILURE: the log carries the resolved address 10.96.44.17, so the name resolved. NOT NETWORK_POLICY_BLOCKED: connection refused means the packet arrived and was rejected, and the endpoint count reaching zero says there is nothing behind the Service to accept it. The decisive fact is the metric, not the log: pricing-api's available endpoints go 3 to 0 one minute after it was scaled to zero.",
+  "must_cite": [
+    "events[0].message",
+    "series[1].points[2].value"
+  ]
+}

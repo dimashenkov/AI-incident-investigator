@@ -33,7 +33,13 @@
         "READINESS_PROBE_FAILURE",
         "DEPLOYMENT_REGRESSION",
         "CPU_THROTTLING",
-        "NODE_NOT_READY"
+        "NODE_NOT_READY",
+        "VOLUME_FULL",
+        "DEPENDENCY_UNAVAILABLE",
+        "CONNECTION_POOL_EXHAUSTED",
+        "DNS_RESOLUTION_FAILURE",
+        "NETWORK_POLICY_BLOCKED",
+        "CERTIFICATE_EXPIRED"
       ],
       "description": "The named causes this system can identify. One carrier, referenced by both the incident's root_cause_code and an agent's hypothesis code. Codex, 2026-09-05: keeping them as two enums that a test compares means the lists can still be written apart and only caught afterwards - and one such drift had already made a scenario unsolvable, with CPU_THROTTLING recordable while no agent could propose it. INSUFFICIENT_EVIDENCE is deliberately NOT here: it is a verdict about a whole incident, not a cause an agent can hold a hypothesis about."
     },

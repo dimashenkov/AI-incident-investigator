@@ -1,0 +1,8 @@
+{
+  "root_cause_code": "DNS_RESOLUTION_FAILURE",
+  "note": "LOGS-LED, and the accepted weak point among the seven (owner's decision, 2026-09-11). The observation shape has no resolved-address field, so the diagnosis rests on the log lines: the same name, events-gateway, resolves to 10.96.58.20 at 09:27 and to 203.0.113.77 two minutes later, an address outside the cluster. The event gives the mechanism - this pod's DNS search paths were truncated, so the short name stopped completing inside the cluster - and the metric confirms the consequence: forwarded queries to the upstream resolver surge 402 to 12046. NOT DEPENDENCY_UNAVAILABLE: both events-gateway pods are Running and ready, so the callee is up; a healthy callee reached at a foreign address is a resolution fault, not an outage. NOT NETWORK_POLICY_BLOCKED: connection refused, not i/o timeout. The honest limit, stated: the observation cannot PROVE the resolver returned the foreign record rather than the service legitimately moving; an attentive logs-only reader can reach the code, which is why this scenario is logs-led rather than forcing the combination the others force.",
+  "must_cite": [
+    "events[0].message",
+    "lines[1].message"
+  ]
+}

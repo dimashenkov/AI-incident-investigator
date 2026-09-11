@@ -1,0 +1,34 @@
+{
+  "collected_at": "2026-09-12T03:42:09Z",
+  "window": {
+    "from": "2026-09-12T03:33:00Z",
+    "to": "2026-09-12T03:42:00Z"
+  },
+  "truncated": false,
+  "lines": [
+    {
+      "ts": "2026-09-12T03:35:12Z",
+      "level": "info",
+      "container": "media-archiver",
+      "message": "segment 4468 committed to /var/lib/archive, 512MiB"
+    },
+    {
+      "ts": "2026-09-12T03:39:48Z",
+      "level": "warn",
+      "container": "media-archiver",
+      "message": "write to /var/lib/archive/segment-4471.tmp returned ENOSPC, retrying in 5s"
+    },
+    {
+      "ts": "2026-09-12T03:40:31Z",
+      "level": "error",
+      "container": "media-archiver",
+      "message": "write to /var/lib/archive/segment-4471.tmp failed: no space left on device"
+    },
+    {
+      "ts": "2026-09-12T03:41:05Z",
+      "level": "error",
+      "container": "media-archiver",
+      "message": "archive backlog 214 segments and growing; refusing new uploads"
+    }
+  ]
+}

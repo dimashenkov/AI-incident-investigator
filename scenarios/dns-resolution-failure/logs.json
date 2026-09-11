@@ -1,0 +1,34 @@
+{
+  "collected_at": "2026-09-13T09:34:10Z",
+  "window": {
+    "from": "2026-09-13T09:26:00Z",
+    "to": "2026-09-13T09:34:00Z"
+  },
+  "truncated": false,
+  "lines": [
+    {
+      "ts": "2026-09-13T09:27:12Z",
+      "level": "info",
+      "container": "webhook-dispatcher",
+      "message": "POST http://events-gateway:8080/v2/hooks 202 in 34ms, resolved events-gateway to 10.96.58.20"
+    },
+    {
+      "ts": "2026-09-13T09:29:04Z",
+      "level": "error",
+      "container": "webhook-dispatcher",
+      "message": "POST http://events-gateway:8080/v2/hooks failed: resolved events-gateway to 203.0.113.77 (outside the cluster) then dial tcp 203.0.113.77:8080: connect: connection refused"
+    },
+    {
+      "ts": "2026-09-13T09:31:37Z",
+      "level": "error",
+      "container": "webhook-dispatcher",
+      "message": "POST http://events-gateway:8080/v2/hooks failed: resolved events-gateway to 203.0.113.77 (outside the cluster) then dial tcp 203.0.113.77:8080: connect: connection refused"
+    },
+    {
+      "ts": "2026-09-13T09:33:12Z",
+      "level": "warn",
+      "container": "webhook-dispatcher",
+      "message": "delivery queue depth 1840, oldest item 4m ago"
+    }
+  ]
+}

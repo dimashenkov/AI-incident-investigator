@@ -1,0 +1,96 @@
+{
+  "collected_at": "2026-09-14T02:19:06Z",
+  "pods": [
+    {
+      "name": "partner-gateway-7c4d9f8b65-j5vwc",
+      "namespace": "production",
+      "phase": "Running",
+      "restart_count": 0,
+      "containers": [
+        {
+          "name": "partner-gateway",
+          "ready": true,
+          "restart_count": 0,
+          "limits": {
+            "memory": "1Gi",
+            "cpu": "1000m"
+          },
+          "requests": {
+            "memory": "512Mi",
+            "cpu": "500m"
+          }
+        }
+      ]
+    },
+    {
+      "name": "partner-gateway-7c4d9f8b65-r2ptq",
+      "namespace": "production",
+      "phase": "Running",
+      "restart_count": 0,
+      "containers": [
+        {
+          "name": "partner-gateway",
+          "ready": true,
+          "restart_count": 0,
+          "limits": {
+            "memory": "1Gi",
+            "cpu": "1000m"
+          },
+          "requests": {
+            "memory": "512Mi",
+            "cpu": "500m"
+          }
+        }
+      ]
+    },
+    {
+      "name": "partner-gateway-7c4d9f8b65-w8xqz",
+      "namespace": "production",
+      "phase": "Running",
+      "restart_count": 0,
+      "containers": [
+        {
+          "name": "partner-gateway",
+          "ready": true,
+          "restart_count": 0,
+          "limits": {
+            "memory": "1Gi",
+            "cpu": "1000m"
+          },
+          "requests": {
+            "memory": "512Mi",
+            "cpu": "500m"
+          }
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "type": "Warning",
+      "reason": "CertificateExpired",
+      "count": 1,
+      "last_seen": "2026-09-14T02:17:10Z",
+      "involved_object": "certificate/partner-gateway-tls",
+      "message": "the certificate partner-gateway-tls served on :8443 expired at 2026-09-14T02:16:00Z; cert-manager renewal order partner-gateway-tls-4 is in state invalid and the expired secret is still in place"
+    },
+    {
+      "type": "Normal",
+      "reason": "ScalingReplicaSet",
+      "count": 1,
+      "last_seen": "2026-09-06T10:41:07Z",
+      "involved_object": "deployment/partner-gateway",
+      "message": "Scaled up replica set partner-gateway-7c4d9f8b65 to 3 for image registry.internal/partner-gateway:5.0.4"
+    }
+  ],
+  "deployment": {
+    "name": "partner-gateway",
+    "namespace": "production",
+    "replicas": {
+      "desired": 3,
+      "ready": 3,
+      "available": 3
+    },
+    "image": "registry.internal/partner-gateway:5.0.4"
+  }
+}

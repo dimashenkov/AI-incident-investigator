@@ -1,0 +1,8 @@
+{
+  "root_cause_code": "VOLUME_FULL",
+  "note": "Nothing in Kubernetes is unhealthy: pod Running, container ready, restart_count 0, memory flat near 700MiB against a 2Gi limit and no last_state, so NOT CONTAINER_OOM. The logs say `no space left on device` and name the file path /var/lib/archive/segment-4471.tmp, but nothing in the logs links that path to a PersistentVolumeClaim - a container's own writable layer and an emptyDir produce the same path and the same error. The decisive pair does the linking: the event names the claim media-archive-data AND the mount /var/lib/archive and says it is full, cited with the metric where available bytes on that claim reach 0 while capacity stays flat at 100Gi. NOT NODE_NOT_READY: the only node-shaped event is a Normal Scheduled five hours before.",
+  "must_cite": [
+    "events[0].message",
+    "series[0].points[3].value"
+  ]
+}

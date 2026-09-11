@@ -2915,8 +2915,12 @@ export const MUTATIONS = [
      */
     id: "a-code-may-exist-with-no-scenario",
     file: "schemas/common.schema.json",
+    // The introduced code must be one NO scenario expects. VOLUME_FULL used to
+    // be orphan and was the mutation; then it got a scenario, so the mutation
+    // stopped biting and survived a gate run. A sentinel that will never have a
+    // scenario keeps the test honest however many real codes are added.
     from: '        "NODE_NOT_READY"',
-    to: '        "VOLUME_FULL"',
+    to: '        "NO_SCENARIO_FOR_THIS_CODE"',
     mustFail: "gives every code in the schema a scenario that expects it",
   },
 ];

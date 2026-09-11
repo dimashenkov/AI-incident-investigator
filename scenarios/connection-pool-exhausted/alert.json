@@ -1,0 +1,12 @@
+{
+  "id": "alert-2f66",
+  "title": "billing-api p99 latency above 5s",
+  "triggered_at": "2026-09-12T16:48:00Z",
+  "severity": "warning",
+  "monitor_id": "mon-3390",
+  "tags": [
+    "service:billing-api",
+    "env:production",
+    "cluster:prod-eu"
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "collected_at": "2026-09-13T15:14:22Z",
+  "pods": [
+    {
+      "name": "report-exporter-6c8d5f9b47-k4wzn",
+      "namespace": "production",
+      "phase": "Running",
+      "restart_count": 0,
+      "containers": [
+        {
+          "name": "report-exporter",
+          "ready": true,
+          "restart_count": 0,
+          "limits": {
+            "memory": "1Gi",
+            "cpu": "1000m"
+          },
+          "requests": {
+            "memory": "512Mi",
+            "cpu": "500m"
+          }
+        }
+      ]
+    },
+    {
+      "name": "warehouse-api-7d9f6c5b83-m2rvq",
+      "namespace": "production",
+      "phase": "Running",
+      "restart_count": 0,
+      "containers": [
+        {
+          "name": "warehouse-api",
+          "ready": true,
+          "restart_count": 0,
+          "limits": {
+            "memory": "2Gi",
+            "cpu": "2000m"
+          },
+          "requests": {
+            "memory": "1Gi",
+            "cpu": "1000m"
+          }
+        }
+      ]
+    },
+    {
+      "name": "warehouse-api-7d9f6c5b83-p8kdt",
+      "namespace": "production",
+      "phase": "Running",
+      "restart_count": 0,
+      "containers": [
+        {
+          "name": "warehouse-api",
+          "ready": true,
+          "restart_count": 0,
+          "limits": {
+            "memory": "2Gi",
+            "cpu": "2000m"
+          },
+          "requests": {
+            "memory": "1Gi",
+            "cpu": "1000m"
+          }
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "type": "Warning",
+      "reason": "PacketDropped",
+      "count": 1284,
+      "last_seen": "2026-09-13T15:12:44Z",
+      "involved_object": "pod/report-exporter-6c8d5f9b47-k4wzn",
+      "message": "cni-agent dropped 1284 egress packets from this pod in the last 10 minutes"
+    },
+    {
+      "type": "Normal",
+      "reason": "Scheduled",
+      "count": 1,
+      "last_seen": "2026-09-13T06:02:18Z",
+      "involved_object": "pod/report-exporter-6c8d5f9b47-k4wzn",
+      "message": "Successfully assigned production/report-exporter-6c8d5f9b47-k4wzn to ip-10-2-41-77"
+    }
+  ],
+  "deployment": {
+    "name": "report-exporter",
+    "namespace": "production",
+    "replicas": {
+      "desired": 2,
+      "ready": 2,
+      "available": 2
+    },
+    "image": "registry.internal/report-exporter:3.2.0"
+  }
+}

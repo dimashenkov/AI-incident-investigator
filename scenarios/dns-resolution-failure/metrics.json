@@ -1,0 +1,55 @@
+{
+  "collected_at": "2026-09-13T09:34:12Z",
+  "window": {
+    "from": "2026-09-13T09:26:00Z",
+    "to": "2026-09-13T09:34:00Z"
+  },
+  "series": [
+    {
+      "name": "coredns_forward_requests_total:upstream",
+      "unit": "count",
+      "container": "coredns",
+      "points": [
+        {
+          "ts": "2026-09-13T09:27:00Z",
+          "value": 402
+        },
+        {
+          "ts": "2026-09-13T09:29:00Z",
+          "value": 3811
+        },
+        {
+          "ts": "2026-09-13T09:31:00Z",
+          "value": 7920
+        },
+        {
+          "ts": "2026-09-13T09:34:00Z",
+          "value": 12046
+        }
+      ]
+    },
+    {
+      "name": "http_requests_failed_ratio",
+      "unit": "ratio",
+      "container": "webhook-dispatcher",
+      "points": [
+        {
+          "ts": "2026-09-13T09:27:00Z",
+          "value": 0.002
+        },
+        {
+          "ts": "2026-09-13T09:29:00Z",
+          "value": 0.48
+        },
+        {
+          "ts": "2026-09-13T09:31:00Z",
+          "value": 0.97
+        },
+        {
+          "ts": "2026-09-13T09:34:00Z",
+          "value": 1.0
+        }
+      ]
+    }
+  ]
+}

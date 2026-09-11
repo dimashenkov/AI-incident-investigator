@@ -108,6 +108,12 @@ result, and the run was wasted on a question nobody had answered.
 - `DEPLOYMENT_REGRESSION`
 - `CPU_THROTTLING`
 - `NODE_NOT_READY`
+- `VOLUME_FULL`
+- `DEPENDENCY_UNAVAILABLE`
+- `CONNECTION_POOL_EXHAUSTED`
+- `DNS_RESOLUTION_FAILURE`
+- `NETWORK_POLICY_BLOCKED`
+- `CERTIFICATE_EXPIRED`
 
 If none of them fits what you see, report the findings and return no hypotheses
 at all. An invented code is refused, and a wrong one from the list is worse — it

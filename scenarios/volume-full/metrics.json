@@ -1,0 +1,66 @@
+{
+  "collected_at": "2026-09-12T03:42:11Z",
+  "window": {
+    "from": "2026-09-12T03:33:00Z",
+    "to": "2026-09-12T03:42:00Z"
+  },
+  "series": [
+    {
+      "name": "kubelet_volume_stats_available_bytes:media-archive-data",
+      "unit": "bytes",
+      "container": "media-archiver",
+      "points": [
+        {
+          "ts": "2026-09-12T03:33:00Z",
+          "value": 5368709120
+        },
+        {
+          "ts": "2026-09-12T03:36:00Z",
+          "value": 1073741824
+        },
+        {
+          "ts": "2026-09-12T03:39:00Z",
+          "value": 134217728
+        },
+        {
+          "ts": "2026-09-12T03:42:00Z",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "name": "kubelet_volume_stats_capacity_bytes:media-archive-data",
+      "unit": "bytes",
+      "container": "media-archiver",
+      "points": [
+        {
+          "ts": "2026-09-12T03:33:00Z",
+          "value": 107374182400
+        },
+        {
+          "ts": "2026-09-12T03:42:00Z",
+          "value": 107374182400
+        }
+      ]
+    },
+    {
+      "name": "container_memory_working_set_bytes",
+      "unit": "bytes",
+      "container": "media-archiver",
+      "points": [
+        {
+          "ts": "2026-09-12T03:33:00Z",
+          "value": 734003200
+        },
+        {
+          "ts": "2026-09-12T03:37:00Z",
+          "value": 739246080
+        },
+        {
+          "ts": "2026-09-12T03:42:00Z",
+          "value": 741343232
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "collected_at": "2026-09-12T03:42:07Z",
+  "pods": [
+    {
+      "name": "media-archiver-7c5f8d6b94-nz4tp",
+      "namespace": "production",
+      "phase": "Running",
+      "restart_count": 0,
+      "containers": [
+        {
+          "name": "media-archiver",
+          "ready": true,
+          "restart_count": 0,
+          "limits": {
+            "memory": "2Gi",
+            "cpu": "1000m"
+          },
+          "requests": {
+            "memory": "1Gi",
+            "cpu": "500m"
+          }
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "type": "Warning",
+      "reason": "VolumeFull",
+      "count": 3,
+      "last_seen": "2026-09-12T03:41:32Z",
+      "involved_object": "persistentvolumeclaim/media-archive-data",
+      "message": "claim media-archive-data, mounted at /var/lib/archive, is full: 0 bytes available of 100Gi"
+    },
+    {
+      "type": "Normal",
+      "reason": "Scheduled",
+      "count": 1,
+      "last_seen": "2026-09-11T22:10:04Z",
+      "involved_object": "pod/media-archiver-7c5f8d6b94-nz4tp",
+      "message": "Successfully assigned production/media-archiver-7c5f8d6b94-nz4tp to ip-10-2-41-90"
+    }
+  ],
+  "deployment": {
+    "name": "media-archiver",
+    "namespace": "production",
+    "replicas": {
+      "desired": 1,
+      "ready": 1,
+      "available": 1
+    },
+    "image": "registry.internal/media-archiver:1.8.3"
+  }
+}

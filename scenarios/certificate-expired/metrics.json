@@ -1,0 +1,74 @@
+{
+  "collected_at": "2026-09-14T02:19:10Z",
+  "window": {
+    "from": "2026-09-14T02:10:00Z",
+    "to": "2026-09-14T02:19:00Z"
+  },
+  "series": [
+    {
+      "name": "certmanager_certificate_seconds_until_expiry:partner-gateway-tls",
+      "unit": "seconds",
+      "container": "partner-gateway",
+      "points": [
+        {
+          "ts": "2026-09-14T02:10:00Z",
+          "value": 360
+        },
+        {
+          "ts": "2026-09-14T02:13:00Z",
+          "value": 180
+        },
+        {
+          "ts": "2026-09-14T02:16:00Z",
+          "value": 0
+        },
+        {
+          "ts": "2026-09-14T02:19:00Z",
+          "value": -180
+        }
+      ]
+    },
+    {
+      "name": "tls_handshake_failures_total",
+      "unit": "count",
+      "container": "partner-gateway",
+      "points": [
+        {
+          "ts": "2026-09-14T02:10:00Z",
+          "value": 3
+        },
+        {
+          "ts": "2026-09-14T02:13:00Z",
+          "value": 5
+        },
+        {
+          "ts": "2026-09-14T02:16:00Z",
+          "value": 149
+        },
+        {
+          "ts": "2026-09-14T02:19:00Z",
+          "value": 412
+        }
+      ]
+    },
+    {
+      "name": "container_cpu_cfs_throttled_seconds_total",
+      "unit": "seconds",
+      "container": "partner-gateway",
+      "points": [
+        {
+          "ts": "2026-09-14T02:10:00Z",
+          "value": 0.0
+        },
+        {
+          "ts": "2026-09-14T02:16:00Z",
+          "value": 0.0
+        },
+        {
+          "ts": "2026-09-14T02:19:00Z",
+          "value": 0.0
+        }
+      ]
+    }
+  ]
+}

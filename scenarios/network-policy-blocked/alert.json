@@ -1,0 +1,12 @@
+{
+  "id": "alert-9e57",
+  "title": "report-exporter nightly extract stalled",
+  "triggered_at": "2026-09-13T15:13:00Z",
+  "severity": "critical",
+  "monitor_id": "mon-5521",
+  "tags": [
+    "service:report-exporter",
+    "env:production",
+    "cluster:prod-eu"
+  ]
+}

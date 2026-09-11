@@ -1,0 +1,70 @@
+{
+  "collected_at": "2026-09-12T16:49:07Z",
+  "window": {
+    "from": "2026-09-12T16:40:00Z",
+    "to": "2026-09-12T16:49:00Z"
+  },
+  "series": [
+    {
+      "name": "db_connection_pool_in_use_of_20_max:billing-primary",
+      "unit": "count",
+      "container": "billing-api",
+      "points": [
+        {
+          "ts": "2026-09-12T16:41:00Z",
+          "value": 14
+        },
+        {
+          "ts": "2026-09-12T16:43:00Z",
+          "value": 20
+        },
+        {
+          "ts": "2026-09-12T16:45:00Z",
+          "value": 20
+        },
+        {
+          "ts": "2026-09-12T16:49:00Z",
+          "value": 20
+        }
+      ]
+    },
+    {
+      "name": "db_query_duration_seconds_p99:billing-primary",
+      "unit": "seconds",
+      "container": "billing-api",
+      "points": [
+        {
+          "ts": "2026-09-12T16:41:00Z",
+          "value": 0.011
+        },
+        {
+          "ts": "2026-09-12T16:45:00Z",
+          "value": 0.012
+        },
+        {
+          "ts": "2026-09-12T16:49:00Z",
+          "value": 0.012
+        }
+      ]
+    },
+    {
+      "name": "container_cpu_cfs_throttled_seconds_total",
+      "unit": "seconds",
+      "container": "billing-api",
+      "points": [
+        {
+          "ts": "2026-09-12T16:41:00Z",
+          "value": 0.0
+        },
+        {
+          "ts": "2026-09-12T16:45:00Z",
+          "value": 0.0
+        },
+        {
+          "ts": "2026-09-12T16:49:00Z",
+          "value": 0.0
+        }
+      ]
+    }
+  ]
+}

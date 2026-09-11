@@ -1,0 +1,74 @@
+{
+  "collected_at": "2026-09-13T15:14:26Z",
+  "window": {
+    "from": "2026-09-13T15:03:00Z",
+    "to": "2026-09-13T15:14:00Z"
+  },
+  "series": [
+    {
+      "name": "cilium_drop_count_total:report-exporter-egress-policy-denied",
+      "unit": "count",
+      "container": "report-exporter",
+      "points": [
+        {
+          "ts": "2026-09-13T15:04:00Z",
+          "value": 0
+        },
+        {
+          "ts": "2026-09-13T15:06:00Z",
+          "value": 218
+        },
+        {
+          "ts": "2026-09-13T15:09:00Z",
+          "value": 741
+        },
+        {
+          "ts": "2026-09-13T15:14:00Z",
+          "value": 1284
+        }
+      ]
+    },
+    {
+      "name": "cilium_forward_count_total:report-exporter-egress",
+      "unit": "count",
+      "container": "report-exporter",
+      "points": [
+        {
+          "ts": "2026-09-13T15:04:00Z",
+          "value": 90412
+        },
+        {
+          "ts": "2026-09-13T15:06:00Z",
+          "value": 90788
+        },
+        {
+          "ts": "2026-09-13T15:09:00Z",
+          "value": 91240
+        },
+        {
+          "ts": "2026-09-13T15:14:00Z",
+          "value": 91694
+        }
+      ]
+    },
+    {
+      "name": "http_requests_failed_ratio",
+      "unit": "ratio",
+      "container": "warehouse-api",
+      "points": [
+        {
+          "ts": "2026-09-13T15:04:00Z",
+          "value": 0.001
+        },
+        {
+          "ts": "2026-09-13T15:09:00Z",
+          "value": 0.001
+        },
+        {
+          "ts": "2026-09-13T15:14:00Z",
+          "value": 0.001
+        }
+      ]
+    }
+  ]
+}

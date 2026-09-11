@@ -260,6 +260,12 @@ result, and the run was wasted on a question nobody had answered.
 - `DEPLOYMENT_REGRESSION`
 - `CPU_THROTTLING`
 - `NODE_NOT_READY`
+- `VOLUME_FULL`
+- `DEPENDENCY_UNAVAILABLE`
+- `CONNECTION_POOL_EXHAUSTED`
+- `DNS_RESOLUTION_FAILURE`
+- `NETWORK_POLICY_BLOCKED`
+- `CERTIFICATE_EXPIRED`
 
 **`NODE_NOT_READY` is for a fault UNDER the pod.** A node reported `NotReady`,
 with pods `Pending` or evicted because of it — restart counts at zero, no probe

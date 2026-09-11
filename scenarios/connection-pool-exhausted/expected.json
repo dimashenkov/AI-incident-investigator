@@ -1,0 +1,8 @@
+{
+  "root_cause_code": "CONNECTION_POOL_EXHAUSTED",
+  "note": "Latency is real and every usual cause is clean: pods Running and ready, throttled seconds flat at zero against a 2000m limit, the database answering in 12ms. NOT CPU_THROTTLING: series[2] is 0.0 everywhere and the one HPA event shrank the deployment because utilisation was below target. NOT DEPENDENCY_UNAVAILABLE: the database serves at 12ms, nothing refused or timed out downstream. Decisive pair: the event names pool billing-primary at its configured maximum of 20 with 63 waiters, cited with the metric pinned at that 20 on half the pods of fifteen minutes earlier.",
+  "must_cite": [
+    "events[0].message",
+    "series[0].points[3].value"
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "collected_at": "2026-09-12T11:27:04Z",
+  "pods": [
+    {
+      "name": "cart-api-6b9d47c5f8-h2rkd",
+      "namespace": "production",
+      "phase": "Running",
+      "restart_count": 0,
+      "containers": [
+        {
+          "name": "cart-api",
+          "ready": true,
+          "restart_count": 0,
+          "limits": {
+            "memory": "1Gi",
+            "cpu": "1000m"
+          },
+          "requests": {
+            "memory": "512Mi",
+            "cpu": "500m"
+          }
+        }
+      ]
+    },
+    {
+      "name": "cart-api-6b9d47c5f8-v8tqn",
+      "namespace": "production",
+      "phase": "Running",
+      "restart_count": 0,
+      "containers": [
+        {
+          "name": "cart-api",
+          "ready": true,
+          "restart_count": 0,
+          "limits": {
+            "memory": "1Gi",
+            "cpu": "1000m"
+          },
+          "requests": {
+            "memory": "512Mi",
+            "cpu": "500m"
+          }
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "type": "Normal",
+      "reason": "ScalingReplicaSet",
+      "count": 1,
+      "last_seen": "2026-09-12T11:22:37Z",
+      "involved_object": "deployment/pricing-api",
+      "message": "Scaled down replica set pricing-api-58c7d9f4b6 from 3 to 0"
+    },
+    {
+      "type": "Normal",
+      "reason": "ScalingReplicaSet",
+      "count": 1,
+      "last_seen": "2026-09-10T08:04:11Z",
+      "involved_object": "deployment/cart-api",
+      "message": "Scaled up replica set cart-api-6b9d47c5f8 to 2 for image registry.internal/cart-api:3.6.2"
+    }
+  ],
+  "deployment": {
+    "name": "cart-api",
+    "namespace": "production",
+    "replicas": {
+      "desired": 2,
+      "ready": 2,
+      "available": 2
+    },
+    "image": "registry.internal/cart-api:3.6.2"
+  }
+}

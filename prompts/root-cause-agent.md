@@ -82,6 +82,12 @@ fix. Write `hypotheses[0].code` and nothing else:
 - `DEPLOYMENT_REGRESSION`
 - `CPU_THROTTLING`
 - `NODE_NOT_READY`
+- `VOLUME_FULL`
+- `DEPENDENCY_UNAVAILABLE`
+- `CONNECTION_POOL_EXHAUSTED`
+- `DNS_RESOLUTION_FAILURE`
+- `NETWORK_POLICY_BLOCKED`
+- `CERTIFICATE_EXPIRED`
 
 `INSUFFICIENT_EVIDENCE` is **not** in that list and is not a hypothesis. If the
 evidence does not support a cause, return **no hypotheses at all** and
@@ -117,6 +123,12 @@ below is named by something an agent can observe directly:
 | `APPLICATION_STARTUP_FAILURE` | the process exiting or erroring during start, in the logs |
 | `DEPLOYMENT_REGRESSION` | a change in the deployment lining up in time with the failure |
 | `NODE_NOT_READY` | a node reported `NotReady`, with pods evicted or unschedulable **because of it** |
+| `VOLUME_FULL` | a volume's available bytes at zero while its capacity holds, with ENOSPC in the logs |
+| `DEPENDENCY_UNAVAILABLE` | this service healthy, but a service it calls has zero endpoints or refuses the connection |
+| `CONNECTION_POOL_EXHAUSTED` | a connection pool pinned at its configured maximum with waiters, while the database answers fast |
+| `DNS_RESOLUTION_FAILURE` | one name resolving to different or foreign addresses, with search-path truncation |
+| `NETWORK_POLICY_BLOCKED` | egress denied by a named policy, i/o timeout not refusal, while the callee serves others |
+| `CERTIFICATE_EXPIRED` | a served TLS certificate past its expiry, handshakes rejected, pods otherwise healthy |
 
 If a finding is one of those direct observations, that code is your hypothesis —
 even though no agent named it, because none of them was allowed to.

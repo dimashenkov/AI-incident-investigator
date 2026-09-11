@@ -1,0 +1,96 @@
+{
+  "collected_at": "2026-09-13T09:34:08Z",
+  "pods": [
+    {
+      "name": "webhook-dispatcher-5f7b9c6d84-t8qmv",
+      "namespace": "production",
+      "phase": "Running",
+      "restart_count": 0,
+      "containers": [
+        {
+          "name": "webhook-dispatcher",
+          "ready": true,
+          "restart_count": 0,
+          "limits": {
+            "memory": "512Mi",
+            "cpu": "500m"
+          },
+          "requests": {
+            "memory": "256Mi",
+            "cpu": "250m"
+          }
+        }
+      ]
+    },
+    {
+      "name": "events-gateway-6d4c8b7f95-x3plw",
+      "namespace": "production",
+      "phase": "Running",
+      "restart_count": 0,
+      "containers": [
+        {
+          "name": "events-gateway",
+          "ready": true,
+          "restart_count": 0,
+          "limits": {
+            "memory": "1Gi",
+            "cpu": "1000m"
+          },
+          "requests": {
+            "memory": "512Mi",
+            "cpu": "500m"
+          }
+        }
+      ]
+    },
+    {
+      "name": "events-gateway-6d4c8b7f95-z7nhc",
+      "namespace": "production",
+      "phase": "Running",
+      "restart_count": 0,
+      "containers": [
+        {
+          "name": "events-gateway",
+          "ready": true,
+          "restart_count": 0,
+          "limits": {
+            "memory": "1Gi",
+            "cpu": "1000m"
+          },
+          "requests": {
+            "memory": "512Mi",
+            "cpu": "500m"
+          }
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "type": "Warning",
+      "reason": "DNSConfigForming",
+      "count": 34,
+      "last_seen": "2026-09-13T09:33:41Z",
+      "involved_object": "pod/webhook-dispatcher-5f7b9c6d84-t8qmv",
+      "message": "Search Line limits were exceeded, some search paths have been omitted: production.svc.cluster.local svc.cluster.local cluster.local"
+    },
+    {
+      "type": "Normal",
+      "reason": "Scheduled",
+      "count": 1,
+      "last_seen": "2026-09-13T09:26:41Z",
+      "involved_object": "pod/webhook-dispatcher-5f7b9c6d84-t8qmv",
+      "message": "Successfully assigned production/webhook-dispatcher-5f7b9c6d84-t8qmv to ip-10-2-41-92"
+    }
+  ],
+  "deployment": {
+    "name": "webhook-dispatcher",
+    "namespace": "production",
+    "replicas": {
+      "desired": 3,
+      "ready": 3,
+      "available": 3
+    },
+    "image": "registry.internal/webhook-dispatcher:2.4.1"
+  }
+}
