@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from "vitest";
 // @ts-expect-error - plain .mjs script, no types
-import { generate, MODEL } from "../scripts/generate-workflow.mjs";
+import { generate, MODEL, COLLECTION_MODEL } from "../scripts/generate-workflow.mjs";
 
 type Node = { name: string; type: string; parameters: Record<string, any> };
 
@@ -40,7 +40,17 @@ describe("the request that spends the money, evaluated rather than matched", () 
       });
       expect(typeof text, `${name} must send a JSON string`).toBe("string");
       const body = JSON.parse(text as string);
-      expect(body.model, `${name} asks the pinned model`).toBe(MODEL);
+      /*
+       * TWO pinned models since 2026-09-11, and which one is not decoration.
+       *
+       * `gpt-5` produced the dissent that thirty hypotheses on smaller models
+       * never did, so the concluding agent keeps it. Four sequential gpt-5 calls
+       * took 183 seconds against a gateway that cuts at 100, and the three
+       * collection agents spent 6272 of the 9152 reasoning tokens on work that
+       * is extraction. They ask the smaller one.
+       */
+      const expected = name === "Ask root-cause" ? MODEL : COLLECTION_MODEL;
+      expect(body.model, `${name} asks the model pinned for its job`).toBe(expected);
       /*
        * The sentence that stood here — „a run that cannot be repeated is not a
        * measurement" — is still true, and since 2026-09-11 this project cannot

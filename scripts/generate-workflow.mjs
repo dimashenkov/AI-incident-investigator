@@ -82,7 +82,7 @@ function askNode(agent, position) {
        * rather than the change. That is stated in LIMITATIONS rather than
        * papered over, and it is the price of asking this model anything.
        */
-      jsonBody: "={{ JSON.stringify({ model: " + JSON.stringify(MODEL) + ", "
+      jsonBody: "={{ JSON.stringify({ model: " + JSON.stringify(modelFor(agent)) + ", "
         + "response_format: { type: 'json_object' }, messages: [ "
         + "{ role: 'system', content: $json.prompt }, "
         + "{ role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
@@ -241,7 +241,35 @@ function collectNode(agent, from, position) {
 }
 
 /** The model every agent is asked with, named once. */
+/**
+ * The model that CONCLUDES, and the one that collects.
+ *
+ * Two, since 2026-09-11, and the split is measured rather than tidy.
+ *
+ * `gpt-5` answered the one question this project could not answer any other
+ * way: thirty recorded hypotheses across two smaller models and eight rounds
+ * of prompts carried `contradicted_by` in none, and it produced dissent at 0.35
+ * confidence with no prompt change at all. So the concluding agent keeps it.
+ *
+ * But four sequential `gpt-5` calls took 183 seconds and the gateway cuts the
+ * connection at about 100, so the answer existed and could not be delivered.
+ * Measured at the nodes: 9152 hidden reasoning tokens, of which the three
+ * collection agents spent 6272 — on work that is EXTRACTION, not reasoning.
+ * They read one slice and report what is in it; the judgement is the
+ * concluding agent's, and that is where the tokens are worth their seconds.
+ *
+ * The owner chose this over lowering the reasoning effort, which would have
+ * risked the dissent that had just been bought.
+ */
 export const MODEL = "gpt-5";
+
+/** What the three collection agents ask. They extract; they do not conclude. */
+export const COLLECTION_MODEL = "gpt-5-mini";
+
+/** Which model one agent asks. */
+export function modelFor(agent) {
+  return agent === "root-cause" ? MODEL : COLLECTION_MODEL;
+}
 
 /**
  * Which stored credential the HTTP nodes use.

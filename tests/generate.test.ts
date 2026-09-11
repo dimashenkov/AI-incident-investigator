@@ -247,7 +247,8 @@ describe("the shape of the deployed chain", () => {
     expect(MODEL, "the model this project measures against, spelled out once")
       .toBe("gpt-5");
     const ask = node("Ask kubernetes");
-    expect(ask.parameters.jsonBody).toContain(MODEL);
+    expect(ask.parameters.jsonBody, "a collection agent asks the smaller model")
+      .toContain("gpt-5-mini");
     /*
      * NO temperature, and this test says what that costs.
      *
@@ -259,10 +260,22 @@ describe("the shape of the deployed chain", () => {
      */
     expect(ask.parameters.jsonBody, "the refused parameter is not sent at all")
       .not.toContain("temperature");
-    // Every agent call is the same model, or the runs are not comparable.
-    for (const name of ["Ask kubernetes", "Ask logs", "Ask metrics", "Ask root-cause"]) {
-      expect(node(name).parameters.jsonBody, `${name} asks the same model`).toContain(MODEL);
+    /*
+     * NOT the same model any more, and the split is the point.
+     *
+     * It said „every agent call is the same model, or the runs are not
+     * comparable". Comparability was already lost the hour gpt-5 refused
+     * temperature 0 — that is the thirteenth stated limitation. What is
+     * asserted now is that each agent asks the model pinned for its JOB: the
+     * three that extract ask the smaller one, and the one that concludes asks
+     * the one that produced dissent where thirty hypotheses had none.
+     */
+    for (const name of ["Ask kubernetes", "Ask logs", "Ask metrics"]) {
+      expect(node(name).parameters.jsonBody, `${name} extracts, so it asks the smaller model`)
+        .toContain("gpt-5-mini");
     }
+    expect(node("Ask root-cause").parameters.jsonBody, "and the one that judges asks gpt-5")
+      .toMatch(/"gpt-5"/);
   });
 
   it("sends the prompt and payload from the item, never from the node", () => {

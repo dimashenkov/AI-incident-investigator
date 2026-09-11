@@ -86,7 +86,7 @@
         "nodeCredentialType": "openAiApi",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: \"gpt-5\", response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
+        "jsonBody": "={{ JSON.stringify({ model: \"gpt-5-mini\", response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
         "options": {}
       }
     },
@@ -175,7 +175,7 @@
         "nodeCredentialType": "openAiApi",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: \"gpt-5\", response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
+        "jsonBody": "={{ JSON.stringify({ model: \"gpt-5-mini\", response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
         "options": {}
       }
     },
@@ -264,7 +264,7 @@
         "nodeCredentialType": "openAiApi",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: \"gpt-5\", response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
+        "jsonBody": "={{ JSON.stringify({ model: \"gpt-5-mini\", response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
         "options": {}
       }
     },
