@@ -3,12 +3,12 @@
   "name": "AI SRE — incident investigation",
   "description": null,
   "active": true,
-  "activeVersionId": "2b3a9171-08c4-4aa9-b947-396aa2f05cbe",
+  "activeVersionId": "eec629e6-e37a-4360-aaaa-c2ef8bdbffe9",
   "createdAt": "2026-09-04T13:44:43.103Z",
-  "updatedAt": "2026-09-11T05:23:09.843Z",
+  "updatedAt": "2026-09-11T06:35:27.919Z",
   "isArchived": false,
-  "versionId": "2b3a9171-08c4-4aa9-b947-396aa2f05cbe",
-  "versionCounter": 69,
+  "versionId": "eec629e6-e37a-4360-aaaa-c2ef8bdbffe9",
+  "versionCounter": 70,
   "sourceWorkflowId": null,
   "triggerCount": 1,
   "nodes": [
@@ -26,7 +26,7 @@
         "httpMethod": "POST",
         "responseMode": "lastNode"
       },
-      "webhookId": "005c1747-6f96-486c-9fb2-0d51edb79d23"
+      "webhookId": "f3cb2ab5-dd1f-4f9e-9369-5b86d4174156"
     },
     {
       "id": "assemble",
@@ -101,7 +101,7 @@
         "nodeCredentialType": "openAiApi",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: \"gpt-5\", response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
+        "jsonBody": "={{ JSON.stringify({ model: \"gpt-5-mini\", response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
         "options": {}
       }
     },
@@ -193,7 +193,7 @@
         "nodeCredentialType": "openAiApi",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: \"gpt-5\", response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
+        "jsonBody": "={{ JSON.stringify({ model: \"gpt-5-mini\", response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
         "options": {}
       }
     },
@@ -285,7 +285,7 @@
         "nodeCredentialType": "openAiApi",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: \"gpt-5\", response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
+        "jsonBody": "={{ JSON.stringify({ model: \"gpt-5-mini\", response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
         "options": {}
       }
     },
@@ -700,7 +700,7 @@
   "meta": null,
   "tags": [],
   "activeVersion": {
-    "versionId": "2b3a9171-08c4-4aa9-b947-396aa2f05cbe",
+    "versionId": "eec629e6-e37a-4360-aaaa-c2ef8bdbffe9",
     "workflowId": "49T3pwFvfumqTdo7",
     "nodes": [
       {
@@ -717,7 +717,7 @@
           "httpMethod": "POST",
           "responseMode": "lastNode"
         },
-        "webhookId": "005c1747-6f96-486c-9fb2-0d51edb79d23"
+        "webhookId": "f3cb2ab5-dd1f-4f9e-9369-5b86d4174156"
       },
       {
         "id": "assemble",
@@ -789,7 +789,7 @@
           "nodeCredentialType": "openAiApi",
           "sendBody": true,
           "specifyBody": "json",
-          "jsonBody": "={{ JSON.stringify({ model: \"gpt-5\", response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
+          "jsonBody": "={{ JSON.stringify({ model: \"gpt-5-mini\", response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
           "options": {}
         }
       },
@@ -878,7 +878,7 @@
           "nodeCredentialType": "openAiApi",
           "sendBody": true,
           "specifyBody": "json",
-          "jsonBody": "={{ JSON.stringify({ model: \"gpt-5\", response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
+          "jsonBody": "={{ JSON.stringify({ model: \"gpt-5-mini\", response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
           "options": {}
         }
       },
@@ -967,7 +967,7 @@
           "nodeCredentialType": "openAiApi",
           "sendBody": true,
           "specifyBody": "json",
-          "jsonBody": "={{ JSON.stringify({ model: \"gpt-5\", response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
+          "jsonBody": "={{ JSON.stringify({ model: \"gpt-5-mini\", response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.prompt }, { role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
           "options": {}
         }
       },
@@ -1365,16 +1365,16 @@
     "name": null,
     "description": null,
     "autosaved": false,
-    "createdAt": "2026-09-11T05:23:09.907Z",
-    "updatedAt": "2026-09-11T05:23:09.907Z",
+    "createdAt": "2026-09-11T06:35:27.950Z",
+    "updatedAt": "2026-09-11T06:35:27.950Z",
     "workflowPublishHistory": [
       {
-        "id": 131,
+        "id": 133,
         "workflowId": "49T3pwFvfumqTdo7",
-        "versionId": "2b3a9171-08c4-4aa9-b947-396aa2f05cbe",
+        "versionId": "eec629e6-e37a-4360-aaaa-c2ef8bdbffe9",
         "event": "activated",
         "userId": "6e8e3eb9-d8db-4e7f-bdb3-3318d80dee5a",
-        "createdAt": "2026-09-11T05:23:10.493Z"
+        "createdAt": "2026-09-11T06:35:28.580Z"
       }
     ]
   },

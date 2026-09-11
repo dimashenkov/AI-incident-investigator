@@ -7,12 +7,13 @@
     "conflicting-evidence"
   ],
   "outcomes": {
-    "conflicting-evidence": "called, no reply recorded — this key may have been charged (unreachable: HTTP 524 | body: <!DOCTYPE html>\n<!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 7]>    <html class=\"no-js ie7 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 8]>    <html class=\"no-js ie8 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if gt IE 8]><!--> <html class=\"no-js\" lang=\"en-US\"> <!--<![endif]-->\n<head>\n\n<title>n8n.cloud | 524: A timeout occurred</title>\n<meta charset=\"UTF-8\" />\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />\n<meta http-equiv=\"X-UA-Compatib)"
+    "conflicting-evidence": "answered, recovered by hand: execution 303 COMPLETED with state concluded at ~183s, and the gateway had already cut the connection at ~100s. root_cause_code CONTAINER_OOM, confidence 0.35, contradicted_by [series[0].points[2].value, series[0].points[3].value]. Read out of n8n by the owner's local agent. Charged: yes, 11793 in and 10760 out, measured at the nodes. Recorded in docs/runs/2026-09-11-gpt5-dissent.json."
   },
   "totals": {
     "input_tokens": null,
     "output_tokens": null,
     "why": "the webhook reply carries no usage; nothing here could read it"
   },
-  "scored": null
+  "scored": null,
+  "what_the_runner_saw": "called, no reply recorded — this key may have been charged (unreachable: HTTP 524 | body: <!DOCTYPE html>\n<!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 7]>    <html class=\"no-js ie7 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 8]>    <html class=\"no-js ie8 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if gt IE 8]><!--> <html class=\"no-js\" lang=\"en-US\"> <!--<![endif]-->\n<head>\n\n<title>n8n.cloud | 524: A timeout occurred</title>\n<meta charset=\"UTF-8\" />\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />\n<meta http-equiv=\"X-UA-Compatib)"
 }
