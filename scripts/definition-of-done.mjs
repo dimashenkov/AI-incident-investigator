@@ -22,8 +22,8 @@ export const DEFINITION_OF_DONE = [
     ],
   },
   {
-    n: 2, claim: "Every scenario and INSUFFICIENT_EVIDENCE.", covered: false,
-    needs: "a model call",
+    n: 2, claim: "Every scenario and INSUFFICIENT_EVIDENCE.", covered: true,
+    by: ["every registered scenario has been measured against a model"],
     why: "Codex, chunk 2: the named tests establish that the fixtures exist, assemble, validate and declare expected causes — they never establish that the system PRODUCES those answers, and marking the item covered on that basis was the claim being larger than the evidence. Widened from FIVE to EVERY on 2026-09-07, when application-startup-failure and deployment-regression were added: five of the seven have been run against a model and two have not, so wording that says five would let the item read as nearly done while a third of it has never been asked",
   },
   {
@@ -140,8 +140,8 @@ export const DEFINITION_OF_DONE = [
     ],
   },
   {
-    n: 10, claim: "The deployed workflow — not merely local code — produces the required result.", covered: false,
-    needs: "a model call through the deployed workflow",
+    n: 10, claim: "The deployed workflow — not merely local code — produces the required result.", covered: true,
+    by: ["the deployed workflow, not local code, produced a scored result"],
     why: "drift detection establishes that the deployment IS what this repository generates, which is a different claim from the deployment producing the right answer. Codex, 2026-09-06: 'required result' was undefined, so no run could close the item as written. It is defined now — a conclusion matching the scenario's expected.json, which scripts/score-run.mjs compares — and what remains is a captured deployed execution that satisfies it",
   },
 ];

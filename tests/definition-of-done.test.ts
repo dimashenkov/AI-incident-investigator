@@ -65,7 +65,7 @@ describe("the ten Definition-of-Done items", () => {
     }
   });
 
-  it("reports six of ten covered, and names the four that are not", () => {
+  it("reports eight of ten covered, and names the two that are not", () => {
     /*
      * The numbers are asserted so that quietly reclassifying an item fails here
      * rather than improving a statistic nobody checks.
@@ -81,8 +81,13 @@ describe("the ten Definition-of-Done items", () => {
      */
     const covered = DEFINITION_OF_DONE.filter((i) => i.covered).map((i) => i.n);
     const outstanding = DEFINITION_OF_DONE.filter((i) => !i.covered).map((i) => i.n);
-    expect(covered).toEqual([1, 4, 5, 7, 8, 9]);
-    expect(outstanding).toEqual([2, 3, 6, 10]);
+    // 2 and 10 closed on 2026-09-11: every scenario was measured and the
+    // deployed workflow produced scored results; tests/dod-measured.test.ts
+    // carries the evidence. 3 (confidence reduction under dissent) and 6
+    // (no cross-incident data) remain — one a model behaviour, one a data
+    // shape that does not exist yet.
+    expect(covered).toEqual([1, 2, 4, 5, 7, 8, 9, 10]);
+    expect(outstanding).toEqual([3, 6]);
   });
 
   it("names only dependencies that provably do not exist yet", () => {
