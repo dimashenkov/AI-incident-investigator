@@ -1,0 +1,55 @@
+{
+  "note": "Issued by scripts/run-scenarios.mjs against the deployed workflow's webhook. The reply carries the chain's report; it does not carry the model's token usage, because the Collect nodes keep only the reply. Token counts and cost are therefore UNESTABLISHED on this path, not zero — read them from the n8n execution and add them with a second edit if they are wanted, and say that they were added by hand.",
+  "recorded": "at the moment the answers arrived, by the script that issued them",
+  "when": "2026-09-11",
+  "webhook_host": "dimitarshenkov.app.n8n.cloud",
+  "keys": [
+    "application-startup-failure#5",
+    "cpu-throttling#5",
+    "deployment-regression#5",
+    "readiness-probe-failure#5"
+  ],
+  "outcomes": {
+    "application-startup-failure#5": "called, no reply recorded — this key may have been charged (accepted, awaiting collection: token sub-8670e930897f4d9ea033f220621e1f90)",
+    "cpu-throttling#5": "called, no reply recorded — this key may have been charged (accepted, awaiting collection: token sub-0f8a15c7017a4b8fba60549ce46b2cea)",
+    "deployment-regression#5": "called, no reply recorded — this key may have been charged (accepted, awaiting collection: token sub-fd941111ad4949bc85ffa660f26d9993)",
+    "readiness-probe-failure#5": "called, no reply recorded — this key may have been charged (accepted, awaiting collection: token sub-fe40147c95594c948442e1b6531e7057)"
+  },
+  "submissions": {
+    "application-startup-failure#5": {
+      "token": "sub-8670e930897f4d9ea033f220621e1f90",
+      "bound": "before the call was made",
+      "claim": "/Users/dimitar/PROJECTS/AI-incident-investigator/docs/claims/application-startup-failure_5.json"
+    },
+    "cpu-throttling#5": {
+      "token": "sub-0f8a15c7017a4b8fba60549ce46b2cea",
+      "bound": "before the call was made",
+      "claim": "/Users/dimitar/PROJECTS/AI-incident-investigator/docs/claims/cpu-throttling_5.json"
+    },
+    "deployment-regression#5": {
+      "token": "sub-fd941111ad4949bc85ffa660f26d9993",
+      "bound": "before the call was made",
+      "claim": "/Users/dimitar/PROJECTS/AI-incident-investigator/docs/claims/deployment-regression_5.json"
+    },
+    "readiness-probe-failure#5": {
+      "token": "sub-fe40147c95594c948442e1b6531e7057",
+      "bound": "before the call was made",
+      "claim": "/Users/dimitar/PROJECTS/AI-incident-investigator/docs/claims/readiness-probe-failure_5.json"
+    }
+  },
+  "totals": {
+    "input_tokens": null,
+    "output_tokens": null,
+    "why": "the webhook reply carries no usage; nothing here could read it"
+  },
+  "scored": {
+    "conflicting-evidence": "unasked",
+    "container-oom": "unasked",
+    "image-pull-failure": "unasked",
+    "insufficient-evidence": "unasked",
+    "application-startup-failure#5": "correct-without-its-evidence",
+    "cpu-throttling#5": "correct",
+    "deployment-regression#5": "correct",
+    "readiness-probe-failure#5": "correct"
+  }
+}
