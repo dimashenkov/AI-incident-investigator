@@ -1,0 +1,48 @@
+{
+  "note": "Issued by scripts/run-scenarios.mjs against the deployed workflow's webhook. The reply carries the chain's report; it does not carry the model's token usage, because the Collect nodes keep only the reply. Token counts and cost are therefore UNESTABLISHED on this path, not zero — read them from the n8n execution and add them with a second edit if they are wanted, and say that they were added by hand.",
+  "recorded": "at the moment the answers arrived, by the script that issued them",
+  "when": "2026-09-11",
+  "webhook_host": "dimitarshenkov.app.n8n.cloud",
+  "keys": [
+    "network-policy-blocked#2",
+    "node-not-ready#3"
+  ],
+  "outcomes": {
+    "network-policy-blocked#2": "called, no reply recorded — this key may have been charged (accepted, awaiting collection: token sub-28264752ed0a4f4b90906d99787192a8)",
+    "node-not-ready#3": "called, no reply recorded — this key may have been charged (accepted, awaiting collection: token sub-179c329b1ae64463bb4838639dc09047)"
+  },
+  "submissions": {
+    "network-policy-blocked#2": {
+      "token": "sub-28264752ed0a4f4b90906d99787192a8",
+      "bound": "before the call was made",
+      "claim": "/Users/dimitar/PROJECTS/AI-incident-investigator/docs/claims/network-policy-blocked_2.json"
+    },
+    "node-not-ready#3": {
+      "token": "sub-179c329b1ae64463bb4838639dc09047",
+      "bound": "before the call was made",
+      "claim": "/Users/dimitar/PROJECTS/AI-incident-investigator/docs/claims/node-not-ready_3.json"
+    }
+  },
+  "totals": {
+    "input_tokens": null,
+    "output_tokens": null,
+    "why": "the webhook reply carries no usage; nothing here could read it"
+  },
+  "scored": {
+    "application-startup-failure": "unasked",
+    "certificate-expired": "unasked",
+    "conflicting-evidence": "unasked",
+    "connection-pool-exhausted": "unasked",
+    "container-oom": "unasked",
+    "cpu-throttling": "unasked",
+    "dependency-unavailable": "unasked",
+    "deployment-regression": "unasked",
+    "dns-resolution-failure": "unasked",
+    "image-pull-failure": "unasked",
+    "insufficient-evidence": "unasked",
+    "readiness-probe-failure": "unasked",
+    "volume-full": "unasked",
+    "network-policy-blocked#2": "correct",
+    "node-not-ready#3": "correct"
+  }
+}

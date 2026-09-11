@@ -1225,7 +1225,7 @@ export const MUTATIONS = [
     // run of the day beats the sixth.
     id: "same-day-records-ordered-by-the-filesystem",
     file: "scripts/readiness.mjs",
-    from: "  dated.sort((a, b) => {\n    if (a.when !== b.when) return 0;\n    return a.f < b.f ? 1 : -1;\n  });",
+    from: "  dated.sort((a, b) => {\n    if (a.when !== b.when) return 0;\n    return -naturalOlderToNewer(a.f, b.f);\n  });",
     to: "",
     mustFail: "breaks a tie between records of the same day by name, not by directory order",
   },
@@ -2922,5 +2922,14 @@ export const MUTATIONS = [
     from: '        "NODE_NOT_READY"',
     to: '        "NO_SCENARIO_FOR_THIS_CODE"',
     mustFail: "gives every code in the schema a scenario that expects it",
+  },
+  {
+    // Comparing digit chunks as text rather than as numbers is the whole defect
+    // in one place.
+    id: "natural-order-compares-digits-as-text",
+    file: "scripts/readiness.mjs",
+    from: "    if (nx && ny) { const d = Number(x) - Number(y); if (d !== 0) return d; }",
+    to: "    if (nx && ny) { if (x !== y) return x < y ? -1 : 1; }",
+    mustFail: "orders run-9 before run-10 as older, the way a human counts",
   },
 ];

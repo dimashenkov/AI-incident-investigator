@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from "vitest";
 // @ts-expect-error - plain .mjs script, no types
-import { definitionOfDone, latestScored, summarise, oneLine, bar, gateResult, scenariosMeasured, sourceNewerThan, latestScoredPerScenario, orderedRecords } from "../scripts/readiness.mjs";
+import { definitionOfDone, latestScored, summarise, oneLine, bar, gateResult, scenariosMeasured, sourceNewerThan, latestScoredPerScenario, orderedRecords, naturalOlderToNewer } from "../scripts/readiness.mjs";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -690,5 +690,38 @@ describe("a verdict survives a later run that did not ask the question", () => {
       expect(r.from!["readiness-probe-failure#1"]).toBe("2026-09-07-part1.json");
       expect(r.from!["image-pull-failure#1"]).toBe("2026-09-07-part2.json");
     } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+});
+
+describe("the newest run of a day wins by its NUMBER, not its name", () => {
+  /*
+   * The same-day tie-break compared filenames as strings, so
+   * `...run-9.json` sorted after `...run-10.json` (because "1" < "9") and the
+   * ninth run was taken as newer than the tenth. It held only while run numbers
+   * had one digit. Measured on 2026-09-11: node-not-ready#3 was scored correct
+   * in run-10 and readiness kept reporting run-9's older wrong-ground verdict.
+   */
+  it("orders run-9 before run-10 as older, the way a human counts", () => {
+    expect(naturalOlderToNewer("x-run-9.json", "x-run-10.json")).toBeLessThan(0);
+    expect(naturalOlderToNewer("x-run-10.json", "x-run-9.json")).toBeGreaterThan(0);
+    expect(naturalOlderToNewer("x-part2.json", "x-part10.json")).toBeLessThan(0);
+    expect(naturalOlderToNewer("x-run-6.json", "x-run-6.json")).toBe(0);
+  });
+
+  it("lets run-10's verdict supersede run-9's for the same scenario", () => {
+    const d = mkdtempSync(join(tmpdir(), "ready-"));
+    const runs = join(d, "runs"); mkdirSync(runs, { recursive: true });
+    // Same date, run-9 older wrong-ground, run-10 newer correct. String order
+    // would pick run-9; number order must pick run-10.
+    writeFileSync(join(runs, "2026-09-11-webhook-run-9.json"), JSON.stringify({
+      when: "2026-09-11", scored: { "alpha#2": "correct-without-its-evidence" } }));
+    writeFileSync(join(runs, "2026-09-11-webhook-run-10.json"), JSON.stringify({
+      when: "2026-09-11", scored: { "alpha#3": "correct" } }));
+    const r = latestScoredPerScenario(runs);
+    // Keyed by the attempt key, and the newest attempt (run-10's alpha#3) is
+    // the one kept; run-9's alpha#2 is superseded, not carried beside it.
+    expect(r.scored["alpha#3"], "the tenth run is the newest, and it scored correct").toBe("correct");
+    expect(r.scored["alpha#2"], "the ninth run's attempt does not survive").toBeUndefined();
+    expect(r.from["alpha#3"]).toContain("run-10");
   });
 });

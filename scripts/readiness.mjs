@@ -332,6 +332,34 @@ function recordFor(latest, scenario) {
   return (key === undefined ? undefined : from[key]) ?? latest.file ?? "a run record";
 }
 
+/**
+ * Compare two run filenames so that later run NUMBERS sort later, not later
+ * strings.
+ *
+ * The tie-break between same-day records was `a.f < b.f` — a string compare —
+ * so `...run-9.json` sorted after `...run-10.json` (because "1" < "9"), and the
+ * ninth run of the day was taken as newer than the tenth. It worked only while
+ * every run number had one digit. Measured on 2026-09-11: node-not-ready#3 was
+ * scored correct in run-10 and readiness still reported run-9's older verdict.
+ *
+ * Natural order: split each name into digit and non-digit chunks and compare
+ * digit chunks as numbers. Returns negative when A is older (smaller), positive
+ * when A is newer, so callers wanting newest-first negate it.
+ */
+export function naturalOlderToNewer(a, b) {
+  const chunk = (s) => s.match(/\d+|\D+/g) ?? [];
+  const ca = chunk(a); const cb = chunk(b);
+  for (let i = 0; i < Math.max(ca.length, cb.length); i += 1) {
+    const x = ca[i]; const y = cb[i];
+    if (x === undefined) return -1;
+    if (y === undefined) return 1;
+    const nx = /^\d+$/.test(x); const ny = /^\d+$/.test(y);
+    if (nx && ny) { const d = Number(x) - Number(y); if (d !== 0) return d; }
+    else if (x !== y) return x < y ? -1 : 1;
+  }
+  return 0;
+}
+
 export function orderedRecords(runsDir) {
   if (!existsSync(runsDir)) return { records: [], why: "docs/runs does not exist" };
   const names = readdirSync(runsDir).filter((f) => f.endsWith(".json"));
@@ -374,7 +402,7 @@ export function orderedRecords(runsDir) {
     if (a.when !== null && b.when !== null) return a.when < b.when ? 1 : a.when > b.when ? -1 : 0;
     if (a.when !== null) return -1;
     if (b.when !== null) return 1;
-    return a.f < b.f ? 1 : -1;
+    return -naturalOlderToNewer(a.f, b.f);
   });
   /*
    * The comparator above returns 0 for two records with the SAME `when`, and
@@ -388,7 +416,7 @@ export function orderedRecords(runsDir) {
    */
   dated.sort((a, b) => {
     if (a.when !== b.when) return 0;
-    return a.f < b.f ? 1 : -1;
+    return -naturalOlderToNewer(a.f, b.f);
   });
   const broken0 = dated.find((d) => d.unreadable !== undefined);
   if (broken0 !== undefined) {
