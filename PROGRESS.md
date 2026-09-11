@@ -5111,3 +5111,37 @@ NotReady, пълен PVC, паднала зависимост, DNS и мрежо
 volume-full, dependency-unavailable, connection-pool-exhausted,
 dns-resolution-failure, network-policy-blocked, certificate-expired. Влизат по
 един, всеки цял. Планът е в scratchpad.
+
+## Седемте нови кода, измерени · 2026-09-11 · 4 CORRECT от 6 на първо пускане
+
+Едно „харчи", `--submit-all` за седемте. Шестото (`network-policy-blocked`)
+върна 524 и редицата спря — `certificate-expired` НЕ беше пратено (няма token,
+не е похабено). Петте приети плюс шестото (пуснало се въпреки 524) — всичките
+шест прибрани по token/id.
+
+| Сценарий | Код | Увереност | Присъда |
+|---|---|---|---|
+| volume-full | VOLUME_FULL | 95% | **CORRECT** |
+| connection-pool-exhausted | CONNECTION_POOL_EXHAUSTED | 90% | **CORRECT** |
+| dns-resolution-failure | DNS_RESOLUTION_FAILURE | 90% | **CORRECT** — логово-воденият мина |
+| network-policy-blocked | NETWORK_POLICY_BLOCKED | 90% | **CORRECT** — тихото събитие проработи |
+| node-not-ready | NODE_NOT_READY | 90% | верен код, **друго основание** — не цитира `lines[2].ts` |
+| dependency-unavailable | DEPENDENCY_UNAVAILABLE | 90% | верен код, **друго основание** — не цитира `events[0].message` |
+
+**Четири пълни CORRECT от шест, на първо пускане, за чисто нов клас сценарии.**
+Двете „друго основание" са верен код през грешен цитат — моделът стига до
+диагнозата, но не по точния път. Честно червено, не дефект в сценария.
+
+**Readiness: 46% → 61%.** `certificate-expired` остава неустановено — чака едно
+подаване повече (нова дума).
+
+### Капанът 524, още веднъж
+Шестото подаване върна HTTP 524 (гейтуейски срез на ~100s), редицата спря както
+трябва — но изпълнението **се пусна** (341) и отговорът е в него. `--submit-all`
+спира пред следващото, не пред вече приетото. Прибрано по token.
+
+### SPEC.md прегледан от Grok, пет поправки
+codex е на акаунтен лимит до 15 септ., затова прегледът е Grok. Пет реални
+неточности, всичките поправени: „седемте кода"→тринайсет; „правилото в четирите
+подкани"→само kubernetes+root-cause; 0.5 е таван не под; webhook-run-9 е от
+09-10 не 09-11 и 90% е проза; 305 мутации→325.

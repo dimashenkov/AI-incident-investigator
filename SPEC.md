@@ -46,7 +46,7 @@ the same evidence `scripts/readiness.mjs` counts (`scenariosMeasured`,
 | `READINESS_PROBE_FAILURE` | `readiness-probe-failure` | 3 | **Yes** — `correct` ×3 (`docs/runs/2026-09-07-part1c.json`) and again (`2026-09-11-webhook-run-7.json`) |
 | `CPU_THROTTLING` | `cpu-throttling` | 4 | **Yes** — `correct` (`docs/runs/2026-09-10-webhook-run-9.json`, `2026-09-11-webhook-run-7.json`) |
 | `APPLICATION_STARTUP_FAILURE` | `application-startup-failure` | 6 | **Yes** — once `correct` (`docs/runs/2026-09-10-webhook-run-9.json`); other runs right code but citation missed |
-| `DEPLOYMENT_REGRESSION` | `deployment-regression` | 7 | **Yes**, after repair — `wrong` on 2026-09-10 (`webhook-run-2/4`), then `correct` at 90% on 2026-09-11 (`webhook-run-9`, `webhook-run-7`; PROGRESS.md, entry "Това не носи никаква информация") |
+| `DEPLOYMENT_REGRESSION` | `deployment-regression` | 7 | **Yes**, after repair — `wrong` on 2026-09-10 (`webhook-run-2/4`), then `correct` (`docs/runs/2026-09-10-webhook-run-9.json`, `2026-09-11-webhook-run-7.json`). The `scored` field stores the verdict only, not a confidence; the 90% is PROGRESS.md prose, not a recorded number |
 | `NODE_NOT_READY` | `node-not-ready` | 9 | **No — built, not yet measured.** Scenario and prompt rules exist; the paid run "чака думата" (PROGRESS.md, "Първият нов случай: NODE_NOT_READY"). No `scored` record mentions it |
 | `VOLUME_FULL` | `volume-full` | 10 | **No — built, not yet measured.** Reviewed by three adversarial passes 2026-09-11; awaits the word |
 | `DEPENDENCY_UNAVAILABLE` | `dependency-unavailable` | 11 | **No — built, not yet measured** |
@@ -78,7 +78,7 @@ absent but that an agent facing an unknown case may **press it into the nearest
 code**, which looks like an answer.
 
 **Built, not yet measured — a code in the schema, a scenario in the registry,
-the distinguishing rule in all four prompts, but no scored run yet.** Seven codes
+the code listed in all four agent prompts and the distinguishing rule added to the kubernetes and root-cause prompts (the logs and metrics prompts only list the codes), but no scored run yet.** Seven codes
 are in this state: `NODE_NOT_READY`, `VOLUME_FULL`, `DEPENDENCY_UNAVAILABLE`,
 `CONNECTION_POOL_EXHAUSTED`, `DNS_RESOLUTION_FAILURE`, `NETWORK_POLICY_BLOCKED`,
 `CERTIFICATE_EXPIRED` (§2). They are wired and pass every static check the gate
@@ -98,7 +98,7 @@ the nearest known one. Coverage on paper is not coverage measured.
 - **Stateful-set- and cronjob-specific failures** — no scenario or code.
 - **Multi-service incidents** — out of scope by design (see §4): the isolation
   guarantees rest on one incident per execution.
-- **Anything the seven simulated codes do not name** — the fault space of a real
+- **Anything the thirteen codes do not name** — the fault space of a real
   cluster is far larger than thirteen codes, and an unknown case still risks
   being pressed into the nearest known one. That risk is the reason each new code
   enters whole, with a scenario that measures it, rather than as a bare enum
@@ -116,7 +116,7 @@ gaps waiting on work.
 | No real cluster | every provider is simulated; the project is a prototype | `CLAUDE.md` §13, 2026-09-05 ("Прототип, и това е обхватът"); `README.md` line 29 |
 | Read-only | agents recommend actions, never execute them; the schema **refuses `executed: true`** so the day something acts, it fails loudly | `CLAUDE.md` §13, 2026-09-04 ("MVP-то е read-only"); `schemas/remediation.schema.json` `executed` (`const: false`) |
 | One incident per execution | all isolation (`collection_id`, `requested_for`, one-to-one thread, namespace match) compares against a single request; two incidents in one process would have no unambiguous owner | PROGRESS.md, "Могат ли няколко инцидента наведнъж" (2026-09-11) — parallel *separate* executions are measured; multiple incidents in one execution is "не, и нарочно" |
-| Confidence is the model's own assertion | there is no calibrated scale behind the number; the only enforced ceiling is `conflicting-evidence` `max_confidence` 0.6, and the schema floor 0.5 for a refusal — both are *chosen*, not measured | `CLAUDE.md` §13, "Праговете и границите на приемане"; `scenarios/conflicting-evidence/expected.json` |
+| Confidence is the model's own assertion | there is no calibrated scale behind the number; the schema caps a refusal at `maximum` 0.5 and the `conflicting-evidence` scenario caps its answer at `max_confidence` 0.6 — two ceilings on the same number (there is no floor, no `minimum`), both *chosen*, not measured | `CLAUDE.md` §13, "Праговете и границите на приемане"; `scenarios/conflicting-evidence/expected.json` |
 
 The review boundary follows from the prototype decision: the question asked of the
 code is "does it ever quietly claim something false about its own work", not "does
@@ -241,7 +241,7 @@ n8n execution record (see `collect-execution.mjs` below).
 | `scripts/readiness.mjs` | the readiness figure, from artifacts on disk (see §5) |
 | `scripts/spend.mjs` | the spend counter, from recorded runs (see §5) |
 | `scripts/acceptance-gate.mjs` | checks that what was promised is built, and runs the mutation check |
-| `scripts/mutation-fanout.mjs` | runs the mutation gate in parallel across worker copies (305 mutations: 540 s sequential → 68 s, same catch count; `docs/async-shape.md` lines 254–264) |
+| `scripts/mutation-fanout.mjs` | runs the mutation gate in parallel across worker copies (the full mutation set — 325 as of this writing, read from `scripts/mutations.mjs`, not a fixed number — across worker copies; measured 540 s sequential → 68 s at 305 mutations, `docs/async-shape.md`) |
 
 **The review tools.** The external review is **Astra** — `gpt-6-astra`, run through
 `codex exec -m gpt-6-astra` (`CLAUDE.md` §13, "прегледът е Астра", 2026-09-11).
