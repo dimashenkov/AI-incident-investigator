@@ -1,0 +1,18 @@
+{
+  "when": "2026-09-10",
+  "tool": "grok",
+  "model_asked": "grok-4.6",
+  "kind": "review",
+  "outcome": "cancelled after one turn: the read tool was never approved, because headless mode has nobody to approve it. The answer was a single sentence of intent and the process exited 0.",
+  "total_cost_usd": 0.01332562,
+  "note": "SuperGrok Lite is a fixed monthly fee, so this figure is WEIGHT, not a bill. Recorded because an unrecorded call makes every total a floor while looking like an answer.",
+  "usage": {
+    "input_tokens": 36443,
+    "output_tokens": 714,
+    "reasoning_tokens": 425
+  },
+  "scored": {},
+  "totals": {
+    "why": "Grok runs on the owner's SuperGrok Lite subscription, a fixed monthly fee, so this call cannot be priced as spending: one more run does not raise the invoice. The total_cost_usd it reports is what the call WOULD have cost at API prices, and is recorded as weight."
+  }
+}

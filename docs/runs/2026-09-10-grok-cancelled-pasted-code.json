@@ -1,0 +1,13 @@
+{
+  "when": "2026-09-10",
+  "tool": "grok",
+  "model_asked": "grok-4.6",
+  "kind": "review",
+  "outcome": "cancelled after six turns. This was the OLD documented shape, with read in the deny list and the code pasted into the prompt. The model tried to use tools anyway, was refused, and the run was cancelled mid-thought. Exit code 0.",
+  "total_cost_usd": 0.08805796,
+  "note": "SuperGrok Lite is a fixed monthly fee, so this is WEIGHT, not a bill. Recorded because an unrecorded call makes every total a floor while looking like an answer. Two cancelled runs the same hour, $0.101 of weight, and neither produced a verdict.",
+  "scored": {},
+  "totals": {
+    "why": "Grok runs on the owner's SuperGrok Lite subscription, a fixed monthly fee, so this call cannot be priced as spending: one more run does not raise the invoice. The total_cost_usd it reports is what the call WOULD have cost at API prices, and is recorded as weight."
+  }
+}

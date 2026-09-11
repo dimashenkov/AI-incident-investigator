@@ -1,0 +1,23 @@
+{
+  "when": "2026-09-10",
+  "tool": "n8n",
+  "kind": "paired-comparison",
+  "outcome": "Six scenarios on each of two models, one execution each, on one frozen revision, changing only the model string. gpt-4o-mini: 2 correct, 2 right-code-without-its-evidence, 1 wrong. gpt-4o: 5 correct, 0, 0. Model citation recall 7 of 11 against 10 of 11. The one remaining red, conflicting-evidence, is IDENTICAL on both: each cites a ref no agent reported and the chain refuses it, so that is a defect in the prompt or the contract rather than in the model.",
+  "models": { "a": "gpt-4o-mini", "b": "gpt-4o" },
+  "answers": [
+    "docs/answers/2026-09-10-mini-baseline.json",
+    "docs/answers/2026-09-10-gpt4o.json"
+  ],
+  "what_this_establishes": "Coverage on six cases, paired. NOT reliability: one execution per scenario per model, and the contract forbids the claim.",
+  "what_it_closed": [
+    "The citations were not a prompt problem. Seven rewrites had not produced deployment.image or limits.memory; gpt-4o cites them with no prompt change at all.",
+    "deployment-regression was not a fixture ceiling. With the times in front of it, gpt-4o orders the rollout before the errors and names the right code; mini could not, three purchases running.",
+    "Three identical aggregates were the model's ceiling, not remaining variance in the harness."
+  ],
+  "totals": {
+    "input_tokens": null,
+    "output_tokens": null,
+    "why": "The per-node usage now travels with the answer, but these two runs were issued from a deployment recorded before that reached the webhook reply for every path. The token measurement of the same day, docs/runs/2026-09-10-token-measurement.json, holds 11249 in and 750 out for one whole mini run; a gpt-4o run of the same shape is dearer per token and no rate is established here."
+  },
+  "scored": {}
+}

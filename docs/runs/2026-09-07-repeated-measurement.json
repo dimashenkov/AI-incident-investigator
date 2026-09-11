@@ -1,0 +1,9 @@
+{
+  "note": "The first REPEATED measurement, run to a protocol written before it rather than judged after. Codex had blocked a seventh five-scenario run on method: no score out of five separates a fix from model variability, and six runs that each fixed one thing and broke another predicted a seventh ambiguous number. So the prompt, fixtures and scorer were frozen, the two broken scenarios were run three times each on one deployment, and six of six correct codes was the only success declared in advance. Six of six came back, and identically: image-pull-failure cited the same three paths all three times. The repetition established what a single run cannot — three attempts on ONE deployment, with prompt, fixtures and scorer frozen, returned the same code and the same three citation paths each time. That is stability across repeats of one configuration; it is NOT determinism in general, and Codex was right on 2026-09-07 that calling it that is a claim larger than three samples. Nothing here measures the prompt written AFTER these runs — that fix is unmeasured until a run of its own.",
+  "when": "2026-09-07",
+  "model": "gpt-4o-mini-2024-07-18",
+  "temperature": 0,
+  "totals": { "input_tokens": 44778, "output_tokens": 2966 },
+  "calls": 21,
+  "outcome": "readiness-probe-failure fully correct three times out of three; image-pull-failure gave IMAGE_PULL_FAILURE three times out of three, each time citing events[0].message, pods[0].phase and pods[0].containers[0].ready and not deployment.image"
+}

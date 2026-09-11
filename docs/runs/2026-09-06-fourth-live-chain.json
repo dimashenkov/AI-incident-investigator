@@ -1,0 +1,9 @@
+{
+  "note": "The fourth run, after the prompt contradiction was resolved. cpu-throttling gave CPU_THROTTLING where the third run gave INSUFFICIENT_EVIDENCE, and container-oom cited the memory limit it had been missing — both prompt fixes worked, and there were no wrong answers at all. Two scenarios refused on something new: the model wrote observation.events[0].message, prefixing the path with the wrapper the payload arrives in, which every specialist prompt warns against twice. Fixed deterministically in resolveRef rather than with more prompt text.",
+  "when": "2026-09-06",
+  "model": "gpt-4o-mini-2024-07-18",
+  "temperature": 0,
+  "totals": { "input_tokens": 26035, "output_tokens": 1630 },
+  "calls": 13,
+  "outcome": "container-oom and insufficient-evidence correct; cpu-throttling right code without citing limits.cpu; image-pull-failure and readiness-probe-failure refused on a wrapper-prefixed source_ref; zero wrong answers"
+}

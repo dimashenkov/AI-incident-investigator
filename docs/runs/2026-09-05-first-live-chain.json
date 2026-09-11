@@ -1,0 +1,9 @@
+{
+  "note": "The first end-to-end runs through the DEPLOYED workflow. Five scenarios attempted, three concluded, two stopped at Ask metrics. Token counts read from the n8n execution log rather than estimated: every Ask node's response carries the API's own usage block, and these are the sum across all executions of that day including the failed ones — a call that was made and then thrown away still cost.",
+  "when": "2026-09-05",
+  "model": "gpt-4o-mini-2024-07-18",
+  "temperature": 0,
+  "totals": { "input_tokens": 25847, "output_tokens": 2451 },
+  "calls": 17,
+  "outcome": "container-oom concluded CONTAINER_OOM at 0.6; readiness-probe-failure concluded READINESS_PROBE_FAILURE at 0.6; cpu-throttling concluded INSUFFICIENT_EVIDENCE at 0; image-pull-failure and insufficient-evidence stopped at Ask metrics with a 400, because a refused item still flowed into the next HTTP call"
+}

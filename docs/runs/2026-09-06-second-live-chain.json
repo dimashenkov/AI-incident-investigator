@@ -1,0 +1,9 @@
+{
+  "note": "The second end-to-end attempt through the deployed workflow, after the gate and the skip were added. Three of five concluded; readiness-probe-failure came back at 0.8 where the first run gave 0.6, which is the confidence scale reading in both directions. Two still refused, and the reason was new: a gate's false branch routed past the node that prepares the next question, so a skipped agent skipped everything after it and the root cause agent was never asked. Token counts read from the n8n execution log, not estimated.",
+  "when": "2026-09-06",
+  "model": "gpt-4o-mini-2024-07-18",
+  "temperature": 0,
+  "totals": { "input_tokens": 25894, "output_tokens": 2044 },
+  "calls": 16,
+  "outcome": "container-oom CONTAINER_OOM at 0.6; readiness-probe-failure READINESS_PROBE_FAILURE at 0.8; cpu-throttling INSUFFICIENT_EVIDENCE at 0; image-pull-failure and insufficient-evidence refused with 'the incident carries 0 root cause results'"
+}

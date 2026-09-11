@@ -1,0 +1,19 @@
+{
+  "note": "Issued by scripts/run-scenarios.mjs against the deployed workflow's webhook. The reply carries the chain's report; it does not carry the model's token usage, because the Collect nodes keep only the reply. Token counts and cost are therefore UNESTABLISHED on this path, not zero — read them from the n8n execution and add them with a second edit if they are wanted, and say that they were added by hand.",
+  "recorded": "at the moment the answers arrived, by the script that issued them",
+  "when": "2026-09-11",
+  "webhook_host": "dimitarshenkov.app.n8n.cloud",
+  "keys": [
+    "conflicting-evidence"
+  ],
+  "outcomes": {
+    "conflicting-evidence": "not charged, established: OpenAI rejected the call at validation with HTTP 400, temperature 0 unsupported on this model, before any inference. Read out of n8n execution 296 by the owner's local n8n agent, who confirmed the node output carries no usage object at all. The runner had recorded it as possibly charged, which is what it could see; this is what was then established."
+  },
+  "totals": {
+    "input_tokens": null,
+    "output_tokens": null,
+    "why": "the webhook reply carries no usage; nothing here could read it"
+  },
+  "scored": null,
+  "what_the_runner_saw": "called, no reply recorded — this key may have been charged (unreachable: HTTP 500 | body: {\"message\":\"Error in workflow\"})"
+}

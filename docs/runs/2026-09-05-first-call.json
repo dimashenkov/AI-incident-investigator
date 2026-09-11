@@ -1,0 +1,9 @@
+{
+  "note": "The first model call that returned at all, recorded after the fact from PROGRESS.md rather than from a captured response. The token counts are what the n8n execution reported; the response body was not kept, so this file is a cost record and nothing else. It exists because a run nobody wrote down is a run the spend counter cannot see, and an uncounted run makes every total a floor.",
+  "recorded": "after the fact, on 2026-09-05, from the round log",
+  "when": "2026-09-05",
+  "model": "gpt-4o-mini-2024-07-18",
+  "temperature": 0,
+  "totals": { "input_tokens": 823, "output_tokens": 260 },
+  "outcome": "refused by the schema — the model invented a hypothesis code H1, because the prompt showed the field and never said which values were allowed"
+}

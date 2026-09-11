@@ -1,0 +1,33 @@
+{
+  "note": "Issued by scripts/run-scenarios.mjs against the deployed workflow's webhook. The reply carries the chain's report; it does not carry the model's token usage, because the Collect nodes keep only the reply. Token counts and cost are therefore UNESTABLISHED on this path, not zero — read them from the n8n execution and add them with a second edit if they are wanted, and say that they were added by hand.",
+  "recorded": "at the moment the answers arrived, by the script that issued them",
+  "when": "2026-09-09",
+  "webhook_host": "dimitarshenkov.app.n8n.cloud",
+  "keys": [
+    "image-pull-failure#1",
+    "image-pull-failure#2",
+    "image-pull-failure#3"
+  ],
+  "outcomes": {
+    "image-pull-failure#1": "answered",
+    "image-pull-failure#2": "answered",
+    "image-pull-failure#3": "answered"
+  },
+  "totals": {
+    "input_tokens": null,
+    "output_tokens": null,
+    "why": "the webhook reply carries no usage; nothing here could read it"
+  },
+  "scored": {
+    "application-startup-failure": "unasked",
+    "conflicting-evidence": "unasked",
+    "container-oom": "unasked",
+    "cpu-throttling": "unasked",
+    "deployment-regression": "unasked",
+    "insufficient-evidence": "unasked",
+    "readiness-probe-failure": "unasked",
+    "image-pull-failure#1": "correct-without-its-evidence",
+    "image-pull-failure#2": "correct-without-its-evidence",
+    "image-pull-failure#3": "correct-without-its-evidence"
+  }
+}

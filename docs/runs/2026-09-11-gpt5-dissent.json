@@ -1,0 +1,32 @@
+{
+  "when": "2026-09-11",
+  "tool": "n8n",
+  "model_asked": "gpt-5",
+  "model_answered": "gpt-5-2025-08-07",
+  "kind": "measurement",
+  "outcome": "The question this run was bought for is ANSWERED, and the frozen criterion is met. Execution 303 completed with state concluded; the webhook reply never reached this machine because the gateway cut the connection at ~100s and the answer appeared at ~183s. Read out of n8n by the owner's local agent.",
+  "frozen_criterion": "contradicted_by non-empty AND confidence at or under 0.6. Both, or it is not a pass.",
+  "result": {
+    "root_cause_code": "CONTAINER_OOM",
+    "confidence": 0.35,
+    "contradicted_by": ["series[0].points[2].value", "series[0].points[3].value"],
+    "evidence": "4 for, from kubernetes and the limit; 2 against, from the metrics that argue with OOM",
+    "verdict": "PASS on both halves"
+  },
+  "what_this_closes": "30 recorded hypotheses across gpt-4o-mini and gpt-4o, and eight rounds of prompts, carried contradicted_by in NONE. One larger model produced it with no prompt change at all. Capacity was the explanation, and it was the only one left after the contract and the prompt were both excluded by reading them.",
+  "what_this_does_not_establish": "Reliability: one execution, on a model this project can no longer pin to temperature 0. And the run is NOT in docs/answers — see below.",
+  "why_no_answers_file": "The answer exists in the n8n execution and reached this machine only as a summary. Reconstructing an answers file from a summary would be inventing the parts nobody quoted, and the scorer would then score fiction. What is established is written here; the artifact the scorer reads is not faked.",
+  "per_node_usage": {
+    "kubernetes": { "prompt_tokens": 3492, "completion_tokens": 4313, "reasoning_tokens": 3776 },
+    "logs": { "prompt_tokens": 1848, "completion_tokens": 1114, "reasoning_tokens": 960 },
+    "metrics": { "prompt_tokens": 1930, "completion_tokens": 1862, "reasoning_tokens": 1536 },
+    "root-cause": { "prompt_tokens": 4523, "completion_tokens": 3471, "reasoning_tokens": 2880 }
+  },
+  "totals": {
+    "input_tokens": 11793,
+    "output_tokens": 10760,
+    "why": "Measured at the nodes by the owner's local agent. No dollar figure: the rate for this model at this date is not established here. Of the 10760 output tokens, 9152 are hidden reasoning — which is also the whole explanation for the timeout."
+  },
+  "why_it_timed_out": "Not input size: the input is comparable to the mini run at about 12k tokens. It is the reasoning tokens. gpt-5 defaults to medium reasoning and generated 9152 of them, which lifted completion from about 750 on mini to 10760 and stretched four sequential calls to ~183s. The kubernetes call alone took ~78s.",
+  "scored": {}
+}

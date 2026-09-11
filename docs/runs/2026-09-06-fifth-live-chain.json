@@ -1,0 +1,9 @@
+{
+  "note": "The fifth run, and the first with no refusals and no wrong answers. Three of five correct against expected.json; two gave the right code without citing what the scenario was built around. The normalisation counter answered the question the third review raised before the run: image-pull-failure and readiness-probe-failure each reported 3 rewritten citations — the two scenarios that had refused in run 4 — while the other three reported 0. So the fix was exercised, not merely unneeded.",
+  "when": "2026-09-06",
+  "model": "gpt-4o-mini-2024-07-18",
+  "temperature": 0,
+  "totals": { "input_tokens": 36892, "output_tokens": 2544 },
+  "calls": 18,
+  "outcome": "container-oom, insufficient-evidence and readiness-probe-failure correct; cpu-throttling and image-pull-failure right code without citing limits.cpu and deployment.image; zero wrong, zero refused; normalised citations 3 and 3 on the two that used to refuse, 0 elsewhere"
+}

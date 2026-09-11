@@ -1,0 +1,16 @@
+{
+  "when": "2026-09-11",
+  "tool": "n8n",
+  "model_asked": "gpt-5",
+  "kind": "measurement",
+  "outcome": "Authorised and failed differently: HTTP 524, a gateway timeout, with a Cloudflare HTML page as the body. Not a model error and not a parameter error — the chain answers inside the HTTP response, and four sequential reasoning calls do not finish inside the gateway's window. Zero answers of one. Not retried: one authorisation is one run.",
+  "what_may_still_exist": "The n8n execution may have COMPLETED and may hold the answer. The timeout is between this machine and n8n, not inside n8n. Nothing here has read it.",
+  "charged": "unestablished, and this time probably yes: unlike the HTTP 400 before it, inference had started. The record says may have been charged because that is what is known.",
+  "structural_finding": "The webhook-response shape cannot carry a slow model. Every measurement so far rode on a model fast enough to answer four times inside one HTTP request. That was an accident of the model, not a property of the design, and it is now the binding constraint.",
+  "totals": {
+    "input_tokens": null,
+    "output_tokens": null,
+    "why": "No reply reached this machine. The usage may exist in the n8n execution and has not been read."
+  },
+  "scored": {}
+}

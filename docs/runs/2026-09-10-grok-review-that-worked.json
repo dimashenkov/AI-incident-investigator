@@ -1,0 +1,13 @@
+{
+  "when": "2026-09-10",
+  "tool": "grok",
+  "model_asked": "grok-4.6",
+  "kind": "review",
+  "outcome": "The first Grok review that returned a verdict: end_turn, 7 turns, reading the files itself. It found that three tests I had just written did not reach the check they were named after — rogueProvider goes through stampOrRefuse, so assembly refuses at 'every observation failed' long before checkProvenance. Verdict: do not commit. Verified by disabling checkProvenance: the old tests stayed green, the rewritten ones fail 3.",
+  "total_cost_usd": 0.0815796,
+  "note": "SuperGrok Lite is a fixed monthly fee, so this is WEIGHT, not a bill.",
+  "scored": {},
+  "totals": {
+    "why": "Grok runs on the owner's SuperGrok Lite subscription, a fixed monthly fee, so this call cannot be priced as spending: one more run does not raise the invoice. The total_cost_usd it reports is what the call WOULD have cost at API prices, and is recorded as weight."
+  }
+}

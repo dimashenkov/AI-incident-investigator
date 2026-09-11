@@ -1,0 +1,158 @@
+{
+  "note": "Four real model calls, recorded verbatim. This is evidence of what a model DID answer on one occasion, not a claim about what it will answer. Nothing grades a run by comparing against it; the scenarios' expected.json says what a run is for, and a human reads the two together.",
+  "when": "2026-09-05",
+  "model": "gpt-4o-mini-2024-07-18",
+  "temperature": 0,
+  "totals": {
+    "input_tokens": 4721,
+    "output_tokens": 778
+  },
+  "calls": [
+    {
+      "agent": "kubernetes",
+      "scenario": "container-oom",
+      "incident_id": "INC-2026-0101",
+      "input_tokens": 1247,
+      "output_tokens": 267,
+      "reply_sha256": "67494f73b11152a6",
+      "reply": {
+        "agent": "kubernetes",
+        "status": "ok",
+        "findings": [
+          {
+            "fact": "Container 'payment-api' was terminated due to OOMKilled.",
+            "source_ref": "pods[0].containers[0].last_state.terminated.reason",
+            "severity": "warning"
+          },
+          {
+            "fact": "Container 'payment-api' has been restarted 7 times.",
+            "source_ref": "pods[0].containers[0].restart_count",
+            "severity": "warning"
+          },
+          {
+            "fact": "Pod 'payment-api-7d4b8c9f5-x2mnq' is in BackOff state.",
+            "source_ref": "events[0].reason",
+            "severity": "warning"
+          }
+        ],
+        "hypotheses": [
+          {
+            "code": "CONTAINER_OOM",
+            "statement": "The container is experiencing out of memory issues leading to restarts.",
+            "supported_by": [
+              "pods[0].containers[0].last_state.terminated.reason",
+              "pods[0].containers[0].restart_count",
+              "events[0].reason"
+            ]
+          }
+        ],
+        "confidence": 0.9
+      }
+    },
+    {
+      "agent": "logs",
+      "scenario": "readiness-probe-failure",
+      "incident_id": "INC-2026-0301",
+      "input_tokens": 1164,
+      "output_tokens": 119,
+      "reply_sha256": "bbdc1aed5f64570d",
+      "reply": {
+        "agent": "logs",
+        "status": "ok",
+        "findings": [
+          {
+            "source_ref": "lines[0]",
+            "fact": "index warmup at 61%, readiness withheld"
+          },
+          {
+            "source_ref": "lines[1]",
+            "fact": "index warmup at 68%, readiness withheld"
+          },
+          {
+            "source_ref": "truncated",
+            "fact": "The log was truncated"
+          }
+        ],
+        "hypotheses": [],
+        "confidence": 0
+      }
+    },
+    {
+      "agent": "metrics",
+      "scenario": "cpu-throttling",
+      "incident_id": "INC-2026-0401",
+      "input_tokens": 1081,
+      "output_tokens": 208,
+      "reply_sha256": "795dbf0a184cb36a",
+      "reply": {
+        "agent": "metrics",
+        "status": "ok",
+        "findings": [
+          {
+            "source_ref": "series[0].points[1]",
+            "value": 12.8,
+            "unit": "seconds"
+          },
+          {
+            "source_ref": "series[0].points[2]",
+            "value": 41.2,
+            "unit": "seconds"
+          },
+          {
+            "source_ref": "series[0].points[3]",
+            "value": 78.9,
+            "unit": "seconds"
+          },
+          {
+            "source_ref": "series[1].points[0]",
+            "value": 310378496,
+            "unit": "bytes"
+          },
+          {
+            "source_ref": "series[1].points[1]",
+            "value": 318767104,
+            "unit": "bytes"
+          }
+        ],
+        "hypotheses": [],
+        "confidence": 0
+      }
+    },
+    {
+      "agent": "root-cause",
+      "scenario": "container-oom",
+      "incident_id": "INC-2026-0101",
+      "input_tokens": 1229,
+      "output_tokens": 184,
+      "reply_sha256": "8d5e8ff00882b9dc",
+      "reply": {
+        "agent": "root_cause",
+        "status": "ok",
+        "findings": [
+          {
+            "fact": "container payment-api terminated with reason OOMKilled",
+            "source_ref": "pods[0].containers[0].last_state.terminated.reason"
+          },
+          {
+            "fact": "the container has restarted 7 times",
+            "source_ref": "pods[0].containers[0].restart_count"
+          },
+          {
+            "fact": "the memory limit is 512Mi",
+            "source_ref": "pods[0].containers[0].limits.memory"
+          }
+        ],
+        "hypotheses": [
+          {
+            "code": "CONTAINER_OOM",
+            "statement": "the container exceeded its memory limit",
+            "supported_by": [
+              "pods[0].containers[0].last_state.terminated.reason"
+            ]
+          }
+        ],
+        "confidence": 0.9
+      }
+    }
+  ]
+}

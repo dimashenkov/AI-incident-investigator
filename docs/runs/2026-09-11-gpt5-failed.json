@@ -1,0 +1,17 @@
+{
+  "when": "2026-09-11",
+  "tool": "n8n",
+  "model_asked": "gpt-5",
+  "kind": "measurement",
+  "outcome": "Authorised, uploaded, and FAILED: HTTP 500 with body {\"message\":\"Error in workflow\"}, zero answers of one. The runner marked conflicting-evidence as called with no reply recorded, so it may have been charged, and refuses to reissue that key until a person reads the execution. Not retried: one authorisation is one run and a retry is a new run.",
+  "question_it_was_bought_for": "Whether model capacity explains that 30 recorded hypotheses across two models and eight rounds of prompts carry contradicted_by in none, while the contract permits dissent and the prompt teaches where it goes.",
+  "frozen_criterion": "contradicted_by non-empty AND confidence at or under 0.6. One of the two alone is not a pass.",
+  "what_is_established": "Nothing about the question. The chain did not answer.",
+  "hypothesis_not_verified": "gpt-5 may refuse temperature: 0 or the response_format the body sends, as some newer models do. That is a guess; the error text in the n8n execution is what would settle it, and it has not been read.",
+  "totals": {
+    "input_tokens": null,
+    "output_tokens": null,
+    "why": "No reply came back, so nothing could be read from one. Whether the call was billed is unestablished — the record says may have been charged rather than was, because that is what is known."
+  },
+  "scored": {}
+}

@@ -1,0 +1,9 @@
+{
+  "note": "The third end-to-end run, and the first where all five scenarios reached a conclusion on one deployment. Scored against expected.json rather than reported as concluded: two correct, two right code on other ground, one wrong. cpu-throttling still answers INSUFFICIENT_EVIDENCE where CPU_THROTTLING is expected — the scenario is built so the answer is only in the metrics, and the memory series is deliberately flat. Token counts read from the n8n execution log.",
+  "when": "2026-09-06",
+  "model": "gpt-4o-mini-2024-07-18",
+  "temperature": 0,
+  "totals": { "input_tokens": 29034, "output_tokens": 2285 },
+  "calls": 18,
+  "outcome": "insufficient-evidence and readiness-probe-failure correct; container-oom and image-pull-failure gave the right code without citing what the scenario was built around; cpu-throttling wrong; nothing refused"
+}

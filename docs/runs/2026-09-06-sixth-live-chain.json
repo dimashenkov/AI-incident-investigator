@@ -1,0 +1,9 @@
+{
+  "note": "The sixth run, and a regression caused by the fix in the fifth. cpu-throttling became fully correct — it cites the CPU limit now — and image-pull-failure and readiness-probe-failure went from right-code to wrong, both answering INSUFFICIENT_EVIDENCE. Read from the recorded run rather than guessed: for image-pull-failure the Kubernetes agent reported three configuration findings and NOT the event saying the image could not be pulled, which it had cited the run before. A new duty displaced the one that mattered, the root cause agent had no symptom to name, and it said there was not enough evidence.",
+  "when": "2026-09-06",
+  "model": "gpt-4o-mini-2024-07-18",
+  "temperature": 0,
+  "totals": { "input_tokens": 39231, "output_tokens": 2560 },
+  "calls": 18,
+  "outcome": "container-oom, cpu-throttling and insufficient-evidence correct; image-pull-failure and readiness-probe-failure wrong, both INSUFFICIENT_EVIDENCE; zero refusals; zero normalised citations"
+}

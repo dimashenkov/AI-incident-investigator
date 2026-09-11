@@ -27,7 +27,17 @@ coverage/
 # ── логове и отчети ──────────────────────────────────────────────────
 *.log
 logs/
-runs/
+# `runs/` used to stand here, and it matched `docs/runs/` — every record of
+# every paid call since 2026-09-05, thirty-three files, invisible to git and
+# absent from any clone. Found on 2026-09-11 when a new record refused to
+# commit. Three written promises were false because of it: that every paid call
+# is recorded as an artifact, that one command answers what it cost by reading
+# the disk, and that the proof lives in the repository. It lived on one disk.
+#
+# Narrowed to the two directories it was written for. `docs/runs/` is the
+# evidence and belongs in the repository.
+/logs/runs/
+/out/runs/
 executions/
 test-results/
 .pytest_cache/
