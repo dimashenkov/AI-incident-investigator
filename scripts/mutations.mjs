@@ -2733,4 +2733,82 @@ export const MUTATIONS = [
     to: "  const setByFile = [];",
     mustFail: "does not read the .env file merely because it was imported",
   },
+  {
+    // A parallel check that only counts what came back reads as a clean run
+    // over a smaller set. This is the line that refuses that.
+    id: "a-parallel-run-that-lost-workers-reads-as-clean",
+    file: "scripts/acceptance-gate.mjs",
+    from: "  if (caught + survived.length + unresolved.length !== total) {",
+    to: "  if (false) {",
+    mustFail: "requires every mutation to be accounted for",
+  },
+  {
+    // A worker copy that carries .env lets a mutation redirect the runner at
+    // the paid instance — the defect that made the gate pay for itself.
+    id: "the-worker-copy-carries-the-env-file",
+    file: "scripts/mutation-fanout.mjs",
+    from: '  { name: ".env", why: "a mutation that lets the file beat the environment would read a paid address from it" },',
+    to: "",
+    mustFail: "withholds the .env file, and says why",
+  },
+  {
+    // Contiguous slices hand one worker every slow whole-suite mutation.
+    id: "the-share-is-contiguous-not-round-robin",
+    file: "scripts/mutation-fanout.mjs",
+    from: "  mutations.forEach((m, i) => out[i % workers].push(m.id));",
+    to: "  mutations.forEach((m, i) => out[Math.min(workers - 1, Math.floor(i / Math.ceil(mutations.length / workers)))].push(m.id));",
+    mustFail: "shares round-robin, not in blocks",
+  },
+  {
+    // A worker with nothing to do is a tree copied for nothing.
+    id: "more-workers-than-there-is-work",
+    file: "scripts/mutation-fanout.mjs",
+    from: "  return Math.max(1, Math.min(room, mutations));",
+    to: "  return room;",
+    mustFail: "never makes more workers than there is work",
+  },
+  {
+    // A matching count is not a matching set: two results for one mutation and
+    // none for another adds up, and the missing one reads as checked.
+    id: "a-foreign-result-is-counted-as-the-share",
+    file: "scripts/mutation-fanout.mjs",
+    from: "    if (r === null || typeof r !== \"object\" || typeof r.id !== \"string\" || !mine.has(r.id)) { stray += 1; continue; }",
+    to: "    if (r === null || typeof r !== \"object\") { stray += 1; continue; }",
+    mustFail: "drops results for mutations the worker was not given",
+  },
+  {
+    // Two answers for one question is not one answer.
+    id: "a-mutation-reported-twice-is-accepted",
+    file: "scripts/mutation-fanout.mjs",
+    from: "    if (verdict.has(r.id)) { doubled.add(r.id); continue; }",
+    to: "    if (false) { doubled.add(r.id); continue; }",
+    mustFail: "refuses two results for one mutation, including the first copy",
+  },
+  {
+    // A mutation counts as caught when its named test FAILS, so a copy that
+    // cannot run tests makes every mutation on it look caught.
+    id: "an-unusable-copy-is-trusted-anyway",
+    file: "scripts/mutation-fanout.mjs",
+    from: "  if (!fit.usable) {",
+    to: "  if (false) {",
+    mustFail: "reports the whole share unresolved when its copy is unusable",
+  },
+  {
+    // An empty set of test files is the one thing that must never read as a
+    // pass.
+    id: "a-copy-with-no-tests-counts-as-usable",
+    file: "scripts/mutation-fanout.mjs",
+    from: '  if (smallest === null) return { usable: false, why: "the copy contains no test file to try" };',
+    to: "  if (smallest === null) return { usable: true };",
+    mustFail: "refuses a copy that holds no test file at all",
+  },
+  {
+    // Picked by size, so renaming or deleting one file cannot turn the check
+    // into nothing.
+    id: "the-sanity-file-is-picked-by-name",
+    file: "scripts/mutation-fanout.mjs",
+    from: "      if (smallest === null || bytes < smallest.bytes) smallest = { f, bytes };",
+    to: "      if (smallest === null) smallest = { f, bytes };",
+    mustFail: "picks the smallest test file rather than a named one",
+  },
 ];

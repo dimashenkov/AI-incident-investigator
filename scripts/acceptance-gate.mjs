@@ -583,11 +583,64 @@ function checkCoreBuild() {
  * discard it: git restore would also throw away anything else uncommitted in
  * that file, including work in progress that has nothing to do with this check.
  */
+/**
+ * Ask the parallel runner, and accept its answer only if it is complete.
+ *
+ * Returns null when the sequential path should be used instead — so a broken
+ * fanout costs time, never coverage.
+ */
+function runFanout() {
+  if (process.env.ACCEPTANCE_GATE_SEQUENTIAL === "1") return null;
+  const r = run("node", ["scripts/mutation-fanout.mjs"]);
+  if (!r.ran) return null;
+  let d;
+  try { d = JSON.parse(r.stdout.trim().split("\n").pop() ?? ""); }
+  catch { return null; }
+  if (typeof d !== "object" || d === null) return null;
+  const { total, caught, survived, unresolved, workers, seconds } = d;
+  if (total !== MUTATIONS.length || !Array.isArray(survived) || !Array.isArray(unresolved)) return null;
+  /*
+   * Every mutation has to be accounted for. A fanout that reports fewer than
+   * it was given has checked less, and "checked less" must never read as
+   * "clean" — which is the whole hazard a parallel check introduces.
+   */
+  if (caught + survived.length + unresolved.length !== total) {
+    return unknown(`the parallel run accounted for ${caught + survived.length + unresolved.length} of ${total} `
+      + "mutations; the rest were neither caught nor refused", "mutation run");
+  }
+  if (survived.length > 0) return fail(`mutation survived: ${survived.join("; ")}`, "mutation run");
+  if (unresolved.length > 0) return unknown(`could not test: ${unresolved.join("; ")}`, "mutation run");
+  return pass(`${total} reintroduced defects, each caught by its named test `
+    + `(${workers} workers, ${seconds}s)`, "mutation run");
+}
+
 function checkMutations() {
   if (process.env[CHILD_MARKER] !== undefined) {
     return unknown(`refusing to run mutations from inside a gate run (${CHILD_MARKER} is set)`, "guard");
   }
   if (MUTATIONS.length === 0) return unknown("no mutations are recorded; nothing was proven", "mutations");
+
+  /*
+   * The parallel path first, the sequential one as the fallback.
+   *
+   * Measured on this tree, same 305 mutations: 540 seconds sequentially, 68 in
+   * eight worker copies — 7.9x, with the same 305 caught. Each worker owns a
+   * COPY of the tree, because a mutation is a deliberately broken file and a
+   * test run reading a tree somebody else is mutating reports failures that do
+   * not exist.
+   *
+   * It also removed a hazard rather than adding one: a killed parallel run
+   * leaves the broken files in a temporary directory that is thrown away, and
+   * the real tree untouched. Verified by killing eight workers mid-mutation —
+   * every anchor in the repository was still intact. The sequential path could
+   * not promise that; it needed a repair file read by the NEXT run.
+   *
+   * A fanout that cannot run, or answers with something unreadable, falls back
+   * rather than deciding. `unknown` is the only thing it may produce on its
+   * own — never `pass`.
+   */
+  const fanned = runFanout();
+  if (fanned !== null) return fanned;
 
   const survived = [];
   const unresolvedIds = [];

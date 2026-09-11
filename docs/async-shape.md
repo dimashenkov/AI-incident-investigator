@@ -250,3 +250,54 @@ in these six rounds blocked a paid run. It blocked a commit, which is free.
 The signal that it was converging is not the count but the KIND: rounds 1–3
 found defects that lose money, round 6 found one production defect and three
 tests that assert too little.
+
+## The mutation gate, made parallel · 2026-09-11
+
+Measured on one tree, the same 305 mutations:
+
+| | Sequential | Eight worker copies |
+|---|---|---|
+| wall clock | **540 s** | **68 s** |
+| caught | 305 | **305** |
+| survived | 0 | 0 |
+| unresolved | 0 | 0 |
+
+**Why copies and not one tree.** A mutation is a deliberately broken file, and a
+test run that reads a tree somebody else is mutating reports failures that do
+not exist — a trap this project already paid for once. So the unit of isolation
+is a directory, and because each worker owns one, mutations do NOT have to be
+grouped by file: two workers may mutate the same file safely. The list is split
+round-robin instead, which balances far better than grouping would — the largest
+single file holds 46 of the 309.
+
+**It removed a hazard rather than adding one.** A killed parallel run leaves its
+broken files in a temporary directory that is thrown away, and the real tree
+untouched. Verified by killing eight workers mid-mutation: every anchor in the
+repository was still intact. The sequential path could not promise that — it
+needed a repair file read by the NEXT run, and on 2026-09-05 a killed run left a
+prompt file saying "a hypothesis code is whatever seems right" until something
+happened to notice.
+
+**Three things a copy does not get, each for a reason:** `.env`, so a mutation
+that lets the file beat the environment has no paid address to read — the third
+floor under the defect that made the gate pay for itself; `node_modules`, which
+is symlinked because nothing mutates it; and the parent's `out/`, which holds
+the reports being written.
+
+### Two defects in the first version, and how each surfaced
+
+| Found | How |
+|---|---|
+| importing the file started 305 mutations | running it — there was no entry guard, the same class as reading `.env` at import |
+| `cpSync` refuses to copy a directory into itself, so all eight copies failed | running it — and it failed as `unresolved` for all 305, never as anything passing |
+| the test filter was an ABSOLUTE path into the original repo, so vitest in a copy matched nothing, exited 1, and wrote no report | carrying vitest's own words into the diagnostic instead of guessing at "no readable report" |
+| eight workers with vitest left to its own threading pushed the load past 43 on ten cores, slower than sequential | measuring, then giving each worker a single-fork vitest — the parallelism that helps is at the mutation level, and a second layer inside each unit only oversubscribes |
+
+### The one hazard parallelism adds, and the line that refuses it
+
+A worker that dies quietly takes its mutations with it, and a summary counting
+only what came back reads as a clean run over a smaller set. So the gate accepts
+the parallel answer only when `caught + survived + unresolved` equals the number
+of mutations it handed out; anything else is `unknown`. A fanout that cannot run
+at all falls back to the sequential path — it may produce `unknown`, never
+`pass`.
