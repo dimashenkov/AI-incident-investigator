@@ -1,0 +1,64 @@
+{
+  "note": "Reconstructed AFTER the fact, by reading the n8n executions API. A recovered number and a captured number are different evidence, and this is the recovered kind. Nothing here was recorded when the calls were made, which is the defect this file documents.",
+  "recorded": "after the fact, from GET /executions?includeData=true, on 2026-09-11",
+  "when": "2026-09-11",
+  "webhook_host": "dimitarshenkov.app.n8n.cloud",
+  "what_happened": {
+    "summary": "The acceptance gate was paying for its own mutation testing, on every run, and nothing said so.",
+    "chain": [
+      "The gate applies the mutation `the-env-file-overriding-a-chosen-value`, which deletes the line making the environment beat the repo's .env file.",
+      "It then runs the test file that declares that mutation's named test.",
+      "That same file holds the tests which spawn scripts/run-scenarios.mjs as a real child process, with a localhost address in the environment.",
+      "With the guard mutated away, .env overwrote that localhost address with the live paid instance.",
+      "Every such test then POSTed to the paid webhook."
+    ],
+    "established_how": "Reproduced by hand with the new interlock in place, so it cost nothing: applying the mutation made the resolved address `dimitarshenkov.app.n8n.cloud`, and the run stopped before calling it.",
+    "corroboration": "The number of live executions per burst tracks the number of e2e tests that spawn the runner: pairs with a 5-second stagger while there were two such tests, then triples sub-second on the day a third was added. Bursts line up with gate and full-suite runs, not with any timer."
+  },
+  "executions": {
+    "range_read": "300 to 329, all on 2026-09-11, all mode webhook, none a retry",
+    "total": 30,
+    "authorised_by_the_owner": {
+      "count": 4,
+      "ids": [
+        303,
+        308,
+        313,
+        329
+      ],
+      "scenario": "conflicting-evidence",
+      "why": "each bought with the word, one run each"
+    },
+    "unauthorised": {
+      "count": 26,
+      "scenario": "container-oom",
+      "of_which_billed": 23,
+      "of_which_free": {
+        "count": 3,
+        "ids": [
+          300,
+          301,
+          302
+        ],
+        "why": "all three died at Ask kubernetes with a Bad request before any model call — a MEASURED zero, not an unknown"
+      }
+    }
+  },
+  "totals": {
+    "input_tokens": 310447,
+    "output_tokens": 243059,
+    "total_tokens": 553506,
+    "across_executions": 27,
+    "source": "the provider's own usage object on each Ask <agent> HTTP node, which is the authoritative figure",
+    "could_not_be_established": 0,
+    "usd": null,
+    "why": "the repository records a price for gpt-4o-mini only. These ran on gpt-5 and gpt-5-mini, whose prices are not recorded here, so the dollar cost is UNESTABLISHED rather than estimated. A guessed price would make the one number that is supposed to be measured into a number somebody invented."
+  },
+  "a_second_defect_found_while_reading": {
+    "what": "The Report node's own usage_by_agent field is populated on only 18 of the 30 executions, empty on 9 and absent on 3.",
+    "cost_of_trusting_it": "summing that field gives 359881 tokens against a true 553506 — an under-count of 193625, or 35%.",
+    "so": "any counter that reads usage_by_agent as its source under-reports by a third. The Ask nodes' own usage objects are the source."
+  },
+  "fixed_by": "liveCallFromTestLedger in scripts/run-scenarios.mjs: a claims ledger under the temporary directory, which only a test sets, refuses any non-loopback address BEFORE the POST. The mutation stays, because .env beating a chosen environment value is a real defect worth catching; what was missing was a floor under it.",
+  "scored": null
+}

@@ -63,8 +63,55 @@ export function loadEnvFile(text, env) {
   return named;
 }
 
-if (existsSync(join(ROOT, ".env"))) {
-  loadEnvFile(readFileSync(join(ROOT, ".env"), "utf8"), process.env);
+/*
+ * The `.env` file is NOT read at import time. It is read inside `main`.
+ *
+ * At module level it poisoned every process that merely IMPORTED this file:
+ * a vitest worker that imports the runner carried the real paid address in its
+ * own `process.env`, and any child it spawned with `{ ...process.env }` and no
+ * explicit address inherited it — no mutation needed, nothing in the test
+ * saying so. Found on 2026-09-11 by a subagent reading for this one class of
+ * defect, after the gate had already been paying for its mutation runs.
+ *
+ * Importing a module must not change the environment of the process that
+ * imported it.
+ */
+function loadDotEnvOnce(env = process.env) {
+  const at = join(ROOT, ".env");
+  if (!existsSync(at)) return [];
+  return loadEnvFile(readFileSync(at, "utf8"), env);
+}
+
+/**
+ * May this run call an address that is not on this machine?
+ *
+ * Only with `AI_SRE_LIVE=1` in the ENVIRONMENT of the invocation. Three
+ * reasons, and the third is the one that was measured:
+ *
+ * 1. A paid call should be an explicit act, which is what the owner's rule
+ *    about the word `харчи` says in prose. This is the same thing in code.
+ * 2. A test never sets it, so no test can reach a paid instance — whatever
+ *    happens to its address, its ledger, or its mutations.
+ * 3. The earlier floor keyed on a temporary claims ledger, which guards the
+ *    shape the test helper happens to use rather than "a test". A spawn that
+ *    omitted the ledger went straight through it.
+ *
+ * And it may NOT come from the `.env` file, because that file is read by every
+ * invocation including the ones under test. `loadEnvFile` answers with the
+ * names it set, so a value that arrived that way is refused by name.
+ */
+export function liveCallAllowed(env, setByFile = []) {
+  if (env.AI_SRE_LIVE !== "1") {
+    return { allowed: false,
+      why: "AI_SRE_LIVE=1 is not set, so this run may only call an address on this machine. A paid call "
+        + "is an explicit act: put AI_SRE_LIVE=1 in front of the command" };
+  }
+  if (setByFile.includes("AI_SRE_LIVE")) {
+    return { allowed: false,
+      why: "AI_SRE_LIVE came from the .env file, and that file is read by every invocation including the "
+        + "ones under test. Give it on the command line instead" };
+  }
+  return { allowed: true };
 }
 
 /**
@@ -216,7 +263,20 @@ export function planFor(keys, root = SCENARIOS) {
  * the RAW key is written inside — so two different keys that flatten to one
  * name are detected as a collision instead of quietly sharing a claim.
  */
-export const LEDGER = join(ROOT, "docs", "runs", "claims");
+/*
+ * The ledger lives BESIDE the run records, not inside them.
+ *
+ * `docs/runs/claims` put it under the directory the spend counter walks, and
+ * `readRuns` reads subdirectories on purpose — a listed defect once had
+ * results hiding in a subfolder. So a claim was counted as a RUN: one more
+ * unpriced run in a total that is already a floor, which is exactly the kind
+ * of number this project refuses to let drift. Caught by the test that pins
+ * the runs on disk against the ones the counter reads, 2026-09-11.
+ *
+ * A claim is not a run. It says a key was bought; the run record says what
+ * came back.
+ */
+export const LEDGER = join(ROOT, "docs", "claims");
 
 /**
  * Where the ledger may be pointed, and where it may not.
@@ -764,6 +824,54 @@ export function recordShape(keys, { when, webhookHost, outcomes, submissions }) 
   };
 }
 
+/**
+ * A test ledger and a real address are a contradiction, and it stops the run.
+ *
+ * Measured, and then ESTABLISHED, on 2026-09-11. Twenty-one `container-oom`
+ * executions reached the live instance across the day, in groups of exactly
+ * three, and every group lines up with a run of the acceptance gate.
+ *
+ * The chain, reproduced by hand with this interlock in place so it cost
+ * nothing: the gate applies the mutation `the-env-file-overriding-a-chosen-
+ * value`, which deletes the line that makes the environment beat the `.env`
+ * file. It then runs the test file that declares that mutation's named test —
+ * and that file is the one whose tests spawn THIS script as a real child
+ * process. With the guard mutated away, `.env` overwrote the test's
+ * `127.0.0.1` address with the paid instance, and three tests POSTed to it.
+ * Three paid executions per gate run, on every gate run.
+ *
+ * So the gate — the thing that exists to prove the code is honest — was
+ * spending the owner's credits every time it ran, and nothing said so. The
+ * mutation is right to exist and stays; what was missing is a floor under it.
+ *
+ * This is that floor: with a ledger under the temporary directory, a
+ * non-loopback address is refused BEFORE the POST. Verified live by applying
+ * the mutation by hand — the address became the real instance and the run
+ * stopped without calling it.
+ *
+ * Deliberately not clever. It does not try to detect "am I a test"; it refuses
+ * one specific contradiction, and says what to do instead.
+ */
+export function liveCallFromTestLedger(url, overridden, host = undefined) {
+  if (overridden !== true) return null;
+  const at = host ?? hostOf(url);
+  if (at === "unreadable") {
+    return `the claims ledger is a temporary one, so this is a test, and ${url} cannot be read as an address`;
+  }
+  /*
+   * `hostOf` answers with the PORT attached — `127.0.0.1:5000` — because that
+   * is what a record wants. So the port is stripped here rather than compared,
+   * and an IPv6 literal keeps its brackets. Caught by running it: the first
+   * version refused the loopback address every test uses, which would have
+   * turned the interlock into a suite that cannot run.
+   */
+  const bare = at.startsWith("[") ? at.slice(0, at.indexOf("]") + 1) : at.split(":")[0];
+  if (bare === "localhost" || bare === "127.0.0.1" || bare === "[::1]") return null;
+  return `refusing to call ${at}: the claims ledger is under the temporary directory, which only a test `
+    + "sets, and a test must never reach a paid instance. If this is a real run, unset AI_SRE_CLAIMS_DIR; "
+    + "if it is a test, its local address did not reach this process";
+}
+
 /** The host of a URL, so a record says which instance answered without carrying a token. */
 export function hostOf(url) {
   try { return new URL(url).host; } catch { return "unreadable"; }
@@ -869,6 +977,11 @@ export function recordPathFor(given, when, exists = existsSync) {
 }
 
 async function main() {
+  /*
+   * The file is read HERE, not at import, and what it set is remembered — so a
+   * value that arrived from the file can be refused by name below.
+   */
+  const setByFile = loadDotEnvOnce();
   const url = process.env.N8N_WEBHOOK_URL;
   const { keys, flags } = parseArgv(process.argv.slice(2));
   const answersAt = flags["--answers"] ? resolve(flags["--answers"]) : resolve(ROOT, "out/answers.json");
@@ -881,12 +994,38 @@ async function main() {
     process.stderr.write(`refusing to start: ${LEDGER_ASKED.why}\n`);
     process.exit(2);
   }
+  /*
+   * A test ledger pointed at a paid instance stops here — before anything is
+   * read, and long before anything is POSTed.
+   */
+  const contradiction = liveCallFromTestLedger(url ?? "", LEDGER_ASKED.overridden);
+  if (contradiction !== null) {
+    process.stderr.write(`refusing to start: ${contradiction}\n`);
+    process.exit(2);
+  }
+  /*
+   * The floor that does not depend on the ledger, or on the address being
+   * wrong, or on anything a test happens to set: an address off this machine
+   * is called only when the invocation says, explicitly, that it may be.
+   */
+  const host = hostOf(url ?? "");
+  const bare = host.startsWith("[") ? host.slice(0, host.indexOf("]") + 1) : host.split(":")[0];
+  const offMachine = !(bare === "localhost" || bare === "127.0.0.1" || bare === "[::1]");
+  if (offMachine) {
+    const may = liveCallAllowed(process.env, setByFile);
+    if (!may.allowed) {
+      process.stderr.write(`refusing to call ${host}: ${may.why}\n`);
+      process.exit(2);
+    }
+  }
   if (url === undefined || url.length === 0) {
     process.stderr.write("N8N_WEBHOOK_URL is not set; this script has nothing to call\n");
     process.exit(2);
   }
   if (keys.length === 0) {
-    process.stderr.write("usage: node scripts/run-scenarios.mjs <key> [key...] [--answers path] [--record path]\n"
+    process.stderr.write("usage: AI_SRE_LIVE=1 node scripts/run-scenarios.mjs <key> [key...] [--answers path] [--record path]\n"
+      + "  AI_SRE_LIVE=1 is required to call an address off this machine, and must come from the command\n"
+      + "  line rather than the .env file — a paid call is an explicit act\n"
       + "  a key is a scenario name, optionally with an attempt: image-pull-failure#2\n"
       + "  EVERY key is one paid execution of the deployed workflow\n");
     process.exit(2);

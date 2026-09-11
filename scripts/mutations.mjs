@@ -2679,4 +2679,58 @@ export const MUTATIONS = [
     to: "  return null;",
     mustFail: "refuses a deployment from another namespace even when every pod is ours",
   },
+  {
+    // Twelve paid executions reached the live instance from a temporary
+    // ledger. Without this the thirteenth costs money instead of naming
+    // itself.
+    id: "a-test-ledger-may-reach-a-paid-instance",
+    file: "scripts/run-scenarios.mjs",
+    from: "  if (overridden !== true) return null;",
+    to: "  if (true) return null;",
+    mustFail: "refuses a paid address when the ledger is a temporary one",
+  },
+  {
+    // hostOf answers with the port attached. Comparing the whole string
+    // refuses the loopback address every test uses.
+    id: "the-port-is-compared-with-the-host",
+    file: "scripts/run-scenarios.mjs",
+    from: '  const bare = at.startsWith("[") ? at.slice(0, at.indexOf("]") + 1) : at.split(":")[0];',
+    to: "  const bare = at;",
+    mustFail: "allows the loopback address every test uses, port and all",
+  },
+  {
+    // A prefix match calls 127.0.0.1.evil.com a loopback address.
+    id: "loopback-by-prefix-instead-of-equality",
+    file: "scripts/run-scenarios.mjs",
+    from: '  if (bare === "localhost" || bare === "127.0.0.1" || bare === "[::1]") return null;',
+    to: '  if (at.startsWith("localhost") || at.startsWith("127.0.0.1") || at.startsWith("[::1]")) return null;',
+    mustFail: "is not fooled by a host that merely begins with a loopback address",
+  },
+  {
+    // Without this the gate's own mutation run pays for three executions,
+    // every run, and nothing says so.
+    id: "a-paid-address-needs-no-explicit-permission",
+    file: "scripts/run-scenarios.mjs",
+    from: '  if (env.AI_SRE_LIVE !== "1") {',
+    to: "  if (false) {",
+    mustFail: "requires the live flag before any address off this machine",
+  },
+  {
+    // .env is read by every invocation including the ones under test, so a
+    // live flag from there re-arms the runs this floor exists to stop.
+    id: "the-live-flag-may-come-from-the-file",
+    file: "scripts/run-scenarios.mjs",
+    from: '  if (setByFile.includes("AI_SRE_LIVE")) {',
+    to: "  if (false) {",
+    mustFail: "refuses the flag when it came from the file every invocation reads",
+  },
+  {
+    // Importing a module must not change the environment of the process that
+    // imported it.
+    id: "the-env-file-is-read-on-import-again",
+    file: "scripts/run-scenarios.mjs",
+    from: "  const setByFile = loadDotEnvOnce();",
+    to: "  const setByFile = [];",
+    mustFail: "does not read the .env file merely because it was imported",
+  },
 ];

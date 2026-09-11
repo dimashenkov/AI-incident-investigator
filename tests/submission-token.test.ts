@@ -10,7 +10,7 @@
  */
 import { describe, it, expect } from "vitest";
 // @ts-expect-error — plain .mjs, the same file node runs.
-import { submissionToken, callOnce, recordShape, classifyReply, claimKey, claimPathFor, releaseClaim, ledgerFrom, canonical, isInside, ensureDurableDir, writeClaimFile, writeAtomic, CLAIM_CREATED, LEDGER, TOKEN_HEADER } from "../scripts/run-scenarios.mjs";
+import { submissionToken, callOnce, recordShape, classifyReply, claimKey, claimPathFor, releaseClaim, ledgerFrom, liveCallFromTestLedger, liveCallAllowed, hostOf, canonical, isInside, ensureDurableDir, writeClaimFile, writeAtomic, CLAIM_CREATED, LEDGER, TOKEN_HEADER } from "../scripts/run-scenarios.mjs";
 // @ts-expect-error — plain .mjs, the same file node runs.
 import { tokenOf, matchByToken, scanForToken, tokenInRecord, parseReaderArgv, TOKEN_HEADER as READ_HEADER } from "../scripts/collect-execution.mjs";
 import { readFileSync, writeFileSync, mkdtempSync, realpathSync, existsSync, symlinkSync, openSync, closeSync } from "node:fs";
@@ -435,7 +435,13 @@ describe("the hole in the first version of the claim", () => {
     const src: string = readFileSync(resolve(ROOT, "scripts/run-scenarios.mjs"), "utf8");
     expect(src).toContain("const claim = claimKey(key, token);");
     expect(src, "the ledger is one fixed place, not a per-run one")
-      .toContain('join(ROOT, "docs", "runs", "claims")');
+      .toContain('join(ROOT, "docs", "claims")');
+    /*
+     * And NOT inside docs/runs, which the spend counter walks — a claim there
+     * was read as an unpriced RUN, quietly adding to a total that is already a
+     * floor.
+     */
+    expect(src).not.toContain('join(ROOT, "docs", "runs", "claims")');
     // And it is printed, because an override nobody can see is the same hole
     // wearing a different name.
     expect(src).toContain("claims  → ${CLAIMS_DIR}");
@@ -751,5 +757,161 @@ describe("what the runner does with a durability it could not confirm", () => {
     const src: string = readFileSync(resolve(ROOT, "scripts/run-scenarios.mjs"), "utf8");
     expect(src).toContain("if (Array.isArray(claim.unconfirmed) && claim.unconfirmed.length > 0) {");
     expect(src, "and it names them").toContain("NOT CONFIRMED DURABLE: the claim on ${key} is written");
+  });
+});
+
+describe("a test ledger pointed at a paid instance", () => {
+  /*
+   * Measured on 2026-09-11: twelve container-oom executions reached the live
+   * instance carrying this runner's submission-token header, with only ONE
+   * claim in docs/runs/claims — and a real run always leaves a claim per key
+   * and refuses the second submission of the same key. A temporary ledger is
+   * the only thing that explains both.
+   *
+   * What produced them was not established. This interlock is what makes the
+   * next occurrence free: it refuses before the POST rather than after the
+   * bill.
+   */
+  it("refuses a paid address when the ledger is a temporary one", () => {
+    const no = liveCallFromTestLedger("https://x.app.n8n.cloud/webhook/y", true);
+    expect(no).not.toBeNull();
+    expect(no).toContain("refusing to call x.app.n8n.cloud");
+    expect(no, "and it says what to do instead").toContain("unset AI_SRE_CLAIMS_DIR");
+  });
+
+  it("allows the loopback address every test uses, port and all", () => {
+    /*
+     * `hostOf` answers with the port attached, because that is what a run
+     * record wants. The first version of this interlock compared the whole
+     * string and so refused `127.0.0.1:5000` — which would have turned a guard
+     * against spending into a suite that cannot run. Caught by running it.
+     */
+    expect(hostOf("http://127.0.0.1:5000/webhook/x"), "the port really is in there").toBe("127.0.0.1:5000");
+    expect(liveCallFromTestLedger("http://127.0.0.1:5000/webhook/x", true)).toBeNull();
+    expect(liveCallFromTestLedger("http://localhost:8080/x", true)).toBeNull();
+    expect(liveCallFromTestLedger("http://[::1]:9/x", true)).toBeNull();
+  });
+
+  it("is not fooled by a host that merely begins with a loopback address", () => {
+    expect(liveCallFromTestLedger("http://127.0.0.1.evil.com/x", true)).not.toBeNull();
+    expect(liveCallFromTestLedger("http://localhost.evil.com/x", true)).not.toBeNull();
+  });
+
+  it("says nothing at all when the ledger is the real one", () => {
+    // A real run against a paid instance is the whole point of the script.
+    expect(liveCallFromTestLedger("https://x.app.n8n.cloud/webhook/y", false)).toBeNull();
+    expect(liveCallFromTestLedger("", false)).toBeNull();
+  });
+
+  it("refuses an address it could not read, rather than allowing it", () => {
+    // Unknown falls to stopping: an unreadable address under a test ledger is
+    // exactly the state where nobody can say where the POST would land.
+    expect(liveCallFromTestLedger("not a url", true)).not.toBeNull();
+    expect(liveCallFromTestLedger("", true)).not.toBeNull();
+  });
+
+  it("is wired in before anything is read, let alone POSTed", () => {
+    const src: string = readFileSync(resolve(ROOT, "scripts/run-scenarios.mjs"), "utf8");
+    const guard = src.indexOf("const contradiction = liveCallFromTestLedger(url ?? \"\", LEDGER_ASKED.overridden);");
+    const plan = src.indexOf("plan = planFor(keys);");
+    const call = src.indexOf("await callOnce(url, alert, { token })");
+    expect(guard).toBeGreaterThan(-1);
+    expect(plan, "the guard comes before the plan is even built").toBeGreaterThan(guard);
+    expect(call).toBeGreaterThan(guard);
+  });
+});
+
+describe("the gate was paying for its own mutation, and how that is floored", () => {
+  it("arms the interlock on every test that spawns the runner", () => {
+    /*
+     * Established on 2026-09-11, after twenty-one paid executions.
+     *
+     * The gate applies `the-env-file-overriding-a-chosen-value`, which deletes
+     * the line making the environment beat the `.env` file. It then runs the
+     * file declaring that mutation's named test — the same file whose tests
+     * spawn this script as a real child. With the guard gone, `.env`
+     * overwrote the test's 127.0.0.1 address with the paid instance, and three
+     * tests POSTed to it. Three executions per gate run, every gate run.
+     *
+     * The interlock only fires when a temporary ledger is in use, so every
+     * spawn has to set one. A spawn without it is a spawn the floor does not
+     * reach — which is this defect with a new door.
+     */
+    const src: string = readFileSync(resolve(ROOT, "tests/run-scenarios.test.ts"), "utf8");
+    const spawns = src.split("spawn(process.execPath").length - 1;
+    expect(spawns, "this test is vacuous if nothing spawns the runner").toBeGreaterThan(0);
+    const armed = src.split("AI_SRE_CLAIMS_DIR").length - 1;
+    expect(armed, "every spawn of the runner sets a temporary ledger").toBeGreaterThanOrEqual(spawns);
+  });
+
+  it("keeps the mutation that caused it, because the property is real", () => {
+    /*
+     * The answer is not to delete the mutation. `.env` beating a chosen
+     * environment value is a genuine defect — it once sent a run to whatever
+     * instance the file still named. The mutation stays and the floor goes
+     * under it.
+     */
+    const muts: string = readFileSync(resolve(ROOT, "scripts/mutations.mjs"), "utf8");
+    expect(muts).toContain("the-env-file-overriding-a-chosen-value");
+  });
+});
+
+describe("the floor that does not depend on what a test happens to set", () => {
+  /*
+   * The ledger floor guards the SHAPE the test helper uses, not "a test": a
+   * spawn that omitted AI_SRE_CLAIMS_DIR went straight through it. And the
+   * `.env` file was read at IMPORT, so every vitest worker that imported the
+   * runner carried the paid address in its own environment, and any child it
+   * spawned with `{ ...process.env }` inherited it — no mutation needed.
+   *
+   * Both were found on 2026-09-11 by subagents reading for one class of defect
+   * each, after the gate had already been paying for its mutation runs.
+   */
+  it("requires the live flag before any address off this machine", () => {
+    expect(liveCallAllowed({}).allowed).toBe(false);
+    expect(liveCallAllowed({ AI_SRE_LIVE: "0" }).allowed).toBe(false);
+    expect(liveCallAllowed({ AI_SRE_LIVE: "true" }, []).allowed, "only the exact value counts").toBe(false);
+    expect(liveCallAllowed({ AI_SRE_LIVE: "1" }, []).allowed).toBe(true);
+  });
+
+  it("refuses the flag when it came from the file every invocation reads", () => {
+    /*
+     * `.env` is read by every invocation, including the ones under test. A
+     * live flag from there would re-arm exactly the runs this floor exists to
+     * stop, while looking like an operator's decision.
+     */
+    const fromFile = liveCallAllowed({ AI_SRE_LIVE: "1" }, ["N8N_WEBHOOK_URL", "AI_SRE_LIVE"]);
+    expect(fromFile.allowed).toBe(false);
+    expect(fromFile.why).toContain("Give it on the command line instead");
+    // A file that set only the address does not disarm it.
+    expect(liveCallAllowed({ AI_SRE_LIVE: "1" }, ["N8N_WEBHOOK_URL"]).allowed).toBe(true);
+  });
+
+  it("says what to do instead, so the refusal is not a dead end", () => {
+    expect(liveCallAllowed({}).why).toContain("put AI_SRE_LIVE=1 in front of the command");
+  });
+
+  it("does not read the .env file merely because it was imported", () => {
+    /*
+     * Importing a module must not change the environment of the process that
+     * imported it. Asserted at the source because the import has already
+     * happened by the time this test runs: the load lives in a function the
+     * runner calls, not at module level.
+     */
+    const src: string = readFileSync(resolve(ROOT, "scripts/run-scenarios.mjs"), "utf8");
+    expect(src).toContain("function loadDotEnvOnce(");
+    expect(src).toContain("const setByFile = loadDotEnvOnce();");
+    const top = src.slice(0, src.indexOf("function loadDotEnvOnce("));
+    expect(top, "nothing reads .env before that function is even defined").not.toContain('join(ROOT, ".env")');
+  });
+
+  it("checks the flag before the plan is built and long before any call", () => {
+    const src: string = readFileSync(resolve(ROOT, "scripts/run-scenarios.mjs"), "utf8");
+    const flag = src.indexOf("const may = liveCallAllowed(process.env, setByFile);");
+    const plan = src.indexOf("plan = planFor(keys);");
+    const call = src.indexOf("await callOnce(url, alert, { token })");
+    expect(flag).toBeGreaterThan(-1);
+    expect(plan).toBeGreaterThan(flag);
+    expect(call).toBeGreaterThan(flag);
   });
 });
