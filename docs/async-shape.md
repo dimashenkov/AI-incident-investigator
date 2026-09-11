@@ -123,3 +123,29 @@ deployed chain would no longer be the thing under test.
 
 **Verdict: build the corrected shape** — durable submission identity, the guard
 preserved, repeatable GET retrieval, and the report payload unchanged.
+
+
+## Measured on 2026-09-11, with three free GETs
+
+Astra named three things this document had assumed. All three are now
+established, by reading rather than by arguing.
+
+| Assumed | Measured |
+|---|---|
+| the credential can read executions | `GET /executions?limit=3` → **200**, three rows returned |
+| n8n is saving execution data | `GET /executions/{id}?includeData=true` → **200**, 320 KB of data |
+| the fields the artifact needs are in there | the payload mentions **`raw_answers`** and **`usage_by_agent`** |
+
+**And one trap that only a real call would have shown:** `?includeData=true` is
+REQUIRED. Without it the response is still **200** and simply has no `data` key
+at all. A reader written without that parameter would report „no answer" for a
+finished execution — a missing field read as a missing answer, which is the
+defect this project names everywhere else.
+
+### The part that changes what B is worth
+
+The executions behind today's two HTTP 524 timeouts are **`status: success`**.
+
+The answers this project paid for and never received **exist**, and they are
+readable. So B is not only the way to remove the deadline — it is also the way
+to collect what has already been bought. Nothing is re-run to get them.
