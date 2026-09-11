@@ -7,10 +7,16 @@
   "why_it_matters": "Both runs came back HTTP 524 and both executions were status success. The gateway cut the connection; n8n finished. Before the reader existed those answers were unreachable and the money was spent for nothing.",
   "third_data_point": "Three confidences now exist for conflicting-evidence on gpt-5: 0.35, 0.75, 0.88. Two of the three are above the declared ceiling of 0.6. That is not a sample, and the thirteenth limitation applies: this model cannot be pinned to temperature 0, so the spread IS part of the answer rather than noise around it.",
   "unaccounted_executions": {
-    "what": "Nine executions of container-oom in n8n between 06:29 and 06:55 today, all mode webhook, all reaching Report.",
-    "established": "They are paid calls made through the webhook, outside this project's runner.",
-    "not_established": "Who made them. Most likely the owner's local n8n agent, which offered to run a check.",
-    "why_recorded": "An unrecorded call makes every total a floor while looking like an answer. They are named here so the counter's silence about them is visible."
+    "what": "Nine executions of container-oom in n8n between 06:29 and 06:55 UTC today, all mode webhook, all reaching Report.",
+    "established_by_reading": [
+      "They came from THIS machine: the webhook headers carry the same IPv6 address and the same 'node' user-agent as execution 313, which this project's runner made.",
+      "They did not come from this project's runner: its records for today name conflicting-evidence only, four times.",
+      "Nothing else in the repository can post to that webhook. Every test uses https://example/webhook/x with a stubbed fetch, and verify-deployment reads workflow endpoints only.",
+      "So they came from the other tool on this machine — the owner's local n8n agent, which had offered to run a check."
+    ],
+    "not_established": "How many tokens they cost. The executions hold their own usage and nothing here has read it; the owner did not know they had happened.",
+    "why_recorded": "An unrecorded call makes every total a floor while looking like an answer. The counter cannot see calls made by another tool, and that is now written down rather than left as a gap nobody named.",
+    "correction": "An earlier version of this file said 'who made them is not established'. Reading the webhook headers established the machine, and the absence of runner records established which tool. That is as far as the evidence goes."
   },
   "totals": {
     "input_tokens": null,
