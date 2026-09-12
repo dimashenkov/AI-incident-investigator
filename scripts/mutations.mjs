@@ -2946,4 +2946,14 @@ export const MUTATIONS = [
     to: "    if (true) return { state: \"won\" };",
     mustFail: "lets exactly one of many concurrent claims win",
   },
+  {
+    // bind reserves the ts with putIfAbsent so one ts maps to one incident. If a
+    // taken reservation is ignored, two incidents bind one ts — the cross-incident
+    // link. The concurrent-bind test is what catches it.
+    id: "bind-ignores-a-ts-already-reserved",
+    file: "src/providers/thread-index.ts",
+    from: "    if (!reserved) {",
+    to: "    if (false) {",
+    mustFail: "lets only one of two incidents bind the same ts, concurrently",
+  },
 ];
