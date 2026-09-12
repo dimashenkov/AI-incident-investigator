@@ -1,0 +1,10 @@
+{
+  "note": "Live test of the SIMULATED Datadog registration (owner asked to test it). run-scenarios cpu-throttling#1, n8n execution 390: concluded CPU_THROTTLING at 85%, posted a Block Kit report carrying the '🧪 Datadog (simulated): dd-mock-INC-2026-0401 — not sent' line, and — through the new Reported gate and Record Datadog branch — wrote the mock record to the datadog_incidents table (verified: sent:false, severity_from_signal:false since the alert carried no severity). Nothing was sent to Datadog. Also exercised the audit fixes live (ownership gate, Reported gate). Captured when made.",
+  "recorded": "when made, on 2026-09-12, from n8n execution 390",
+  "when": "2026-09-12",
+  "model": "gpt-5-2025-08-07 + gpt-5-mini-2025-08-07 (4 calls)",
+  "temperature": 1,
+  "totals": { "input_tokens": 12694, "output_tokens": 7310,
+    "why": "four calls across gpt-5 (root cause) + gpt-5-mini (collection); neither model is in the PRICES table, so the tokens are recorded (12694 in / 7310 out) but the dollar cost is a floor until a price is added with the date it was read" },
+  "outcome": "Datadog registration works end to end: correct CPU_THROTTLING diagnosis, report shows the simulated line, datadog_incidents row written, sent:false — nothing sent to Datadog"
+}
