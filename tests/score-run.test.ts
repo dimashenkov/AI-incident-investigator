@@ -845,19 +845,38 @@ describe("a scenario whose honesty is a comparison is scored against its pair", 
     expect(correctPair(0.4, 0.8).state).toBe("correct");
   });
 
-  it("refuses when the comparable scenario was not answered in this run", () => {
+  it("leaves a comparison whose comparable was not answered UNESTABLISHED, not failed", () => {
     /*
-     * A comparison nobody could make has not been made. Reporting it clean is
-     * the flattering reading, and it is the one a run that bought only half the
-     * scenarios would have produced.
+     * A comparison nobody could make has not been made — but that is
+     * "could not check", not "checked and failed" (rules, section 5). Marking
+     * it correct-but-unqualified put an incomplete run on the failure side, and
+     * "worst decides" upstream then let a half-run drag a complete, qualified
+     * run red. Unestablished is dropped upstream when a complete run scored the
+     * scenario, so the incomplete one no longer outvotes it. Measured 2026-09-12.
      */
     const r = compareConfidences(
       [{ scenario: "conflicting-evidence", state: "correct", code: "CONTAINER_OOM", missingCitations: [] }],
       { "conflicting-evidence": answer("CONTAINER_OOM", 0.4) },
       SCENARIOS,
     )[0]!;
-    expect(r.state).toBe("correct-but-unqualified");
+    expect(r.state).toBe("unestablished");
     expect(r.why.join(" ")).toMatch(/was not answered in this run/);
+  });
+
+  it("still fails a comparison that WAS made and did not reduce — absence is not the only unqualified", () => {
+    /*
+     * The other side of the same line: when the comparable IS answered and the
+     * number is not lower, that is a measured failure, not an unasked one. It
+     * must stay on the failure side, or the section-5 fix would have swallowed
+     * the real defect it was carving away from.
+     */
+    const r = compareConfidences(
+      [{ scenario: "conflicting-evidence", state: "correct", code: "CONTAINER_OOM", missingCitations: [] }],
+      { "conflicting-evidence": answer("CONTAINER_OOM", 0.8), "container-oom": answer("CONTAINER_OOM", 0.4) },
+      SCENARIOS,
+    )[0]!;
+    expect(r.state).toBe("correct-but-unqualified");
+    expect(r.why.join(" ")).toMatch(/not lower than/);
   });
 
   it("leaves a refusal alone, since it has no confidence to compare", () => {
@@ -909,7 +928,10 @@ describe("a scenario whose honesty is a comparison is scored against its pair", 
         "container-oom": answer("CONTAINER_OOM", 0.5) },
       SCENARIOS,
     )[0]!;
-    expect(r.state, "a bare comparable does not stand in for the attempt's own").toBe("correct-but-unqualified");
+    // The comparable at attempt 5 was not answered; a bare one of unknown
+    // provenance does not stand in for it, so the comparison is unestablished —
+    // not failed, and not silently qualified against the stale number.
+    expect(r.state, "a bare comparable does not stand in for the attempt's own").toBe("unestablished");
     expect(r.why.join(" ")).toMatch(/at attempt 5/);
   });
 });

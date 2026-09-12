@@ -615,9 +615,12 @@ export function scoreAll(answers, root = SCENARIOS) {
  * prose, so the run could have come back green under an outcome the protocol
  * says does not close the item.
  *
- * A missing comparable answer makes the result UNQUALIFIED rather than correct:
- * a comparison nobody could make has not been made, and reporting it as clean
- * is the flattering reading.
+ * A missing comparable answer makes the result UNESTABLISHED, not correct and
+ * not unqualified: a comparison nobody could make has not been made, which is
+ * "could not check" and not "checked and failed" (section 5). Reporting it as
+ * clean is the flattering reading; reporting it as failed let an incomplete run
+ * drag a complete one red under "worst decides" (2026-09-12). A comparison that
+ * WAS made and did not lower the number stays unqualified — the failure side.
  */
 export function compareConfidences(results, answers, root = SCENARIOS) {
   const confidenceOf = (name) => {
@@ -651,19 +654,45 @@ export function compareConfidences(results, answers, root = SCENARIOS) {
     const otherKey = attempt === null
       ? other
       : (answers?.[`${other}#${attempt}`] !== undefined ? `${other}#${attempt}` : null);
-    const theirs = otherKey === null ? null : confidenceOf(otherKey);
     /*
      * A refusal has no confidence to compare, and it is an accepted answer for
      * exactly this scenario — so the comparison does not apply to it.
      */
     if (r.code === "INSUFFICIENT_EVIDENCE") return r;
 
+    /*
+     * The comparable was not answered in this run at all.
+     *
+     * That is not a failed comparison — it is a comparison that could not be
+     * MADE, and §5 of the rules is exactly this: distinguish "could not check"
+     * from "checked and failed". Labelling it correct-but-unqualified put an
+     * incomplete run on the failure side, and "worst decides" then let a run
+     * that only ever asked half the pair drag a complete, qualified run red.
+     * Measured 2026-09-12: scenario-conflicting-evidence stayed red on the
+     * strength of three older runs that never asked container-oom.
+     *
+     * Unestablished is the honest state, and it is dropped upstream when a
+     * complete run scored the scenario — so an unasked comparison no longer
+     * outvotes a made one. A comparable that WAS asked but carries no usable
+     * number is a different thing (the comparable is deficient), and stays on
+     * the unqualified side below.
+     */
+    const comparableAsked = attempt === null
+      ? (answers?.[other] !== undefined)
+      : (otherKey !== null);
+    if (!comparableAsked) {
+      return { ...r, state: "unestablished",
+        why: [`${other}${attempt === null ? "" : ` at attempt ${attempt}`} was not answered in `
+          + "this run, so the confidence reduction could not be measured — unestablished, not failed"] };
+    }
+
+    const theirs = otherKey === null ? null : confidenceOf(otherKey);
     if (mine === null || theirs === null) {
       return { ...r, state: "correct-but-unqualified",
         why: [`the confidence here cannot be compared with ${other}`
           + `${attempt === null ? "" : ` at attempt ${attempt}`}: `
           + `${mine === null ? "this run states none"
-              : `${otherKey ?? other} was not answered in this run`}`] };
+              : `${otherKey ?? other} was answered but states no usable confidence`}`] };
     }
     if (!(mine < theirs)) {
       return { ...r, state: "correct-but-unqualified",

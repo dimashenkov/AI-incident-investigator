@@ -60,7 +60,7 @@ Two scenarios exercise **behaviour**, not a new cause:
 | Scenario dir | Registry # | What it tests | Measured? |
 |---|---|---|---|
 | `insufficient-evidence` | 5 | the agent must refuse to name a cause when evidence is thin (`scenarios/insufficient-evidence/expected.json`) | **Yes** — `correct` (`docs/runs/2026-09-10-webhook-run-9.json`) |
-| `conflicting-evidence` | 8 | restraint: name `CONTAINER_OOM` at **lowered** confidence (ceiling 0.6) or refuse, with dissent in the evidence (`scenarios/conflicting-evidence/expected.json`) | **Yes**, not cleanly — recorded `correct-but-unqualified` (`docs/runs/2026-09-11-webhook-run-3.json`): right code, confidence not lowered below its comparator |
+| `conflicting-evidence` | 8 | restraint: name `CONTAINER_OOM` at **lowered** confidence (ceiling 0.6) or refuse, with dissent in the evidence (`scenarios/conflicting-evidence/expected.json`) | **Yes** — `correct` (`docs/runs/2026-09-11-conflicting-vs-oom-pair.json`): CONTAINER_OOM at 0.55, below the 0.6 ceiling and below container-oom's 0.92 on the same prompt, citing the memory series that argues against it |
 
 Status of the chain as a whole: it has run end-to-end through the deployed
 workflow (`README.md` lines 5–6; `docs/runs/` records). The scored runs above are

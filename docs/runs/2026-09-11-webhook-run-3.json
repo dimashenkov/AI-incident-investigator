@@ -1,5 +1,5 @@
 {
-  "note": "Issued by scripts/run-scenarios.mjs against the deployed workflow's webhook. The reply carries the chain's report; it does not carry the model's token usage, because the Collect nodes keep only the reply. Token counts and cost are therefore UNESTABLISHED on this path, not zero — read them from the n8n execution and add them with a second edit if they are wanted, and say that they were added by hand.",
+  "note": "Issued by scripts/run-scenarios.mjs against the deployed workflow's webhook. The reply carries the chain's report; it does not carry the model's token usage, because the Collect nodes keep only the reply. Token counts and cost are therefore UNESTABLISHED on this path, not zero \u2014 read them from the n8n execution and add them with a second edit if they are wanted, and say that they were added by hand. | 2026-09-12: conflicting-evidence was corrected from correct-but-unqualified to unestablished. This run did not ask container-oom (unasked here), so the confidence reduction could not be MEASURED \u2014 the scorer used to label that as a failed comparison, which section 5 of the rules forbids (could-not-check is not checked-and-failed). The scorer is fixed (compareConfidences); the original answers were not retained so this is a re-derivation under the corrected classification, not a re-score. The complete measurement is in 2026-09-11-conflicting-vs-oom-pair.json.",
   "recorded": "at the moment the answers arrived, by the script that issued them",
   "when": "2026-09-11",
   "webhook_host": "dimitarshenkov.app.n8n.cloud",
@@ -16,7 +16,7 @@
   },
   "scored": {
     "application-startup-failure": "unasked",
-    "conflicting-evidence": "correct-but-unqualified",
+    "conflicting-evidence": "unestablished",
     "container-oom": "unasked",
     "cpu-throttling": "unasked",
     "deployment-regression": "unasked",

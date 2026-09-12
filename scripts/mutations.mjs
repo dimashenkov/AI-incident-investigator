@@ -1854,12 +1854,16 @@ export const MUTATIONS = [
     mustFail: "refuses the same confidence on the contradicted case and the clean one",
   },
   {
-    // A comparison nobody could make, reported as clean.
+    // A comparison nobody could make, read as failed instead of unestablished.
+    // The guard moved (section 5, 2026-09-12): a missing comparable is now
+    // caught here and returned unestablished, not correct-but-unqualified. With
+    // this off, a missing comparable falls through and is scored unqualified —
+    // an incomplete run put back on the failure side.
     id: "a-missing-comparable-answer-read-as-clean",
     file: "scripts/score-run.mjs",
-    from: "    if (mine === null || theirs === null) {",
+    from: "    if (!comparableAsked) {",
     to: "    if (false) {",
-    mustFail: "refuses when the comparable scenario was not answered in this run",
+    mustFail: "leaves a comparison whose comparable was not answered UNESTABLISHED, not failed",
   },
   {
     // A refusal discarding every answer already paid for, so a corrected scorer
