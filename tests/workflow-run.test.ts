@@ -296,6 +296,23 @@ describe("the Set node that joins the answer back to the incident", () => {
     expect(out.reply, "a fence inside the text is not the wrapper around it").toEqual(answer);
   });
 
+  it("carries the model the reply names, and null when it names none", async () => {
+    /*
+     * The trace protocol's first honest field (Grok, 2026-09-12): Collect kept
+     * usage and dropped $json.model, so a trace could not say which model spent
+     * the tokens — and the model that replies is not guaranteed to be the pinned
+     * one. A reply that names no model is null, never the pinned model restated.
+     */
+    const node = await collectNode("kubernetes");
+    const answer = { agent: "kubernetes", status: "ok", findings: [], hypotheses: [], confidence: 0 };
+    const body = envelope(answer as unknown as Record<string, unknown>);
+    const withModel = { ...body, model: "gpt-5-routed-2026" };
+    expect(runSetExpression(node, withModel, {}, "Assemble").model,
+      "the model the reply names travels to the trace").toBe("gpt-5-routed-2026");
+    expect(runSetExpression(node, body, {}, "Assemble").model,
+      "no model in the reply is null, not the pinned one guessed").toBeNull();
+  });
+
   it("reads an answer that is fenced AND encoded as a string", async () => {
     /*
      * The string unwrap ran before the fence, so a fence whose contents are a

@@ -194,6 +194,18 @@ function collectNode(agent, from, position) {
         + ` if (!u || typeof u !== 'object') return null;`
         + ` return { prompt_tokens: u.prompt_tokens, completion_tokens: u.completion_tokens,`
         + ` cached_tokens: (u.prompt_tokens_details && u.prompt_tokens_details.cached_tokens) || 0 }; })(),`
+        /*
+         * The model that ANSWERED, from the reply that names it.
+         *
+         * Collect kept `usage` and dropped `$json.model`, so a trace could say
+         * how many tokens a call cost but not which model spent them — and the
+         * pinned model and the model that replied are not guaranteed equal (a
+         * provider can route or downgrade). Grok, 2026-09-12, named this as the
+         * first honest gap in the Langfuse trace protocol. Missing is null, never
+         * a guess: a reply that carries no model name is unestablished, not the
+         * pinned one restated.
+         */
+        + ` model: (function () { var mm = $json && $json.model; return (typeof mm === 'string' && mm) ? mm : null; })(),`
         + ` reply: (function () {`
         /*
          * Four unguarded property accesses used to stand here, with the

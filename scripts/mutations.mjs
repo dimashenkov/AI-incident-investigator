@@ -2966,4 +2966,13 @@ export const MUTATIONS = [
     to: "    if (false) {",
     mustFail: "Grok's test: a superseded generation cannot bind, the new one can",
   },
+  {
+    // The trace protocol's model capture: Collect must carry the model the reply
+    // names. Dropping it to null loses which model spent the tokens.
+    id: "collect-drops-the-model-the-reply-names",
+    file: "scripts/generate-workflow.mjs",
+    from: "        + ` model: (function () { var mm = $json && $json.model; return (typeof mm === 'string' && mm) ? mm : null; })(),`",
+    to: "        + ` model: (function () { var mm = $json && $json.model; return null; })(),`",
+    mustFail: "carries the model the reply names, and null when it names none",
+  },
 ];
