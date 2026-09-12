@@ -74,7 +74,12 @@ export function datadogMockRecord(
   const incidentId = typeof incident["incident_id"] === "string" ? (incident["incident_id"] as string) : "";
   const cluster = typeof incident["cluster"] === "string" ? (incident["cluster"] as string) : "";
   const namespace = typeof incident["namespace"] === "string" ? (incident["namespace"] as string) : "";
-  const alert = (incident["alert"] ?? {}) as Record<string, unknown>;
+  // The alert lives at incident.source.alert (the trace viewer surfaced this on
+  // 2026-09-12: reading incident.alert always missed, so every severity defaulted
+  // to SEV-3 with severity_from_signal:false). Fall back to a top-level alert just
+  // in case, but the real shape is under source.
+  const source = (incident["source"] ?? {}) as Record<string, unknown>;
+  const alert = ((source["alert"] ?? incident["alert"]) ?? {}) as Record<string, unknown>;
   const pct = Math.round((typeof confidence === "number" ? confidence : 0) * 100);
 
   const record: Record<string, unknown> = {

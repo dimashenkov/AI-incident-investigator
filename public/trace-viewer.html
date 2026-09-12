@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>incident trace viewer</title>
+<style>
+  :root { --bg:#0f1115; --panel:#171a21; --line:#262b36; --fg:#d7dbe2; --dim:#8b93a1;
+    --ok:#3fb950; --bad:#f85149; --warn:#d29922; --accent:#58a6ff; --agent:#a371f7; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; background:var(--bg); color:var(--fg); }
+  header { padding:10px 16px; border-bottom:1px solid var(--line); display:flex; gap:16px; align-items:baseline; }
+  header h1 { font-size:14px; margin:0; font-weight:600; }
+  header .note { color:var(--dim); font-size:11px; }
+  .layout { display:flex; height:calc(100vh - 44px); }
+  #runs { width:230px; border-right:1px solid var(--line); overflow:auto; flex:0 0 auto; }
+  .run { padding:8px 12px; border-bottom:1px solid var(--line); cursor:pointer; }
+  .run:hover { background:var(--panel); }
+  .run.sel { background:var(--panel); border-left:2px solid var(--accent); }
+  .run .id { font-weight:600; }
+  .run .meta { color:var(--dim); font-size:11px; }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+  .s-success{background:var(--ok);} .s-error,.s-crashed{background:var(--bad);}
+  .s-running,.s-new,.s-waiting{background:var(--warn);} .s-unknown{background:var(--dim);}
+  #detail { flex:1; overflow:auto; padding:16px; }
+  .empty { color:var(--dim); padding:40px; text-align:center; }
+  .summary { margin-bottom:14px; }
+  .summary .big { font-size:15px; font-weight:600; }
+  .kv { color:var(--dim); }
+  .conv { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:10px 12px; margin:12px 0; white-space:pre-wrap; }
+  .conv h3, .timeline h3 { font-size:12px; color:var(--dim); text-transform:uppercase; letter-spacing:.05em; margin:0 0 8px; }
+  .node { border:1px solid var(--line); border-radius:6px; margin:6px 0; background:var(--panel); overflow:hidden; }
+  .node.err { border-color:var(--bad); }
+  .nhead { padding:8px 12px; cursor:pointer; display:flex; gap:10px; align-items:center; }
+  .nhead:hover { background:#1d222b; }
+  .nname { font-weight:600; }
+  .badge { font-size:10px; padding:1px 6px; border-radius:10px; border:1px solid var(--line); color:var(--dim); }
+  .badge.agent { color:var(--agent); border-color:var(--agent); }
+  .lat { color:var(--dim); margin-left:auto; font-size:11px; }
+  .nbody { display:none; border-top:1px solid var(--line); padding:10px 12px; }
+  .node.open .nbody { display:block; }
+  pre { margin:0; white-space:pre-wrap; word-break:break-word; color:var(--fg); }
+  .miss { color:var(--warn); font-style:italic; }
+  .errline { color:var(--bad); }
+  .rawbtn { margin:14px 0 6px; }
+  button { background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:5px; padding:4px 10px; cursor:pointer; font:inherit; }
+  button:hover { border-color:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>incident trace viewer</h1>
+  <span class="note">read-only · one execution = one run · node-by-node · missing stays missing</span>
+</header>
+<div class="layout">
+  <div id="runs"><div class="empty">loading…</div></div>
+  <div id="detail"><div class="empty">pick a run on the left</div></div>
+</div>
+<script>
+const $ = (s, r=document) => r.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const AGENTS = ["kubernetes","logs","metrics","root-cause","root_cause"];
+const isAgentNode = (name) => /^(Ask|Collect|Record) /.test(name) || AGENTS.some(a => name.toLowerCase().includes(a));
+
+function fmtTime(t){ if(t===undefined||t===null) return null; try { return new Date(t).toISOString().replace("T"," ").replace("Z"," UTC"); } catch { return String(t); } }
+function orMissing(v){ return (v===undefined||v===null||v==="") ? '<span class="miss">(missing)</span>' : esc(v); }
+
+async function loadRuns(){
+  const box = $("#runs");
+  let data;
+  try { data = await (await fetch("/api/runs")).json(); }
+  catch(e){ box.innerHTML = '<div class="empty errline">could not reach the viewer backend</div>'; return; }
+  if (data.error){ box.innerHTML = `<div class="empty errline">${esc(data.error)}</div>`; return; }
+  const runs = data.runs || [];
+  if (!runs.length){ box.innerHTML = '<div class="empty">no incident runs found</div>'; return; }
+  const STATUSES = new Set(["success","error","crashed","running","new","waiting","unknown"]);
+  box.innerHTML = runs.map(r => {
+    const id = Number(r.id);                       // ids are numeric; coerce so no attribute injection
+    if (!Number.isFinite(id) || id <= 0) return ""; // drops "", null (Number→0) — no phantom "run 0"
+    const raw = String(r.status||"unknown").toLowerCase();
+    const st = STATUSES.has(raw) ? raw : "unknown"; // class from a whitelist, never raw
+    return `<div class="run" data-id="${id}">
+      <div class="id"><span class="dot s-${st}"></span>run ${id}</div>
+      <div class="meta">${esc(r.status||"?")} · ${esc(fmtTime(r.startedAt)||"—")}</div></div>`;
+  }).join("");
+  box.querySelectorAll(".run").forEach(el => el.onclick = () => {
+    box.querySelectorAll(".run").forEach(x=>x.classList.remove("sel"));
+    el.classList.add("sel"); loadRun(el.dataset.id);
+  });
+}
+
+function nodeRuns(exec){
+  // n8n keeps runData as { nodeName: [ {startTime, executionTime, data:{main:[[{json}]]}, error} ] }.
+  const rd = exec?.data?.resultData?.runData || {};
+  const out = [];
+  for (const [name, runs] of Object.entries(rd)){
+    (runs||[]).forEach((run, i) => {
+      const json = run?.data?.main?.[0]?.[0]?.json;
+      out.push({ name, run:i, startTime: run?.startTime, executionTime: run?.executionTime,
+        error: run?.error, json });
+    });
+  }
+  out.sort((a,b) => (a.startTime||0) - (b.startTime||0));
+  return out;
+}
+
+async function loadRun(id){
+  const box = $("#detail");
+  box.innerHTML = '<div class="empty">loading run…</div>';
+  let exec;
+  try { exec = await (await fetch(`/api/runs/${id}`)).json(); }
+  catch(e){ box.innerHTML = '<div class="empty errline">could not load the run</div>'; return; }
+  if (exec.error){ box.innerHTML = `<div class="empty errline">${esc(exec.error)}</div>`; return; }
+
+  const nodes = nodeRuns(exec);
+  const report = nodes.find(n => n.name === "Report")?.json || {};
+  const inc = report.incident || {};
+  const runErr = exec?.data?.resultData?.error;
+
+  // Summary — from what the run actually holds; missing stays missing.
+  let html = `<div class="summary">
+    <div class="big">${orMissing(inc.incident_id)} — ${orMissing(inc.service)}</div>
+    <div class="kv">status: ${orMissing(exec.status)} · started: ${orMissing(fmtTime(exec.startedAt))} · stopped: ${orMissing(fmtTime(exec.stoppedAt))}</div>
+    <div class="kv">root cause: ${orMissing(report.root_cause_code)} · confidence: ${report.confidence!==undefined?esc(Math.round(report.confidence*100)+"%"):'<span class="miss">(missing)</span>'}</div>
+    ${runErr ? `<div class="errline">run error: ${esc(runErr.message||JSON.stringify(runErr))}</div>` : ""}
+  </div>`;
+
+  // Conversation — the thread a person reads, if the run produced one.
+  const thread = report.thread;
+  if (Array.isArray(thread) && thread.length){
+    html += `<div class="conv"><h3>conversation</h3>${thread.map(l=>esc(l)).join("\n\n")}</div>`;
+  } else {
+    html += `<div class="conv"><h3>conversation</h3><span class="miss">no thread in this run</span></div>`;
+  }
+
+  // Timeline — every node run, in order, expandable. Agent calls badged.
+  html += `<div class="timeline"><h3>run timeline (${nodes.length} node runs)</h3>`;
+  for (const n of nodes){
+    const err = n.error;
+    const ms = Number(n.executionTime);
+    const lat = Number.isFinite(ms) ? `${ms} ms` : "—";
+    const badge = isAgentNode(n.name) ? '<span class="badge agent">agent</span>' : "";
+    const body = err
+      ? `<pre class="errline">${esc(err.message || JSON.stringify(err, null, 2))}</pre>`
+      : `<pre>${n.json!==undefined ? esc(JSON.stringify(n.json, null, 2)) : '<span class="miss">(no output recorded)</span>'}</pre>`;
+    html += `<div class="node${err?' err':''}">
+      <div class="nhead"><span class="nname">${esc(n.name)}</span>${badge}
+        <span class="lat">${esc(fmtTime(n.startTime)||"")} · ${lat}</span></div>
+      <div class="nbody">${body}</div></div>`;
+  }
+  html += `</div>`;
+
+  // Raw view — the whole execution, as recorded. No transformation.
+  html += `<div class="rawbtn"><button id="rawtoggle">show raw execution JSON</button></div>
+    <pre id="rawjson" style="display:none">${esc(JSON.stringify(exec, null, 2))}</pre>`;
+
+  box.innerHTML = html;
+  box.querySelectorAll(".node .nhead").forEach(h => h.onclick = () => h.parentElement.classList.toggle("open"));
+  $("#rawtoggle").onclick = () => { const p=$("#rawjson"); const on=p.style.display==="none"; p.style.display=on?"block":"none"; $("#rawtoggle").textContent=on?"hide raw execution JSON":"show raw execution JSON"; };
+}
+
+loadRuns();
+</script>
+</body>
+</html>

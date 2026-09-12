@@ -8,12 +8,15 @@
 import { describe, it, expect } from "vitest";
 import { datadogMockRecord, datadogIncidentId } from "../src/core/datadog.js";
 
+// The alert is nested under `source`, the shape a real assembled incident has —
+// the trace viewer caught (2026-09-12) that reading a top-level `alert` always
+// missed, so every severity defaulted. The test now uses the real shape.
 const INCIDENT = {
   incident_id: "INC-2026-1001",
   service: "media-archiver",
   namespace: "production",
   cluster: "prod-eu",
-  alert: { severity: "critical" },
+  source: { provider: "fake-datadog", alert: { severity: "critical" } },
   observations: { kubernetes: { pods: [{ secret_token: "xoxb-should-not-leak" }] } },
 };
 
@@ -53,6 +56,17 @@ describe("datadogMockRecord", () => {
     expect(r.cluster).toBe("prod-eu");
     expect(r.pod).toBe("media-archiver-7c5f8d6b94-nz4tp");
     expect(r.severity).toBe("SEV-1");
+  });
+
+  it("maps severity FROM source.alert, and marks whether it was recognised", () => {
+    // The bug the trace viewer found: severity was read from incident.alert, but
+    // the alert lives at incident.source.alert — so it ALWAYS defaulted to SEV-3
+    // with severity_from_signal:false, even for a critical alert.
+    expect(r.severity).toBe("SEV-1");            // source.alert.severity = critical
+    expect(r.severity_from_signal).toBe(true);   // recognised, not a default
+    const none = datadogMockRecord({ ...INCIDENT, source: { provider: "x" } }, "X", 0.5);
+    expect(none.severity, "no severity → default").toBe("SEV-3");
+    expect(none.severity_from_signal, "and marked as a default, not the signal").toBe(false);
   });
 
   it("does NOT leak the raw observations", () => {

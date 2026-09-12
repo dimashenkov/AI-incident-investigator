@@ -3175,4 +3175,24 @@ export const MUTATIONS = [
     to: 'leftValue: "={{ $json.incident.incident_id }}"',
     mustFail: "gates Slack and the stores on a successful report, not merely on an incident id",
   },
+  {
+    // The alert lives at incident.source.alert. Reading incident.alert (as the
+    // first version did) always misses, so severity silently defaults to SEV-3 —
+    // the bug the trace viewer surfaced 2026-09-12.
+    id: "datadog-reads-alert-from-wrong-path",
+    file: "src/core/datadog.ts",
+    from: 'source["alert"] ?? incident["alert"]',
+    to: 'incident["alert"]',
+    mustFail: "maps severity FROM source.alert, and marks whether it was recognised",
+  },
+  {
+    // The viewer must redact auth headers, not only the submission token. Dropping
+    // "authorization" from the redaction set leaves a failed HTTP node's
+    // Authorization: Bearer <bot token> visible on the page.
+    id: "trace-viewer-does-not-redact-authorization",
+    file: "scripts/trace-viewer.mjs",
+    from: '  "authorization",\n  "cookie",',
+    to: '  "cookie",',
+    mustFail: "redacts EVERY secret-bearing header, nested, any casing — not just the submission token",
+  },
 ];
