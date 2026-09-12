@@ -31,15 +31,30 @@ outside the tree — the same store the n8n API creds use):
 Verified working on 2026-09-12 with `auth.test` (a read, not a message):
 `ok:true, team:mitko, user:incidentinvestigator`.
 
+## What is built (2026-09-12)
+
+- The generated workflow POSTS the incident report to the real `#incidents`:
+  Report → Slack gate → Slack lookup (`rowNotExists`) → Slack post
+  (`chat.postMessage`) → Slack took → Slack ok → Slack record. Deduped by
+  `incident_id` for the SEQUENTIAL retry; the concurrent race is the recorded
+  SKIP-Redis limitation. Proven live in a scratch workflow before generation.
+- **Credential** (created by the owner — entering a token is prohibited for the
+  agent): a generic **Header Auth** `Authorization: Bearer <bot token>`, id
+  `eOVr6fQ0yzz3yiwO`, name `Header Auth account`. The workflow references it by
+  id+name; the token is never in the repo. NB: the HTTP node uses
+  `authentication: genericCredentialType`, not `predefinedCredentialType` (the
+  latter silently sent no header → `not_authed`).
+- **Data table** `incident_threads` (id `HXGSOCOFnTmnAZtJ`, columns `incident_id`,
+  `ts`) holds the mapping.
+
 ## What is NOT built yet
 
-- The real Slack **provider** in code — `src/providers/slack.ts` is still the
-  simulated one. Posting a real incident report, and the thread/incident link
-  against Slack's own `ts`, is the next code step (concept first).
+- One **live end-to-end run** (a model call → real report → `#incidents`) — it
+  spends and waits for the owner's word. The chain itself is proven.
 - **Two-way** receiving (the chat bot): needs Event Subscriptions with a public
   request URL (an n8n webhook) and scopes like `channels:history`. Not started.
-- For n8n to post, the token goes into **n8n Credentials**; the env file is for
-  local runs and for handing the value to n8n.
+- **Langfuse traces**: the model field is captured (Collect); span timing + the
+  Langfuse POST remain.
 
 ## One design note carried from the setup
 
