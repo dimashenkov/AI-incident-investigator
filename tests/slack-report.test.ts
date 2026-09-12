@@ -51,21 +51,42 @@ describe("problemPod", () => {
     expect(pod?.namespace).toBe("production");
   });
 
-  it("returns null when every pod is healthy, rather than guessing one", () => {
+  it("names the first in-namespace pod when none is not-ready (the affected workload)", () => {
+    // The owner asked (2026-09-12) for the affected pod to be named even when it
+    // is still Running — cpu-throttling, dns, cert affect a pod that is ready. So
+    // when no pod is not-ready, the first pod in this incident's namespace is
+    // named rather than omitted.
     const healthy = { kubernetes: { pods: [
-      { name: "a", namespace: "production", containers: [{ name: "c", ready: true, last_state: {} }] },
+      { name: "the-workload-pod", namespace: "production", containers: [{ name: "c", ready: true, last_state: {} }] },
     ] } };
-    expect(problemPod(healthy, "production")).toBeNull();
+    expect(problemPod(healthy, "production")?.name).toBe("the-workload-pod");
   });
 
-  it("does NOT name a pod that has recovered (ready now, terminated in the past)", () => {
-    // A prior OOM kill on a container that is ready again is history, not the
-    // current fault. Naming it would point the reader at a pod that is fine.
-    const recovered = { kubernetes: { pods: [
-      { name: "recovered-pod", namespace: "production",
-        containers: [{ name: "c", ready: true, last_state: { terminated: { reason: "OOMKilled" } } }] },
+  it("names the incident's SERVICE pod, not the first, when a second service shares the namespace", () => {
+    // Grok, 2026-09-12: a namespace can hold a second ready service (dns,
+    // network-policy). First-in-namespace names the wrong pod if the array order
+    // changes. Here the affected service's pod is listed SECOND and neither is
+    // not-ready — the service match must still pick it.
+    const twoServices = { kubernetes: { pods: [
+      { name: "unrelated-cache-6d9f-aaaa", namespace: "production", containers: [{ name: "c", ready: true }] },
+      { name: "webhook-dispatcher-5f7b-bbbb", namespace: "production", containers: [{ name: "c", ready: true }] },
     ] } };
-    expect(problemPod(recovered, "production")).toBeNull();
+    expect(problemPod(twoServices, "production", "webhook-dispatcher")?.name).toBe("webhook-dispatcher-5f7b-bbbb");
+  });
+
+  it("prefers a not-ready pod over an earlier healthy one", () => {
+    const mixed = { kubernetes: { pods: [
+      { name: "healthy", namespace: "production", containers: [{ name: "c", ready: true }] },
+      { name: "broken", namespace: "production", containers: [{ name: "c", ready: false }] },
+    ] } };
+    expect(problemPod(mixed, "production")?.name).toBe("broken");
+  });
+
+  it("returns null only when there is no pod in this namespace at all", () => {
+    const noKube = { logs: { entries: [] } };
+    expect(problemPod(noKube, "production")).toBeNull();
+    const emptyPods = { kubernetes: { pods: [] } };
+    expect(problemPod(emptyPods, "production")).toBeNull();
   });
 
   it("does NOT name a failing pod from another namespace — that is contamination", () => {

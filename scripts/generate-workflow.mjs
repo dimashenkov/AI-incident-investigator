@@ -341,6 +341,12 @@ export const SLACK_CREDENTIAL = {
 };
 const SLACK_CHANNEL = "C0C1AQLTRM4";
 const THREAD_TABLE = "HXGSOCOFnTmnAZtJ";
+/* The raw observations, stored per incident_id so the two-way bot can answer
+ * detailed questions from the FULL data, not just the posted summary. Written on
+ * an independent branch off Report (never into the Slack body — the observations
+ * must not leak to Slack; the store is private to the n8n instance). Created
+ * 2026-09-12. A pointer, not a secret. */
+const INCIDENT_DATA_TABLE = "rKZEwVRRLB3Xb6LR";
 
 export function buildWorkflow(runtime, { name = "AI SRE — incident investigation" } = {}) {
   const code = (id, nodeName, body, position) => ({
@@ -471,7 +477,29 @@ export function buildWorkflow(runtime, { name = "AI SRE — incident investigati
       leftValue: "={{ ($json.incident && $json.incident.incident_id) ? $json.incident.incident_id : '' }}",
       rightValue: "", operator: { type: "string", operation: "notEmpty" } }] } },
   });
-  connections["Report"] = { main: [[{ node: "Slack gate", type: "main", index: 0 }]] };
+  // Report fans out to TWO independent branches: the Slack post (curated report)
+  // and the raw-data store (full observations, for the two-way bot to answer
+  // detailed questions). The store runs regardless of Slack dedup, and its data
+  // NEVER enters the Slack body — the observations stay private to the instance.
+  const idTable = { __rl: true, mode: "id", value: INCIDENT_DATA_TABLE };
+  nodes.push({
+    id: "store-data", name: "Record incident data", type: "n8n-nodes-base.dataTable", typeVersion: 1.1,
+    position: [sx + 1480, 220],
+    parameters: { resource: "row", operation: "upsert", dataTableId: idTable,
+      filters: { conditions: [{ keyName: "incident_id", condition: "eq",
+        keyValue: "={{ $json.incident.incident_id }}" }] },
+      columns: { mappingMode: "defineBelow",
+        value: { incident_id: "={{ $json.incident.incident_id }}",
+          data: "={{ JSON.stringify($json.incident.observations || {}) }}" },
+        matchingColumns: ["incident_id"], schema: [
+          { id: "incident_id", displayName: "incident_id", type: "string", canBeUsedToMatch: true, required: false, display: true, defaultMatch: false },
+          { id: "data", displayName: "data", type: "string", canBeUsedToMatch: false, required: false, display: true, defaultMatch: false },
+        ] } },
+  });
+  connections["Report"] = { main: [[
+    { node: "Slack gate", type: "main", index: 0 },
+    { node: "Record incident data", type: "main", index: 0 },
+  ]] };
 
   nodes.push({
     id: "slack-lookup", name: "Slack lookup", type: "n8n-nodes-base.dataTable", typeVersion: 1.1,

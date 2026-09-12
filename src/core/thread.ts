@@ -427,10 +427,10 @@ function sourceOf(agent: string, ref: string | undefined, agents: AgentResult[])
  * confidence). It never dumps observations — the leak the schema and the Slack
  * post body both refuse. No imports, so the Code node can carry it.
  *
- * The pod is chosen deterministically, not by the model: the first pod in the
- * kubernetes slot carrying a container that is not ready NOW, and whose namespace
- * is this incident's. If none is found, the pod line is simply omitted rather
- * than guessed. See problemPod for why each of those three conditions is there.
+ * The pod is chosen deterministically, not by the model: a not-ready pod in this
+ * incident's namespace if there is one, otherwise the first pod in that namespace
+ * (the affected workload). Only when the kubernetes slot has no pod at all is the
+ * line omitted. See problemPod.
  */
 type SlackBlock = Record<string, unknown>;
 
@@ -459,24 +459,43 @@ function context(text: string): SlackBlock {
 export function problemPod(
   observations: unknown,
   expectedNamespace: string,
+  service: string = "",
 ): { name: string; namespace: string } | null {
   if (observations === null || typeof observations !== "object") return null;
   const kube = (observations as Record<string, unknown>)["kubernetes"];
   if (kube === null || typeof kube !== "object") return null;
   const podsRaw = (kube as Record<string, unknown>)["pods"];
   if (!Array.isArray(podsRaw)) return null;
+  // Name the AFFECTED pod for every incident that has one, not only the ones with
+  // a not-ready container (owner, 2026-09-12: cpu-throttling, dns, cert affect a
+  // pod that is still Running). The order of preference, and why each:
+  //   1. a not-ready pod — the clearest failure;
+  //   2. a pod belonging to THIS incident's service (name starts with the
+  //      service) — Grok, 2026-09-12: a namespace can hold a second ready service
+  //      (dns, network-policy scenarios), so first-in-namespace names the wrong
+  //      pod if the array order changes; tying to the service is order-proof;
+  //   3. the first pod in the namespace — last resort when nothing else matches.
+  // The namespace match stays: a pod from another namespace is contamination,
+  // never named. All reads are observations.kubernetes.pods, never the whole tree.
+  const prefix = typeof service === "string" && service !== "" ? `${service}-` : "";
+  let failing: { name: string; namespace: string } | null = null;
+  let ofService: { name: string; namespace: string } | null = null;
+  let firstInNamespace: { name: string; namespace: string } | null = null;
   for (const p of podsRaw) {
     if (p === null || typeof p !== "object") continue;
     const rec = p as Record<string, unknown>;
-    const containers = Array.isArray(rec["containers"]) ? (rec["containers"] as Array<Record<string, unknown>>) : [];
-    const failing = containers.some((c) => c !== null && typeof c === "object" && c["ready"] === false);
-    if (!failing) continue;
     if (typeof rec["name"] !== "string") continue;
     const ns = typeof rec["namespace"] === "string" ? rec["namespace"] : "";
     if (ns !== expectedNamespace) continue;
-    return { name: rec["name"] as string, namespace: ns };
+    const name = rec["name"] as string;
+    const here = { name, namespace: ns };
+    const containers = Array.isArray(rec["containers"]) ? (rec["containers"] as Array<Record<string, unknown>>) : [];
+    const notReady = containers.some((c) => c !== null && typeof c === "object" && c["ready"] === false);
+    if (notReady && failing === null) failing = here;
+    if (prefix !== "" && name.startsWith(prefix) && ofService === null) ofService = here;
+    if (firstInNamespace === null) firstInNamespace = here;
   }
-  return null;
+  return failing ?? ofService ?? firstInNamespace;
 }
 
 /** An emoji per agent label, for the thread lines. Unknown labels get a neutral one. */
@@ -505,7 +524,7 @@ export function slackReport(
   const id = typeof incident["incident_id"] === "string" ? incident["incident_id"] : "";
   const cluster = typeof incident["cluster"] === "string" ? incident["cluster"] : "";
   const namespace = typeof incident["namespace"] === "string" ? incident["namespace"] : "";
-  const pod = problemPod(incident["observations"], namespace);
+  const pod = problemPod(incident["observations"], namespace, service);
 
   const ctxParts: string[] = [];
   if (cluster) ctxParts.push(`:wheel_of_dharma: cluster \`${cluster}\``);

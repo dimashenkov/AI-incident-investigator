@@ -1,0 +1,13 @@
+{
+  "note": "Two more live two-way replies after the first, both on the armed listener path (execs 375, 377). 375 asked what to do \u2014 the bot honestly said the report carries no runbook. 377 asked why the pod falls against the RICH full report and answered with the 512Mi detail, in Bulgarian to match the question. Captured when made. The bot is now a standing spend source: one gpt-5 call per threaded question until deactivated; totals here are the sum of these two calls.",
+  "recorded": "when made, on 2026-09-12, from n8n executions 375 and 377",
+  "when": "2026-09-12",
+  "model": "gpt-5-2025-08-07",
+  "temperature": 1,
+  "totals": {
+    "input_tokens": 614,
+    "output_tokens": 1181,
+    "why": "tokens are recorded (614 in / 1181 out) but gpt-5-2025-08-07 has no published price in the PRICES table, so this run is a floor rather than a measured cost until a price is added with the date it was read"
+  },
+  "outcome": "both correct: 375 declined to invent a runbook; 377 named the 512Mi memory limit and OOM. gpt-5 unpriced, so this is a floor run."
+}

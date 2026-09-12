@@ -96,22 +96,40 @@ export function reportTextFrom(repliesBody: unknown): string | null {
 }
 
 /**
- * The system+user messages for the model. The model answers ONLY from the report
- * it is given — the prompt says so, because the bot must not invent facts about
- * an incident a reader will act on. The report and the question are separated so
- * the model cannot mistake one for the other.
+ * The system+user messages for the model. Two things the owner asked for on
+ * 2026-09-12, after seeing the bot only ever paraphrase the report:
+ *
+ *  1. It may REASON and SUGGEST remediation — not just restate the report. But
+ *     the suggestions are ADVICE for a human: this system is read-only and takes
+ *     no actions, and the prompt says so, so the bot cannot imply it did anything.
+ *  2. It answers from the raw observation DATA when given, not only the summary
+ *     report — so a question about an exact metric or log line can be answered.
+ *
+ * The grounding guard stays: every claim must rest on the report or the data; if
+ * neither contains the answer, say so rather than invent. `data` is a JSON string
+ * of the incident's observations, or "" when none was found — in which case only
+ * the report is given, and the bot is told the raw data was not available.
  */
 export function replyMessages(
   reportText: string,
   question: string,
+  data: string = "",
 ): Array<{ role: string; content: string }> {
   const system =
     "You are the incident-investigation assistant answering a question in a Slack " +
-    "thread about ONE incident. Below is the incident report that was posted. " +
-    "Answer the question concisely and factually, using ONLY the report. If the " +
-    "report does not contain the answer, say so plainly rather than guessing. Do " +
-    "not repeat the whole report; answer the specific question.";
-  const user = `Incident report:\n${reportText}\n\nQuestion: ${question}`;
+    "thread about ONE incident. You are given the incident report, and sometimes " +
+    "the incident's raw observation data. Answer the specific question concisely. " +
+    "You MAY reason about the facts and SUGGEST remediation steps — but frame them " +
+    "as advice for a human operator: this system is read-only, it takes no actions " +
+    "and cannot run anything. Ground every claim in the report or the data; if " +
+    "they do not contain what is needed, say so plainly rather than guessing. Do " +
+    "not restate the whole report, and answer in prose — do not paste the raw data " +
+    "or large JSON blobs into the thread.";
+  const hasData = typeof data === "string" && data.trim() !== "";
+  const dataSection = hasData
+    ? `\n\nIncident data (raw observations):\n${data}`
+    : "\n\n(The raw observation data was not available; answer from the report.)";
+  const user = `Incident report:\n${reportText}${dataSection}\n\nQuestion: ${question}`;
   return [
     { role: "system", content: system },
     { role: "user", content: user },

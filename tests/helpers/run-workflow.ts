@@ -268,35 +268,39 @@ export async function runScenario(
     if (node?.type === "n8n-nodes-base.if") branch = runIfExpression(node, item) ? 0 : 1;
 
     /*
-     * One target per branch, refused rather than assumed.
+     * The investigation is a single line; the delivery and the side-effects are
+     * not. A node past Report may fan out to the Slack delivery AND the raw-data
+     * store (two branches, both terminal for this harness). So first drop the
+     * targets this harness does not walk into — the Slack namespace, a dataTable
+     * side-effect, a non-Ask HTTP call — and judge the fan-out on what REMAINS.
      *
-     * Codex, 2026-09-06: following only [0] would walk a fan-out wrongly and
-     * say nothing about it. This chain is deliberately a single line; the day
-     * it is not, this throws instead of quietly testing one half of it.
+     * Codex, 2026-09-06: following only [0] would walk a genuine fan-out wrongly
+     * and say nothing about it. That still holds — but a fan-out where every
+     * branch is delivery/side-effect is not the investigation forking; it is the
+     * investigation ENDING, and the current item is its result. Only more than
+     * one CONTINUABLE branch is the ambiguity worth refusing.
      */
     const targets = outgoing.main[branch] ?? [];
-    if (targets.length > 1) {
-      throw new Error(`${at} branch ${branch} fans out to ${targets.length} nodes; this harness walks one line and would test only the first`);
+    const isTerminalTarget = (name: string): boolean => {
+      if (name.startsWith("Slack ")) return true;
+      const n = byName[name];
+      if (n === undefined) return false;
+      if (n.type === "n8n-nodes-base.dataTable") return true;
+      const ask = n.type === "n8n-nodes-base.httpRequest" && name.startsWith("Ask ");
+      return n.type === "n8n-nodes-base.httpRequest" && !ask;
+    };
+    const continuable = targets.filter((t) => !isTerminalTarget(t.node));
+    // Every branch is delivery or a side-effect: the investigation ends here, and
+    // the current item is Report's output — the result the delivery does not change.
+    if (continuable.length === 0) break;
+    if (continuable.length > 1) {
+      throw new Error(`${at} branch ${branch} fans out to ${continuable.length} investigation nodes; this harness walks one line and would test only the first`);
     }
-    const target = targets[0]?.node;
+    const target = continuable[0]?.node;
     if (target === undefined) throw new Error(`${at} has no branch ${branch}; the run would stop with no answer`);
 
     const next = byName[target];
     if (next === undefined) throw new Error(`${at} points at ${target}, which does not exist`);
-
-    // The Slack chain after Report is a live-only side effect (Slack gate ->
-    // lookup -> post -> took -> ok -> record). This harness runs the
-    // INVESTIGATION, not the delivery, so it stops the moment it reaches the
-    // Slack namespace — the current item is Report's output, the investigation
-    // result, which the delivery does not change. The `Slack ` prefix is a
-    // deliberate namespace for the delivery nodes, not a single hard-coded name;
-    // the type check is defence in case one is ever renamed.
-    const isAsk = next.type === "n8n-nodes-base.httpRequest" && target.startsWith("Ask ");
-    if (target.startsWith("Slack ")
-        || next.type === "n8n-nodes-base.dataTable"
-        || (next.type === "n8n-nodes-base.httpRequest" && !isAsk)) {
-      break;
-    }
 
     if (next.type === "n8n-nodes-base.httpRequest") {
       // The model, replaced by a stub answering from the payload it is handed.

@@ -103,10 +103,34 @@ describe("replyMessages", () => {
 
   it("hands the model the report as context and the question separately", () => {
     expect(msgs[0]!.role).toBe("system");
-    expect(msgs[0]!.content).toContain("ONLY the report");
     expect(msgs[1]!.role).toBe("user");
     expect(msgs[1]!.content).toContain("INC-1 report body");
     expect(msgs[1]!.content).toContain("why did it crash?");
+  });
+
+  it("lets the model reason and advise, but stays read-only (advice, not actions)", () => {
+    // The owner asked for more than paraphrase. The prompt must permit remediation
+    // suggestions AND state the system takes no actions, so the bot cannot imply
+    // it did something.
+    expect(msgs[0]!.content).toMatch(/suggest remediation|reason/i);
+    expect(msgs[0]!.content).toMatch(/read-only|takes no actions|cannot run/i);
+  });
+
+  it("keeps the grounding guard — answer from the given facts, not invention", () => {
+    expect(msgs[0]!.content).toMatch(/ground|do not.*guess|rather than guessing/i);
+  });
+
+  it("includes the raw observation data when given", () => {
+    const withData = replyMessages("report", "q", '{"kubernetes":{"pods":[]}}');
+    expect(withData[1]!.content).toContain("raw observations");
+    expect(withData[1]!.content).toContain('"kubernetes"');
+  });
+
+  it("tells the model the raw data was absent when none is given", () => {
+    // Not silently pretending there was data — the bot answers from the report and
+    // knows the raw data was not available.
+    expect(msgs[1]!.content).toMatch(/not available/i);
+    expect(msgs[1]!.content).not.toContain("raw observations):");
   });
 });
 

@@ -3078,4 +3078,43 @@ export const MUTATIONS = [
     to: 'operation: "get", dataTableId: dtSeen',
     mustFail: "drops a re-delivered event_id BEFORE the model, closing the retry double-spend",
   },
+  {
+    // The raw-data store must upsert, so a re-run refreshes rather than piling up
+    // duplicate rows the fetch would read at random.
+    id: "incident-data-store-inserts-instead-of-upserting",
+    file: "scripts/generate-workflow.mjs",
+    from: 'operation: "upsert", dataTableId: idTable',
+    to: 'operation: "insert", dataTableId: idTable',
+    mustFail: "stores the full observations for the two-way bot, on a branch, never into Slack",
+  },
+  {
+    // A data miss (old incident, nothing stored) must not kill the reply chain.
+    // Without onError-continue, `get` errors on a miss and the bot answers nothing
+    // even though it could have answered from the report.
+    id: "listener-data-miss-kills-the-chain",
+    file: "scripts/generate-listener.mjs",
+    from: 'onError: "continueRegularOutput"',
+    to: 'onError: "stopWorkflow"',
+    mustFail: "enriches the answer with the incident's full data, tolerating a miss",
+  },
+  {
+    // The affected pod is named even when it is still Running: prefer a not-ready
+    // pod, else the first in-namespace pod. Inverting the fallback guard leaves
+    // firstInNamespace unset, so a healthy-pod incident names no pod at all.
+    id: "problem-pod-drops-the-running-affected-pod",
+    file: "src/core/thread.ts",
+    from: "if (firstInNamespace === null)",
+    to: "if (firstInNamespace !== null)",
+    mustFail: "names the first in-namespace pod when none is not-ready (the affected workload)",
+  },
+  {
+    // The fallback ties to the incident's SERVICE, not array order. Never setting
+    // ofService drops back to first-in-namespace, which names the wrong pod when a
+    // second service shares the namespace and is listed first.
+    id: "problem-pod-ignores-the-service-and-takes-the-first",
+    file: "src/core/thread.ts",
+    from: "name.startsWith(prefix) && ofService === null",
+    to: "name.startsWith(prefix) && ofService !== null",
+    mustFail: "names the incident's SERVICE pod, not the first, when a second service shares the namespace",
+  },
 ];

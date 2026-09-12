@@ -52,6 +52,10 @@ const OUT = resolve(ROOT, "workflows/slack-listener.json");
  *  Created 2026-09-12; a pointer, not a secret, like the other table/credential
  *  ids — drift masks the id and compares surrounding structure. */
 const SEEN_TABLE = "uBZvrUFgQcderwqF";
+/** The table the incident workflow stores full observations in, keyed by
+ *  incident_id, so the bot can answer detailed questions from raw data. A miss is
+ *  tolerated (old incidents have none) — the bot then answers from the report. */
+const DATA_TABLE = "rKZEwVRRLB3Xb6LR";
 
 /** The reply logic, transpiled so the Code nodes carry it (no imports). */
 const REPLY = transpile("src/core/reply.ts");
@@ -183,22 +187,52 @@ return [{ json: Object.assign({}, c, { reply: shouldReply(c) }) }];`
   });
   connections["Mark seen"] = { main: [[{ node: "Fetch thread", type: "main", index: 0 }]] };
 
-  // 6. Build ask — the report text and the model messages. No report → stop, so
-  //    the model is never asked to answer from nothing.
+  // 5b. Extract id — pull the incident_id out of the report so the full raw data
+  //     can be looked up. The report text opens with "INC-YYYY-NNNN".
+  nodes.push({
+    id: "extract-id", name: "Extract id", type: "n8n-nodes-base.code", typeVersion: 2,
+    position: pos(),
+    parameters: { language: "javaScript", mode: "runOnceForAllItems", jsCode:
+`${REPLY}
+const report = reportTextFrom(($('Fetch thread').first() && $('Fetch thread').first().json) || {});
+const m = report ? report.match(/INC-\\d{4}-\\d{4}/) : null;
+return [{ json: { incident_id: m ? m[0] : "" } }];`
+    },
+  });
+  connections["Fetch thread"] = { main: [[{ node: "Extract id", type: "main", index: 0 }]] };
+
+  // 5c. Fetch data — the FULL observations for this incident, so the bot can
+  //     answer detailed questions, not just paraphrase the summary. `get` errors
+  //     on a miss (an old incident with nothing stored), so onError continues:
+  //     a miss is not fatal, the bot then answers from the report alone.
+  nodes.push({
+    id: "fetch-data", name: "Fetch data", type: "n8n-nodes-base.dataTable", typeVersion: 1.1,
+    position: pos(), onError: "continueRegularOutput",
+    parameters: { resource: "row", operation: "get",
+      dataTableId: { __rl: true, mode: "id", value: DATA_TABLE },
+      filters: { conditions: [{ keyName: "incident_id", condition: "eq",
+        keyValue: "={{ $json.incident_id }}" }] } },
+  });
+  connections["Extract id"] = { main: [[{ node: "Fetch data", type: "main", index: 0 }]] };
+
+  // 6. Build ask — report + raw data + question → model messages. Report is read
+  //    from Fetch thread by name (Fetch data replaced $json); data is best-effort
+  //    (empty when the lookup missed). No report → stop.
   nodes.push({
     id: "build-ask", name: "Build ask", type: "n8n-nodes-base.code", typeVersion: 2,
     position: pos(),
     parameters: { language: "javaScript", mode: "runOnceForAllItems", jsCode:
 `${REPLY}
 const h = $('Handle').first().json;
-const replies = ($input.first() && $input.first().json) || {};
-const report = reportTextFrom(replies);
+const report = reportTextFrom(($('Fetch thread').first() && $('Fetch thread').first().json) || {});
 if (report === null) return [{ json: { ok: false, why: "no report found in the thread" } }];
+const fd = ($('Fetch data').first() && $('Fetch data').first().json) || {};
+const data = (typeof fd.data === 'string') ? fd.data : "";
 return [{ json: { ok: true, channel: h.channel, thread_ts: h.thread_ts,
-  messages: replyMessages(report, h.text) } }];`
+  messages: replyMessages(report, h.text, data) } }];`
     },
   });
-  connections["Fetch thread"] = { main: [[{ node: "Build ask", type: "main", index: 0 }]] };
+  connections["Fetch data"] = { main: [[{ node: "Build ask", type: "main", index: 0 }]] };
 
   nodes.push({
     id: "has-report", name: "Has report", type: "n8n-nodes-base.if", typeVersion: 2.2,

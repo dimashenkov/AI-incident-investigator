@@ -246,6 +246,27 @@ describe("the shape of the deployed chain", () => {
     expect(text).not.toContain("Bearer");
   });
 
+  it("stores the full observations for the two-way bot, on a branch, never into Slack", () => {
+    // The owner asked (2026-09-12) for the bot to answer detailed questions from
+    // the FULL data. Report fans to TWO branches: the Slack post (curated) and a
+    // data store (raw observations, keyed by incident_id). The store is an
+    // INDEPENDENT branch so it runs regardless of Slack dedup, and the raw data
+    // goes to a private table, NEVER into the Slack body.
+    const node = (name: string) => WF.nodes.find((n: { name: string }) => n.name === name);
+    const fans = WF.connections["Report"].main[0].map((c: { node: string }) => c.node);
+    expect(fans, "Report fans to Slack AND the store").toContain("Slack gate");
+    expect(fans, "Report fans to Slack AND the store").toContain("Record incident data");
+    const store = node("Record incident data") as {
+      type: string; parameters: { operation: string; columns: { value: Record<string, string> } };
+    };
+    expect(store.type).toBe("n8n-nodes-base.dataTable");
+    expect(store.parameters.operation, "upsert so a re-run refreshes").toBe("upsert");
+    expect(store.parameters.columns.value.data, "stores the observations").toContain("observations");
+    // The store's data must NOT be in the Slack post body (leak guard).
+    const post = node("Slack post") as { parameters: { jsonBody: string } };
+    expect(post.parameters.jsonBody, "observations never reach Slack").not.toContain("observations");
+  });
+
   it("pins the model and the temperature, so two runs can be compared", () => {
     /*
      * The literal, not the constant.
