@@ -127,6 +127,23 @@ describe("slackReport", () => {
     expect(asText).toContain("90%");
   });
 
+  it("shows the root cause ONCE — not the agent line AND the conclusion", () => {
+    // Owner, 2026-09-12: the report showed root cause twice — the root_cause AGENT
+    // line (underscore) rendered as a section, plus the Root cause conclusion
+    // block. Both must collapse into the single highlighted block.
+    const withBoth = slackReport(INCIDENT, [
+      "INC-2026-0101: payment-api in production — investigating.",
+      "kubernetes: container OOMKilled.",
+      "root_cause: AGENT_LINE_MARKER should not be rendered as its own section.",
+      "Root cause: the container is being OOM-killed.",
+    ], "CONTAINER_OOM", 0.9);
+    const t = JSON.stringify(withBoth.blocks);
+    expect(t, "the agent's root_cause line must not appear").not.toContain("AGENT_LINE_MARKER");
+    const dartSections = (t.match(/:dart:/g) ?? []).length;
+    expect(dartSections, "exactly one root-cause block").toBe(1);
+    expect(t).toContain("CONTAINER_OOM");
+  });
+
   it("carries the plain thread as the text fallback", () => {
     expect(out.text).toBe(THREAD.join("\n\n"));
   });

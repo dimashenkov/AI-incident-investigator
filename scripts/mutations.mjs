@@ -3117,4 +3117,14 @@ export const MUTATIONS = [
     to: "name.startsWith(prefix) && ofService !== null",
     mustFail: "names the incident's SERVICE pod, not the first, when a second service shares the namespace",
   },
+  {
+    // The root cause is shown once. Skipping only "root cause:" (space) lets the
+    // root_cause AGENT line (underscore) render as its own section, printing the
+    // root cause twice.
+    id: "slack-report-prints-root-cause-twice",
+    file: "src/core/thread.ts",
+    from: "if (/^root[ _]cause/i.test(line)) continue;",
+    to: "if (/^root cause:/i.test(line)) continue;",
+    mustFail: "shows the root cause ONCE — not the agent line AND the conclusion",
+  },
 ];

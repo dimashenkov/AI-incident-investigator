@@ -542,7 +542,11 @@ export function slackReport(
   // emoji and a bold label; the final "Root cause:" line is highlighted below.
   for (let i = 1; i < thread.length; i += 1) {
     const line = thread[i] ?? "";
-    if (/^root cause:/i.test(line)) continue; // shown in the highlighted block below
+    // Skip BOTH the root_cause AGENT line and the "Root cause:" conclusion line —
+    // the highlighted block below already shows the root cause, and rendering the
+    // agent's line too printed it twice (owner, 2026-09-12). The agent label is
+    // `root_cause:` (underscore); the conclusion is `Root cause:` (space).
+    if (/^root[ _]cause/i.test(line)) continue;
     const c = line.indexOf(":");
     if (c > 0) {
       const label = line.slice(0, c);
