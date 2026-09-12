@@ -2984,4 +2984,31 @@ export const MUTATIONS = [
     to: "  if (false) return { state: \"existing\", ts: existing };",
     mustFail: "does not post a second thread for the same incident fired again",
   },
+  {
+    // The dedup: rowNotExists is what stops a second thread for one incident.
+    // get errors on a miss and kills the chain.
+    id: "slack-lookup-uses-get-not-rownotexists",
+    file: "scripts/generate-workflow.mjs",
+    from: "    parameters: { resource: \"row\", operation: \"rowNotExists\", dataTableId: dtId,",
+    to: "    parameters: { resource: \"row\", operation: \"get\", dataTableId: dtId,",
+    mustFail: "wires the real Slack delivery: dedup by rowNotExists, post the thread only, record only on ok",
+  },
+  {
+    // The message body is the thread and nothing else. Posting the whole item
+    // leaks the incident and every observation to Slack.
+    id: "slack-post-sends-the-whole-item-not-the-thread",
+    file: "scripts/generate-workflow.mjs",
+    from: "($json.thread || [])",
+    to: "([JSON.stringify($json)])",
+    mustFail: "wires the real Slack delivery: dedup by rowNotExists, post the thread only, record only on ok",
+  },
+  {
+    // The ts is recorded only when Slack said ok. Dropping the ok check records
+    // whatever came back, including on a 200 that is {ok:false}.
+    id: "slack-records-ts-without-checking-ok",
+    file: "scripts/generate-workflow.mjs",
+    from: "ts: ($json && $json.ok === true && typeof $json.ts === 'string' && $json.ts) ? $json.ts : \"\"",
+    to: "ts: (typeof $json.ts === 'string' && $json.ts) ? $json.ts : \"\"",
+    mustFail: "wires the real Slack delivery: dedup by rowNotExists, post the thread only, record only on ok",
+  },
 ];

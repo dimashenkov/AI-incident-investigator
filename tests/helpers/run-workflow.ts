@@ -284,6 +284,20 @@ export async function runScenario(
     const next = byName[target];
     if (next === undefined) throw new Error(`${at} points at ${target}, which does not exist`);
 
+    // The Slack chain after Report is a live-only side effect (Slack gate ->
+    // lookup -> post -> took -> ok -> record). This harness runs the
+    // INVESTIGATION, not the delivery, so it stops the moment it reaches the
+    // Slack namespace — the current item is Report's output, the investigation
+    // result, which the delivery does not change. The `Slack ` prefix is a
+    // deliberate namespace for the delivery nodes, not a single hard-coded name;
+    // the type check is defence in case one is ever renamed.
+    const isAsk = next.type === "n8n-nodes-base.httpRequest" && target.startsWith("Ask ");
+    if (target.startsWith("Slack ")
+        || next.type === "n8n-nodes-base.dataTable"
+        || (next.type === "n8n-nodes-base.httpRequest" && !isAsk)) {
+      break;
+    }
+
     if (next.type === "n8n-nodes-base.httpRequest") {
       // The model, replaced by a stub answering from the payload it is handed.
       const agent = target.replace(/^Ask /, "");

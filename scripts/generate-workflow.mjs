@@ -321,6 +321,27 @@ export const OPENAI_CREDENTIAL = {
   name: "OpenAI account",
 };
 
+/*
+ * The real Slack post (decision B, 2026-09-12). The whole chain — rowNotExists ->
+ * post -> took -> IF -> insert — was built and proven live in a scratch workflow
+ * before being written here: the first run posted to #incidents and recorded the
+ * ts, the second run for the same incident was dropped by rowNotExists and posted
+ * nothing (sequential dedup). See docs/slack-setup.md.
+ *
+ * The credential is a generic Header Auth (`Authorization: Bearer <bot token>`),
+ * referenced by id+name exactly like OPENAI_CREDENTIAL — the token never enters
+ * this file or the workflow JSON. `authentication` is `genericCredentialType` (not
+ * `predefinedCredentialType`, which is for service-specific creds and silently
+ * sent no header — measured `not_authed`). The channel and the table id are
+ * constants, not env, for the same hermetic reason the OpenAI credential is.
+ */
+export const SLACK_CREDENTIAL = {
+  id: "eOVr6fQ0yzz3yiwO",
+  name: "Header Auth account",
+};
+const SLACK_CHANNEL = "C0C1AQLTRM4";
+const THREAD_TABLE = "HXGSOCOFnTmnAZtJ";
+
 export function buildWorkflow(runtime, { name = "AI SRE — incident investigation" } = {}) {
   const code = (id, nodeName, body, position) => ({
     id,
@@ -411,7 +432,96 @@ export function buildWorkflow(runtime, { name = "AI SRE — incident investigati
   nodes.push(code("report", "Report", reportNodeCode(), [x + 740, 0]));
   connections["Conclude"] = { main: [[{ node: "Report", type: "main", index: 0 }]] };
 
+  /*
+   * And then the real Slack post — the visible end of the prototype (decision B).
+   *
+   * Report -> Slack gate -> Slack lookup -> Slack post -> Slack took -> Slack ok
+   * -> Slack record. Every shape here was proven live in a scratch workflow before
+   * being written (see SLACK_CREDENTIAL above).
+   *
+   *  - Slack gate: only an item carrying an incident_id posts. Report emits
+   *    refused items too; posting one would send an empty message. The gate reads
+   *    the id defensively so an undefined incident does not throw.
+   *  - Slack lookup: `rowNotExists` is the dedup, not a Get — Get ERRORS on a miss
+   *    and kills the chain (measured); rowNotExists passes a miss through UNCHANGED
+   *    and drops a hit, so an incident already posted opens no second thread. This
+   *    closes the SEQUENTIAL retry only; two simultaneous runs is the recorded
+   *    SKIP-Redis limitation (n8n Cloud runs webhooks concurrently, measured).
+   *  - Slack post: chat.postMessage, text is the thread and nothing else — never
+   *    the incident or the observations, which would leak to a foreign disk the
+   *    way content-capture to Langfuse would.
+   *  - Slack took + Slack ok: Slack returns HTTP 200 even on {ok:false}, so the ts
+   *    is taken only when ok===true and non-empty, and only then does record run.
+   *    An empty ts must never be written — it would poison the dictionary forever.
+   *  - Slack record: insert (not upsert) is safe because rowNotExists already
+   *    proved no row exists on this branch.
+   */
+  const sx = x + 740;
+  const ifOptions = { caseSensitive: true, typeValidation: "strict", version: 2 };
+  const dtId = { __rl: true, mode: "id", value: THREAD_TABLE };
 
+  nodes.push({
+    id: "slack-gate", name: "Slack gate", type: "n8n-nodes-base.if", typeVersion: 2.2,
+    position: [sx + 740, 0],
+    parameters: { conditions: { options: ifOptions, combinator: "and", conditions: [{
+      leftValue: "={{ ($json.incident && $json.incident.incident_id) ? $json.incident.incident_id : '' }}",
+      rightValue: "", operator: { type: "string", operation: "notEmpty" } }] } },
+  });
+  connections["Report"] = { main: [[{ node: "Slack gate", type: "main", index: 0 }]] };
+
+  nodes.push({
+    id: "slack-lookup", name: "Slack lookup", type: "n8n-nodes-base.dataTable", typeVersion: 1.1,
+    position: [sx + 1480, 0],
+    parameters: { resource: "row", operation: "rowNotExists", dataTableId: dtId,
+      filters: { conditions: [{ keyName: "incident_id", condition: "eq",
+        keyValue: "={{ $json.incident.incident_id }}" }] } },
+  });
+  // Gate true -> lookup; gate false -> nothing (a refused item never posts).
+  connections["Slack gate"] = { main: [[{ node: "Slack lookup", type: "main", index: 0 }], []] };
+
+  nodes.push({
+    id: "slack-post", name: "Slack post", type: "n8n-nodes-base.httpRequest", typeVersion: 4.2,
+    position: [sx + 2220, 0],
+    credentials: { httpHeaderAuth: { id: SLACK_CREDENTIAL.id, name: SLACK_CREDENTIAL.name } },
+    parameters: { method: "POST", url: "https://slack.com/api/chat.postMessage",
+      authentication: "genericCredentialType", genericAuthType: "httpHeaderAuth",
+      sendHeaders: true, headerParameters: { parameters: [{ name: "Content-Type", value: "application/json; charset=utf-8" }] },
+      sendBody: true, specifyBody: "json",
+      jsonBody: `={{ JSON.stringify({ channel: "${SLACK_CHANNEL}", text: ($json.thread || []).join("\\n\\n") }) }}`,
+      options: {} },
+  });
+  connections["Slack lookup"] = { main: [[{ node: "Slack post", type: "main", index: 0 }]] };
+
+  nodes.push({
+    id: "slack-took", name: "Slack took", type: "n8n-nodes-base.set", typeVersion: 3.4,
+    position: [sx + 2960, 0],
+    parameters: { mode: "raw",
+      jsonOutput: `={{ JSON.stringify({ incident_id: $('Report').item.json.incident.incident_id, ts: ($json && $json.ok === true && typeof $json.ts === 'string' && $json.ts) ? $json.ts : "" }) }}`,
+      options: {} },
+  });
+  connections["Slack post"] = { main: [[{ node: "Slack took", type: "main", index: 0 }]] };
+
+  nodes.push({
+    id: "slack-ok", name: "Slack ok", type: "n8n-nodes-base.if", typeVersion: 2.2,
+    position: [sx + 3700, 0],
+    parameters: { conditions: { options: ifOptions, combinator: "and", conditions: [{
+      leftValue: "={{ $json.ts }}", rightValue: "", operator: { type: "string", operation: "notEmpty" } }] } },
+  });
+  connections["Slack took"] = { main: [[{ node: "Slack ok", type: "main", index: 0 }]] };
+  // ts present -> record; empty -> nothing (never write an empty ts).
+  connections["Slack ok"] = { main: [[{ node: "Slack record", type: "main", index: 0 }], []] };
+
+  nodes.push({
+    id: "slack-record", name: "Slack record", type: "n8n-nodes-base.dataTable", typeVersion: 1.1,
+    position: [sx + 4440, 0],
+    parameters: { resource: "row", operation: "insert", dataTableId: dtId,
+      columns: { mappingMode: "defineBelow",
+        value: { incident_id: "={{ $json.incident_id }}", ts: "={{ $json.ts }}" },
+        matchingColumns: [], schema: [
+          { id: "incident_id", displayName: "incident_id", type: "string", canBeUsedToMatch: true, required: false, display: true, defaultMatch: false },
+          { id: "ts", displayName: "ts", type: "string", canBeUsedToMatch: true, required: false, display: true, defaultMatch: false },
+        ] } },
+  });
 
   return { name, nodes, connections, settings: { executionOrder: "v1" } };
 }

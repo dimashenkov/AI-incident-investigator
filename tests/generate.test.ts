@@ -12,7 +12,7 @@ import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
 // @ts-expect-error — plain .mjs, the same file node runs.
-import { buildWorkflow, serialise, generate, WEBHOOK_PATH, MODEL, OPENAI_CREDENTIAL } from "../scripts/generate-workflow.mjs";
+import { buildWorkflow, serialise, generate, WEBHOOK_PATH, MODEL, OPENAI_CREDENTIAL, SLACK_CREDENTIAL } from "../scripts/generate-workflow.mjs";
 // @ts-expect-error — plain .mjs, the same file node runs.
 import { transpile, AGENT_ORDER } from "../scripts/workflow-runtime.mjs";
 
@@ -120,19 +120,23 @@ describe("the shape of the deployed chain", () => {
       visited.push(at);
     }
     /*
-     * The chain ends at Report, not at Conclude.
+     * The investigation ends at Report; the real Slack delivery follows it.
      *
-     * Until 2026-09-07 it ended at Conclude and the deployed workflow produced
-     * an answer object and no thread — src/core/thread.ts was called only by
-     * tests, so every caveat it writes existed nowhere a live run could show
-     * it. Report is free and deterministic: it reads the incident and asks no
-     * model.
+     * Until 2026-09-07 the line ended at Conclude (no thread); then at Report
+     * (the thread a person reads). Since 2026-09-12 (decision B) Report feeds the
+     * real Slack post — Slack gate -> Slack lookup -> Slack post -> Slack took ->
+     * Slack ok -> Slack record — so the main line now ends at the record, with
+     * Conclude and Report still on it in order. The delivery's false branches
+     * (refused item, empty ts) end deliberately and are checked elsewhere.
      */
-    expect(visited[visited.length - 1], `the chain ends at ${at}`).toBe("Report");
-    expect(visited, "Conclude must still be on the line, immediately before it")
-      .toContain("Conclude");
-    expect(visited[visited.length - 2]).toBe("Conclude");
-    expect(visited).toHaveLength(2 + AGENT_ORDER.length * 4 + 2);
+    expect(visited[visited.length - 1], `the chain ends at ${at}`).toBe("Slack record");
+    const ri = visited.indexOf("Report");
+    expect(ri, "Report must be on the line").toBeGreaterThan(-1);
+    expect(visited[ri - 1], "Conclude immediately before Report").toBe("Conclude");
+    expect(visited.slice(ri), "Report then the Slack delivery chain, in order").toEqual([
+      "Report", "Slack gate", "Slack lookup", "Slack post", "Slack took", "Slack ok", "Slack record",
+    ]);
+    expect(visited).toHaveLength(2 + AGENT_ORDER.length * 4 + 2 + 6);
   });
 
   it("routes every gate's refusal past the paid call, and eventually to Conclude", () => {
@@ -166,6 +170,7 @@ describe("the shape of the deployed chain", () => {
     const types = [...new Set(WF.nodes.map((n: { type: string; typeVersion: number }) => `${n.type}@${n.typeVersion}`))];
     expect(types.sort()).toEqual([
       "n8n-nodes-base.code@2",
+      "n8n-nodes-base.dataTable@1.1",
       "n8n-nodes-base.httpRequest@4.2",
       "n8n-nodes-base.if@2.2",
       "n8n-nodes-base.set@3.4",
@@ -191,6 +196,50 @@ describe("the shape of the deployed chain", () => {
     // gets deleted the first time it is inconvenient.
     expect(text).not.toMatch(/\bsk-[A-Za-z0-9_-]{20,}/);
     expect(text).not.toContain("Authorization");
+  });
+
+  it("wires the real Slack delivery: dedup by rowNotExists, post the thread only, record only on ok", () => {
+    /*
+     * Decision B, proven live in a scratch workflow before it was generated. This
+     * asserts the shape that keeps it honest — not that it posts (that is the live
+     * run), but that it cannot leak, cannot double-post sequentially, and cannot
+     * record a thread that was never opened.
+     */
+    const node = (name: string) => WF.nodes.find((n: { name: string }) => n.name === name);
+
+    // Lookup is rowNotExists — the dedup — NOT get, which errors on a miss and
+    // would kill the chain (measured 2026-09-12).
+    const lookup = node("Slack lookup") as { type: string; parameters: { operation: string } };
+    expect(lookup?.type).toBe("n8n-nodes-base.dataTable");
+    expect(lookup.parameters.operation, "get errors on a miss; rowNotExists branches").toBe("rowNotExists");
+
+    // Post names the credential by id+name, uses genericCredentialType, and its
+    // body is the THREAD and nothing else — never the incident or the
+    // observations, which would leak to a foreign disk.
+    const post = node("Slack post") as {
+      credentials: { httpHeaderAuth: { id: string; name: string } };
+      parameters: { authentication: string; genericAuthType: string; jsonBody: string };
+    };
+    expect(post.parameters.authentication).toBe("genericCredentialType");
+    expect(post.parameters.genericAuthType).toBe("httpHeaderAuth");
+    expect(post.credentials.httpHeaderAuth).toEqual({ id: SLACK_CREDENTIAL.id, name: SLACK_CREDENTIAL.name });
+    expect(post.parameters.jsonBody, "the message is the thread").toContain("$json.thread");
+    expect(post.parameters.jsonBody, "never the whole incident").not.toContain("incident");
+    expect(post.parameters.jsonBody, "never the observations").not.toContain("observations");
+
+    // The ts is taken only when ok is true; an empty ts is never recorded.
+    const took = node("Slack took") as { parameters: { jsonOutput: string } };
+    expect(took.parameters.jsonOutput, "ts only when Slack said ok").toContain("$json.ok === true");
+
+    // Record runs only on the ok branch: main[0] -> record, main[1] -> nothing.
+    const okOut = WF.connections["Slack ok"].main;
+    expect(okOut[0][0].node, "ok true records").toBe("Slack record");
+    expect(okOut[1] ?? [], "ok false records nothing — never an empty ts").toEqual([]);
+
+    // And no token material anywhere in the workflow.
+    const text = JSON.stringify(WF);
+    expect(text).not.toContain("xoxb");
+    expect(text).not.toContain("Bearer");
   });
 
   it("pins the model and the temperature, so two runs can be compared", () => {
