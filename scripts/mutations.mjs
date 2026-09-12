@@ -2975,4 +2975,13 @@ export const MUTATIONS = [
     to: "        + ` model: (function () { var mm = $json && $json.model; return null; })(),`",
     mustFail: "carries the model the reply names, and null when it names none",
   },
+  {
+    // The dedup guarantee: an incident with a recorded thread must not post again.
+    // Skipping the lookup return makes the sequential retry open a second thread.
+    id: "slack-post-ignores-the-existing-thread",
+    file: "src/providers/slack-post.ts",
+    from: "  if (existing) return { state: \"existing\", ts: existing };",
+    to: "  if (false) return { state: \"existing\", ts: existing };",
+    mustFail: "does not post a second thread for the same incident fired again",
+  },
 ];
