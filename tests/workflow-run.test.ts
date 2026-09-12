@@ -447,6 +447,18 @@ describe("the Set node that joins the answer back to the incident", () => {
     const conv = ((out.incident as Record<string, unknown>).conversation ?? {}) as Record<string, unknown>;
     const messages = (conv.messages ?? []) as Array<{ text: string }>;
     expect(messages.map((m) => m.text)).toEqual(thread);
+
+    // The Slack Block Kit view is built by the SAME chain, not by a test calling
+    // slackReport — so the formatted post the owner sees comes from the deployed
+    // Report node, and names this incident's cluster, namespace and failing pod.
+    const blocks = out.slack_blocks as Array<Record<string, unknown>> | undefined;
+    expect(blocks, "the chain produced no Slack blocks").toBeDefined();
+    const blocksText = JSON.stringify(blocks);
+    expect(blocksText, "names the failing pod").toContain("payment-api-7d4b8c9f5-x2mnq");
+    expect(blocksText, "names the cluster").toContain("prod-eu");
+    expect(blocksText, "names the namespace").toContain("production");
+    expect(blocksText, "must not leak the observation blob").not.toContain("provenance");
+    expect(out.slack_text, "the plain thread rides along as the fallback").toBe(thread!.join("\n\n"));
   });
 
   it("keeps the conclusion when the thread cannot be written, rather than losing both", async () => {

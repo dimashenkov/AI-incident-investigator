@@ -447,9 +447,13 @@ export function buildWorkflow(runtime, { name = "AI SRE — incident investigati
    *    and drops a hit, so an incident already posted opens no second thread. This
    *    closes the SEQUENTIAL retry only; two simultaneous runs is the recorded
    *    SKIP-Redis limitation (n8n Cloud runs webhooks concurrently, measured).
-   *  - Slack post: chat.postMessage, text is the thread and nothing else — never
-   *    the incident or the observations, which would leak to a foreign disk the
-   *    way content-capture to Langfuse would.
+   *  - Slack post: chat.postMessage with Block Kit `blocks` (slackReport) and the
+   *    plain thread as the `text` fallback — never the incident or the
+   *    observations, which would leak to a foreign disk the way content-capture
+   *    to Langfuse would. slackReport builds the blocks from this incident's own
+   *    curated fields (cluster, namespace, the offending pod, the thread lines),
+   *    not from the observation blob, so the formatted message carries no more
+   *    than the plain one did.
    *  - Slack took + Slack ok: Slack returns HTTP 200 even on {ok:false}, so the ts
    *    is taken only when ok===true and non-empty, and only then does record run.
    *    An empty ts must never be written — it would poison the dictionary forever.
@@ -487,7 +491,7 @@ export function buildWorkflow(runtime, { name = "AI SRE — incident investigati
       authentication: "genericCredentialType", genericAuthType: "httpHeaderAuth",
       sendHeaders: true, headerParameters: { parameters: [{ name: "Content-Type", value: "application/json; charset=utf-8" }] },
       sendBody: true, specifyBody: "json",
-      jsonBody: `={{ JSON.stringify({ channel: "${SLACK_CHANNEL}", text: ($json.thread || []).join("\\n\\n") }) }}`,
+      jsonBody: `={{ JSON.stringify({ channel: "${SLACK_CHANNEL}", blocks: ($json.slack_blocks || []), text: ($json.slack_text || ($json.thread || []).join("\\n\\n")) }) }}`,
       options: {} },
   });
   connections["Slack lookup"] = { main: [[{ node: "Slack post", type: "main", index: 0 }]] };

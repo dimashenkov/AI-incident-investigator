@@ -416,3 +416,128 @@ function sourceOf(agent: string, ref: string | undefined, agents: AgentResult[])
   }
   return agent;
 }
+
+/**
+ * A Slack Block Kit view of the report, for the real #incidents post.
+ *
+ * The owner asked (2026-09-12) for a formatted message with emoji, and for the
+ * cluster, namespace and PROBLEM POD to be named — the plain thread said only
+ * "container payment-api". This builds that view from THIS incident's own fields
+ * (cluster, namespace, the offending pod, the thread lines, the code and
+ * confidence). It never dumps observations — the leak the schema and the Slack
+ * post body both refuse. No imports, so the Code node can carry it.
+ *
+ * The pod is chosen deterministically, not by the model: the first pod in the
+ * kubernetes slot carrying a container that is not ready NOW, and whose namespace
+ * is this incident's. If none is found, the pod line is simply omitted rather
+ * than guessed. See problemPod for why each of those three conditions is there.
+ */
+type SlackBlock = Record<string, unknown>;
+
+function section(text: string): SlackBlock {
+  return { type: "section", text: { type: "mrkdwn", text } };
+}
+function context(text: string): SlackBlock {
+  return { type: "context", elements: [{ type: "mrkdwn", text }] };
+}
+
+/**
+ * The offending pod's name, or null. Three guards, each closing a defect Grok
+ * found on 2026-09-12 in the first whole-tree version:
+ *
+ *  - it reads ONLY `observations.kubernetes.pods`, not every nested `pods[]` in
+ *    the tree. The whole-tree walk would have named a pod from a contaminated
+ *    slot — somebody else's payload that happens to carry a pods array — as this
+ *    incident's. The rest of the system copies one slot; so does this.
+ *  - a container is failing iff it is `ready === false` NOW. A prior
+ *    `last_state.terminated` on a container that has since recovered is history,
+ *    not the current fault, and naming a recovered pod misleads the reader.
+ *  - the pod is named only when its namespace is THIS incident's. slackReport
+ *    shows the incident's namespace beside the pod name; a pod from another
+ *    namespace would be attributed to the wrong one, so it is skipped instead.
+ */
+export function problemPod(
+  observations: unknown,
+  expectedNamespace: string,
+): { name: string; namespace: string } | null {
+  if (observations === null || typeof observations !== "object") return null;
+  const kube = (observations as Record<string, unknown>)["kubernetes"];
+  if (kube === null || typeof kube !== "object") return null;
+  const podsRaw = (kube as Record<string, unknown>)["pods"];
+  if (!Array.isArray(podsRaw)) return null;
+  for (const p of podsRaw) {
+    if (p === null || typeof p !== "object") continue;
+    const rec = p as Record<string, unknown>;
+    const containers = Array.isArray(rec["containers"]) ? (rec["containers"] as Array<Record<string, unknown>>) : [];
+    const failing = containers.some((c) => c !== null && typeof c === "object" && c["ready"] === false);
+    if (!failing) continue;
+    if (typeof rec["name"] !== "string") continue;
+    const ns = typeof rec["namespace"] === "string" ? rec["namespace"] : "";
+    if (ns !== expectedNamespace) continue;
+    return { name: rec["name"] as string, namespace: ns };
+  }
+  return null;
+}
+
+/** An emoji per agent label, for the thread lines. Unknown labels get a neutral one. */
+function labelIcon(label: string): string {
+  const lower = label.toLowerCase();
+  if (lower === "kubernetes") return ":ice_cube:";
+  if (lower === "logs") return ":page_facing_up:";
+  if (lower === "metrics") return ":bar_chart:";
+  if (lower === "root_cause" || lower.startsWith("root cause")) return ":dart:";
+  return ":small_blue_diamond:";
+}
+
+/**
+ * Build the Block Kit message. `thread` is the sentences a person reads; `incident`
+ * supplies cluster/namespace/service and the observations to find the pod; `code`
+ * and `confidence` are the conclusion. Returns { blocks, text } — text is the
+ * plain fallback for notifications and clients that do not render blocks.
+ */
+export function slackReport(
+  incident: Record<string, unknown>,
+  thread: string[],
+  code: string,
+  confidence: number,
+): { blocks: SlackBlock[]; text: string } {
+  const service = typeof incident["service"] === "string" ? incident["service"] : "incident";
+  const id = typeof incident["incident_id"] === "string" ? incident["incident_id"] : "";
+  const cluster = typeof incident["cluster"] === "string" ? incident["cluster"] : "";
+  const namespace = typeof incident["namespace"] === "string" ? incident["namespace"] : "";
+  const pod = problemPod(incident["observations"], namespace);
+
+  const ctxParts: string[] = [];
+  if (cluster) ctxParts.push(`:wheel_of_dharma: cluster \`${cluster}\``);
+  if (namespace) ctxParts.push(`:globe_with_meridians: namespace \`${namespace}\``);
+  if (pod) ctxParts.push(`:test_tube: pod \`${pod.name}\``);
+
+  const blocks: SlackBlock[] = [
+    { type: "header", text: { type: "plain_text", text: `:rotating_light: ${id} — ${service}`, emoji: true } },
+  ];
+  if (ctxParts.length > 0) blocks.push(context(ctxParts.join("  ·  ")));
+  blocks.push({ type: "divider" });
+
+  // The thread lines as sections. The first line is the system "investigating"
+  // header, already shown in the header/context — skip it. Agent lines get an
+  // emoji and a bold label; the final "Root cause:" line is highlighted below.
+  for (let i = 1; i < thread.length; i += 1) {
+    const line = thread[i] ?? "";
+    if (/^root cause:/i.test(line)) continue; // shown in the highlighted block below
+    const c = line.indexOf(":");
+    if (c > 0) {
+      const label = line.slice(0, c);
+      blocks.push(section(`${labelIcon(label)} *${label}*${line.slice(c + 1)}`));
+    } else if (line.trim() !== "") {
+      blocks.push(section(line));
+    }
+  }
+
+  blocks.push({ type: "divider" });
+  const rc = thread.find((l) => /^root cause:/i.test(l)) ?? "";
+  const rcRest = rc.indexOf(":") > 0 ? rc.slice(rc.indexOf(":") + 1) : "";
+  blocks.push(section(`:dart: *Root cause:*  \`${code}\`${rcRest ? `\n${rcRest.trim()}` : ""}`));
+  blocks.push(context(`:bar_chart: confidence *${asPercent(confidence)}* — the model's own estimate, nothing here checks it`));
+
+  return { blocks, text: thread.join("\n\n") };
+}

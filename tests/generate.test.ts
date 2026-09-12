@@ -223,7 +223,11 @@ describe("the shape of the deployed chain", () => {
     expect(post.parameters.authentication).toBe("genericCredentialType");
     expect(post.parameters.genericAuthType).toBe("httpHeaderAuth");
     expect(post.credentials.httpHeaderAuth).toEqual({ id: SLACK_CREDENTIAL.id, name: SLACK_CREDENTIAL.name });
-    expect(post.parameters.jsonBody, "the message is the thread").toContain("$json.thread");
+    // The visible message is the Block Kit view (slackReport), with the plain
+    // thread as the text fallback. Both are curated fields — never the incident
+    // object or the observation blob, which would leak to a foreign disk.
+    expect(post.parameters.jsonBody, "sends the Block Kit blocks").toContain("$json.slack_blocks");
+    expect(post.parameters.jsonBody, "and the plain thread as the fallback").toContain("$json.thread");
     expect(post.parameters.jsonBody, "never the whole incident").not.toContain("incident");
     expect(post.parameters.jsonBody, "never the observations").not.toContain("observations");
 

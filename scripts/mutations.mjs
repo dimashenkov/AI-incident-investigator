@@ -3011,4 +3011,33 @@ export const MUTATIONS = [
     to: "ts: (typeof $json.ts === 'string' && $json.ts) ? $json.ts : \"\"",
     mustFail: "wires the real Slack delivery: dedup by rowNotExists, post the thread only, record only on ok",
   },
+  {
+    // The Block Kit view must name the FAILING pod. Picking the first pod that
+    // is ready instead names a healthy pod in the incident report a person acts
+    // on — the exact opposite of what the owner asked for.
+    id: "slack-report-names-a-healthy-pod-not-the-failing-one",
+    file: "src/core/thread.ts",
+    from: 'c["ready"] === false',
+    to: 'c["ready"] === true',
+    mustFail: "picks the failing pod, not the first one listed",
+  },
+  {
+    // The pod is named only when its namespace is this incident's. Dropping the
+    // guard names a pod from another namespace — contamination attributed to the
+    // wrong tenant, in a message posted to a real Slack (Grok, 2026-09-12).
+    id: "slack-report-names-a-pod-from-another-namespace",
+    file: "src/core/thread.ts",
+    from: "if (ns !== expectedNamespace) continue;",
+    to: "if (ns !== expectedNamespace && false) continue;",
+    mustFail: "does NOT name a failing pod from another namespace — that is contamination",
+  },
+  {
+    // The post must send the Block Kit blocks. Dropping them falls back to the
+    // plain thread, which is the un-formatted message the owner rejected.
+    id: "slack-post-drops-the-block-kit-blocks",
+    file: "scripts/generate-workflow.mjs",
+    from: "blocks: ($json.slack_blocks || []), ",
+    to: "",
+    mustFail: "wires the real Slack delivery: dedup by rowNotExists, post the thread only, record only on ok",
+  },
 ];

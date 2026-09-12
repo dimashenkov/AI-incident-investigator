@@ -38,6 +38,16 @@ Verified working on 2026-09-12 with `auth.test` (a read, not a message):
   (`chat.postMessage`) → Slack took → Slack ok → Slack record. Deduped by
   `incident_id` for the SEQUENTIAL retry; the concurrent race is the recorded
   SKIP-Redis limitation. Proven live in a scratch workflow before generation.
+- The post is **Block Kit formatted** (`slackReport` in `src/core/thread.ts`,
+  approved 2026-09-12): a header `🚨 <id> — <service>`, a context line
+  `☸️ cluster · 🌐 namespace · 🧫 pod`, the agent thread lines with per-agent
+  emoji, a divider, `🎯 Root cause: <CODE>`, and a confidence context line. The
+  failing pod is chosen deterministically (a container not `ready` or with a
+  `terminated` last state), never by the model. `slackReport` reads only this
+  incident's own curated fields — cluster, namespace, the pod NAME, the thread —
+  and never the observation blob, so the formatted message leaks no more than the
+  plain thread did. The `blocks` are sent with the plain thread as the `text`
+  fallback.
 - **Credential** (created by the owner — entering a token is prohibited for the
   agent): a generic **Header Auth** `Authorization: Bearer <bot token>`, id
   `eOVr6fQ0yzz3yiwO`, name `Header Auth account`. The workflow references it by

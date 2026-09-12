@@ -572,8 +572,19 @@ return items.map(function (item, index) {
       report_errors: reported.errors || [] }) };
   }
   const next = Object.assign({}, inc, { conversation: reported.conversation });
-  return { json: Object.assign({}, j, { incident: next,
-    thread: (reported.conversation.messages || []).map(function (m) { return m.text; }) }) };
+  const thread = (reported.conversation.messages || []).map(function (m) { return m.text; });
+  /*
+   * The Block Kit view for the real Slack post, built from THIS incident's own
+   * fields — cluster, namespace, the offending pod, the thread lines, the code
+   * and confidence. slackReport reads observations.kubernetes.pods ONLY to find
+   * the failing pod's NAME (and only when its namespace is this incident's); it
+   * never carries the observation blob, provenance, or another slot's data into
+   * the message, so the formatted post leaks no more than the plain thread. If
+   * the incident carries no code, the plain thread still posts as the fallback.
+   */
+  const slack = slackReport(inc, thread, j.root_cause_code || "", typeof j.confidence === "number" ? j.confidence : 0);
+  return { json: Object.assign({}, j, { incident: next, thread: thread,
+    slack_blocks: slack.blocks, slack_text: slack.text }) };
 });
 `;
 }
