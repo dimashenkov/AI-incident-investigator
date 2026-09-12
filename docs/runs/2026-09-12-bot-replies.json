@@ -1,0 +1,13 @@
+{
+  "note": "2 more two-way bot replies (executions >377) after the volume-full demo, on the armed listener path \u2014 the owner tested the enhanced bot (full data + advice) and was satisfied. Captured when made.",
+  "recorded": "when made, 2026-09-12",
+  "when": "2026-09-12",
+  "model": "gpt-5-2025-08-07",
+  "temperature": 1,
+  "totals": {
+    "input_tokens": 2374,
+    "output_tokens": 2452,
+    "why": "gpt-5-2025-08-07 has no published price in the PRICES table; the tokens are recorded (2374 in / 2452 out) but the dollar cost is a floor until a price is added with the date it was read"
+  },
+  "outcome": "the enhanced bot answered detailed questions from the full data and gave remediation suggestions; owner approved"
+}
