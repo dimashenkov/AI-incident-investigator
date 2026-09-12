@@ -2942,8 +2942,8 @@ export const MUTATIONS = [
     // test is what catches two winners where there must be one.
     id: "a-losing-claim-is-promoted-to-a-poster",
     file: "src/providers/thread-index.ts",
-    from: "    if (won) return { state: \"won\" };",
-    to: "    if (true) return { state: \"won\" };",
+    from: "      if (await this.#store.putIfAbsent(key, fresh)) return { state: \"won\", gen: 1 };",
+    to: "      if (true) return { state: \"won\", gen: 1 };",
     mustFail: "lets exactly one of many concurrent claims win",
   },
   {
@@ -2955,5 +2955,15 @@ export const MUTATIONS = [
     from: "    if (!reserved) {",
     to: "    if (false) {",
     mustFail: "lets only one of two incidents bind the same ts, concurrently",
+  },
+  {
+    // The whole expiry safety: a superseded generation must not bind, or a
+    // reclaimed incident gets a SECOND Slack thread. Dropping the gen check lets
+    // the stale winner bind.
+    id: "a-superseded-generation-may-still-bind",
+    file: "src/providers/thread-index.ts",
+    from: "    if (p.gen !== gen) {",
+    to: "    if (false) {",
+    mustFail: "Grok's test: a superseded generation cannot bind, the new one can",
   },
 ];

@@ -1,82 +1,74 @@
 /**
- * The durable thread <-> incident index, and the atomic claim + bind that keep a
- * race from opening two threads for one incident, or one thread for two.
+ * The durable thread <-> incident index: the claim wins once, it can EXPIRE
+ * without becoming a second writer, and the bind stays one-to-one.
  *
- * Grok, 2026-09-12, built and reviewed this backbone before any Slack post. The
- * in-memory ThreadIndex in slack.ts dies with the n8n execution, so two executions
- * of one incident both see "no thread" and both post. The decision "may I open a
- * thread for this incident" has to be made once, atomically, BEFORE posting, and
- * the link has to outlive the execution.
+ * Grok drove three rounds of this (2026-09-12). The in-memory ThreadIndex in
+ * slack.ts dies with the n8n execution, so two executions of one incident both
+ * post and Slack ends up with two threads. So the decision "may I open a thread"
+ * is made once, atomically, in a store that outlives the execution, BEFORE the
+ * visible act of posting.
  *
- * A first version of this file was wrong in two ways Grok caught (200/200 repro):
- *   1. `bind` read-then-wrote with an await between, so two binds of one ts to two
- *      incidents both saw "free" and both wrote — the very cross-incident link the
- *      index exists to forbid. The Promise.all test only guarded `claim`.
- *   2. The PENDING marker held a literal NUL byte (a typo the tests could not see,
- *      because they imported the constant); a JSON / Data Table round-trip that
- *      strips NUL would turn the marker into a value that reads like a real ts.
+ * Round 1 was wrong two ways (bind was check-then-put; PENDING held a NUL byte).
+ * Round 2 fixed the target races. Round 3 found what remained and set this round:
+ *   - a winner that crashes between `claim` and `bind` left the slot PENDING
+ *     FOREVER, so that incident could never open a thread again;
+ *   - the rollback could delete a ts a concurrent same-incident binder had
+ *     legitimately bound, on a network store where a delete follows an await.
  *
- * The fix is the store contract below. Correctness rests on TWO atomic primitives,
- * `putIfAbsent` and `compareAndSwap` — never on a plain `put`, because "write this
- * value" is not "write it only if nobody else has moved it". A store that cannot
- * offer both (an n8n Data Table whose only conditional write is upsert, which
- * overwrites) cannot honestly back this index — the adapter must be checked for
- * insert-fail-on-duplicate before it is trusted.
+ * The fix is a GENERATION carried in the pending marker: `pending:<gen>:<expMs>`.
+ *   - `claim` stamps gen 1 and an expiry. A later caller whose expiry has passed
+ *     RECLAIMS by compare-and-swapping the marker to gen+1 — so exactly one
+ *     reclaimer wins, and the stale winner (holding the old gen) can no longer
+ *     bind. Expiry is a CAS on the marker, never a second write of a ts, so it
+ *     cannot open a second thread.
+ *   - `bind` takes the gen it was granted and checks the slot still holds that
+ *     exact gen BEFORE it reserves the ts. A stale-gen bind refuses without
+ *     touching anything, which is what closes the rollback hole: only the caller
+ *     whose gen currently holds the slot ever reserves the ts.
  *
- * KNOWN LIMIT, recorded not hidden (Grok): a winner that crashes between `claim`
- * and `bind` leaves the slot PENDING forever, and that incident can never open a
- * thread again. The honest fix is a claim that can EXPIRE, guarded by a generation
- * and compare-and-swap so the expiry cannot itself become a second writer. That is
- * the next brick; this file does not yet do it, and callers must treat a
- * long-PENDING slot as stuck rather than free.
+ * The wall, stated not hidden (Grok): the index does not reach into Slack. A
+ * stale winner that was reclaimed can still send a late Slack message and orphan
+ * a thread in the channel — the index will not double-bind, but it cannot un-post.
+ * The poster must claim/bind with the CURRENT gen, never a `won` it cached before.
+ *
+ * Correctness rests on two atomic store primitives, `putIfAbsent` and
+ * `compareAndSwap` (plus `compareAndDelete` for rollback), never a plain write. A
+ * store whose only conditional write is upsert (an n8n Data Table) cannot back
+ * this — the adapter must be checked for insert-fail-on-duplicate and a real CAS.
  */
 
-/**
- * The store the index sits on. Every mutation that must not race another writer
- * is conditional: `putIfAbsent` creates only if absent, `compareAndSwap` moves a
- * key only from an exact expected value, `compareAndDelete` removes only from one.
- * Each reports whether THIS caller was the one that changed it. A plain
- * unconditional write is deliberately NOT in the interface — it is the operation
- * that let two binds collide.
- *
- * Every method is async because the real backing (an n8n Data Table over the
- * network) is; the in-memory double resolves immediately.
- */
 export interface AtomicStore {
-  /** Create `key`=`value` only if absent. `true` iff this call created it. Two
-   *  concurrent calls for one key see exactly one `true`. */
   putIfAbsent(key: string, value: string): Promise<boolean>;
-  /** Move `key` from exactly `expected` to `next`. `true` iff it was `expected`
-   *  and is now `next`. A key that is absent or holds anything else is untouched. */
   compareAndSwap(key: string, expected: string, next: string): Promise<boolean>;
-  /** Remove `key` only if it holds exactly `expected`. `true` iff it did and is
-   *  now gone. Used only to roll back a reservation this caller just made. */
   compareAndDelete(key: string, expected: string): Promise<boolean>;
   get(key: string): Promise<string | null>;
 }
 
-/**
- * The marker a claimed-but-not-yet-posted slot holds. Plain ASCII, and nothing a
- * Slack ts could ever equal (a ts is "digits.digits"), so it cannot be mistaken
- * for a real thread even if a store round-trips it. NOT a NUL-bearing string —
- * that was the bug.
- */
-export const PENDING = "pending";
-
 const incidentKey = (incidentId: string) => `incident:${incidentId}`;
 const tsKey = (ts: string) => `ts:${ts}`;
 
-/** The outcome of trying to claim the right to open a thread for an incident. */
+/** A claimed-but-unposted slot: `pending:<gen>:<expiryMs>`. Plain ASCII, and a
+ *  shape no Slack ts ("digits.digits") can equal, so it can never be mistaken for
+ *  a real thread even across a store round-trip. */
+function mkPending(gen: number, expiryMs: number): string {
+  return `pending:${gen}:${expiryMs}`;
+}
+/** Parse a pending marker, or null if the value is not one (e.g. it is a real ts). */
+function parsePending(value: string): { gen: number; expiryMs: number } | null {
+  const m = /^pending:(\d+):(\d+)$/.exec(value);
+  if (m === null) return null;
+  return { gen: Number(m[1]), expiryMs: Number(m[2]) };
+}
+/** Exposed only so a test can assert the marker's shape without hard-coding it. */
+export const isPending = (value: string): boolean => parsePending(value) !== null;
+
 export type Claim =
-  /** This caller won and MUST be the one to post. Nobody else gets `won`. */
-  | { state: "won" }
-  /** Someone already holds the slot. `ts` is the real thread if bound, or null
-   *  while the winner is still mid-post (or stuck). Do NOT post. */
+  /** Won: this caller MUST be the one to post, and MUST pass `gen` to bind. */
+  | { state: "won"; gen: number }
+  /** Held by someone else: `ts` if the thread exists, null while mid-post/pending. */
   | { state: "held"; ts: string | null }
-  /** The claim could not be attempted — the store failed. Not a licence to post. */
   | { state: "error"; reason: string };
 
-/** Looking a thread up by the id Slack sends back on a reply. */
 export type Resolve =
   | { state: "found"; incidentId: string }
   | { state: "unknown"; reason: string };
@@ -85,60 +77,89 @@ export type Bind =
   | { state: "bound" }
   | { state: "refused"; reason: string };
 
-/** Holds no state of its own — everything lives in the store, so it survives the
- *  process. One instance per store. */
+export interface ThreadIndexOptions {
+  /** Wall-clock, injected so tests can advance it. Defaults to Date.now. */
+  now?: () => number;
+  /** How long a claim holds before it may be reclaimed. */
+  ttlMs?: number;
+}
+
+const DEFAULT_TTL_MS = 5 * 60 * 1000;
+
 export class DurableThreadIndex {
   #store: AtomicStore;
+  #now: () => number;
+  #ttlMs: number;
 
-  constructor(store: AtomicStore) {
+  constructor(store: AtomicStore, opts: ThreadIndexOptions = {}) {
     this.#store = store;
+    this.#now = opts.now ?? (() => Date.now());
+    this.#ttlMs = opts.ttlMs ?? DEFAULT_TTL_MS;
   }
 
   /**
    * Claim the right to open a thread for this incident, once.
    *
-   * The race turns on the first write winning: `putIfAbsent` on the incident key.
-   * The winner is the only caller that may post. A loser reads the slot to learn
-   * whether the thread exists (`ts`) or is still being opened (`null`) — it never
-   * gets `won`, so it never posts.
+   * A fresh incident is claimed with `putIfAbsent` at gen 1. If the slot is
+   * already held but its expiry has passed, this RECLAIMS it: compare-and-swap the
+   * exact stale marker to gen+1. The compare-and-swap is what makes reclaim safe —
+   * only one caller moves the marker, and the previous winner, still holding the
+   * old gen, can no longer bind.
    */
   async claim(incidentId: string): Promise<Claim> {
-    let won: boolean;
+    const key = incidentKey(incidentId);
+    const fresh = mkPending(1, this.#now() + this.#ttlMs);
     try {
-      won = await this.#store.putIfAbsent(incidentKey(incidentId), PENDING);
-    } catch (e) {
-      return { state: "error", reason: msg(e) };
-    }
-    if (won) return { state: "won" };
+      if (await this.#store.putIfAbsent(key, fresh)) return { state: "won", gen: 1 };
 
-    let held: string | null;
-    try {
-      held = await this.#store.get(incidentKey(incidentId));
+      const cur = await this.#store.get(key);
+      if (cur === null) return { state: "held", ts: null };
+      const p = parsePending(cur);
+      if (p === null) return { state: "held", ts: cur }; // a real ts: the thread exists
+      if (this.#now() <= p.expiryMs) return { state: "held", ts: null }; // active claim
+
+      // Expired: try to reclaim by advancing the generation.
+      const next = mkPending(p.gen + 1, this.#now() + this.#ttlMs);
+      if (await this.#store.compareAndSwap(key, cur, next)) {
+        return { state: "won", gen: p.gen + 1 };
+      }
+      return { state: "held", ts: null }; // someone else reclaimed first
     } catch (e) {
       return { state: "error", reason: msg(e) };
     }
-    if (held === null || held === PENDING) return { state: "held", ts: null };
-    return { state: "held", ts: held };
   }
 
   /**
-   * Record the real Slack ts against an incident the caller has claimed, atomically
-   * in both directions.
-   *
-   * ts is reserved FIRST, with `putIfAbsent` — so only one incident can ever own a
-   * given ts, and this is the crash-safer order (if the process dies here, an
-   * inbound reply on that ts still resolves to its incident). Then the incident
-   * slot is moved PENDING -> ts with `compareAndSwap`, so only the caller whose
-   * slot is still PENDING binds it. If the slot move fails, the ts reservation is
-   * rolled back with `compareAndDelete` so a refused bind leaves nothing behind.
-   * Re-binding the same pair is idempotent, not a second post.
+   * Record the real Slack ts against an incident, for the generation that was
+   * granted. Gen is checked FIRST, before the ts is reserved, so a stale claim
+   * refuses without touching anything — which is what keeps a rollback from ever
+   * deleting a ts a current-gen binder owns.
    */
-  async bind(incidentId: string, ts: string): Promise<Bind> {
-    if (ts === PENDING || ts.length === 0) {
+  async bind(incidentId: string, ts: string, gen: number): Promise<Bind> {
+    if (ts.length === 0 || parsePending(ts) !== null) {
       return { state: "refused", reason: "a thread ts must be a real, non-empty Slack id" };
     }
+    const key = incidentKey(incidentId);
 
-    // 1. Reserve the ts. One incident per ts, decided by the store, once.
+    let cur: string | null;
+    try {
+      cur = await this.#store.get(key);
+    } catch (e) {
+      return { state: "refused", reason: msg(e) };
+    }
+    if (cur === null) {
+      return { state: "refused", reason: `${incidentId} was never claimed; bind must follow a won claim` };
+    }
+    if (cur === ts) return { state: "bound" }; // idempotent re-bind of the same pair
+    const p = parsePending(cur);
+    if (p === null) {
+      return { state: "refused", reason: `${incidentId} already has thread ${cur}` };
+    }
+    if (p.gen !== gen) {
+      return { state: "refused", reason: `claim for ${incidentId} was superseded (gen ${gen} is not ${p.gen})` };
+    }
+
+    // Our generation holds the slot. Reserve the ts — one incident per ts.
     let reserved: boolean;
     try {
       reserved = await this.#store.putIfAbsent(tsKey(ts), incidentId);
@@ -155,66 +176,51 @@ export class DurableThreadIndex {
       if (owner !== incidentId) {
         return { state: "refused", reason: `${ts} already belongs to ${owner}` };
       }
-      // owner === incidentId: a re-bind of our own ts; fall through to the slot.
+      // our own reservation from a retry; fall through to move the slot
     }
 
-    // 2. Move the incident slot PENDING -> ts, atomically.
+    // Move the slot from this exact pending marker to the ts. If it fails, the
+    // slot was reclaimed in the window between the read and here — refuse and undo
+    // our reservation, which is safe because no other current-gen caller exists.
     let moved: boolean;
     try {
-      moved = await this.#store.compareAndSwap(incidentKey(incidentId), PENDING, ts);
+      moved = await this.#store.compareAndSwap(key, cur, ts);
     } catch (e) {
       await this.#rollback(ts, incidentId);
       return { state: "refused", reason: msg(e) };
     }
     if (moved) return { state: "bound" };
-
-    // The slot was not PENDING. Either already this ts (idempotent), or a state
-    // this bind may not touch — in which case undo the ts reservation.
-    let slot: string | null;
-    try {
-      slot = await this.#store.get(incidentKey(incidentId));
-    } catch (e) {
-      return { state: "refused", reason: msg(e) };
-    }
-    if (slot === ts) return { state: "bound" };
     await this.#rollback(ts, incidentId);
-    if (slot === null) {
-      return { state: "refused", reason: `${incidentId} was never claimed; bind must follow a won claim` };
-    }
-    return { state: "refused", reason: `${incidentId} already has thread ${slot}` };
+    return { state: "refused", reason: `claim for ${incidentId} was reclaimed during bind` };
   }
 
-  /** Undo a ts reservation this caller made, but only if it is still ours — never
-   *  delete a ts another incident has since taken. */
   async #rollback(ts: string, incidentId: string): Promise<void> {
     try {
       await this.#store.compareAndDelete(tsKey(ts), incidentId);
     } catch {
-      // Best effort: a failed rollback leaves a ts->incident row whose incident
-      // is not bound to it. resolve() would still point at that incident, which
-      // did try to own the ts; it is inconsistent, not a cross-incident leak.
+      // Best effort. A stranded ts->incident row points at an incident that did
+      // try to own the ts; it is inconsistent, not a cross-incident leak.
     }
   }
 
-  /** Which incident owns this Slack thread? Unknown is not "probably fine" — an
-   *  unresolved ts is never answered from a guess. */
+  /** Which incident owns this Slack thread? An unregistered ts is unknown, never
+   *  a guess. */
   async resolve(ts: string): Promise<Resolve> {
-    let incidentId: string | null;
     try {
-      incidentId = await this.#store.get(tsKey(ts));
+      const incidentId = await this.#store.get(tsKey(ts));
+      if (incidentId === null) return { state: "unknown", reason: `${ts} is not a registered thread` };
+      return { state: "found", incidentId };
     } catch (e) {
       return { state: "unknown", reason: msg(e) };
     }
-    if (incidentId === null) return { state: "unknown", reason: `${ts} is not a registered thread` };
-    return { state: "found", incidentId };
   }
 
-  /** The thread already open for this incident, if any. `null` means never
-   *  claimed or still pending — the caller must not read that as "post". */
+  /** The thread already open for this incident, if any. A pending or absent slot
+   *  returns null — the caller must not read that as "a thread exists". */
   async tsForIncident(incidentId: string): Promise<string | null> {
-    const slot = await this.#store.get(incidentKey(incidentId));
-    if (slot === null || slot === PENDING) return null;
-    return slot;
+    const cur = await this.#store.get(incidentKey(incidentId));
+    if (cur === null || parsePending(cur) !== null) return null;
+    return cur;
   }
 }
 
@@ -223,15 +229,12 @@ function msg(e: unknown): string {
 }
 
 /**
- * An in-memory store, for tests and single-process local runs.
- *
- * The conditional methods are atomic here only because JavaScript runs one turn
- * at a time and none of them awaits between reading and writing — that is the
- * whole point, and it is exactly what the first `bind` got wrong by awaiting
- * mid-operation. It is NOT the durability the deployed workflow needs: a Map dies
- * with the process. The n8n Data Table adapter is what makes it durable in the
- * cloud, and it must provide the same atomicity or the index's guarantees are a
- * fiction — this is its test double.
+ * An in-memory store for tests and single-process local runs. The conditional
+ * methods are atomic only because JavaScript runs one turn at a time and none of
+ * them awaits between reading and writing — the very property the first `bind`
+ * broke. A Map dies with the process, so this is NOT the durability the deployed
+ * workflow needs; the n8n Data Table adapter is, and it must offer the same
+ * atomicity or the guarantees here are a fiction. This is its test double.
  */
 export class MemoryStore implements AtomicStore {
   #m = new Map<string, string>();
