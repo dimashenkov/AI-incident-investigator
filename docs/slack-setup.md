@@ -61,10 +61,42 @@ Verified working on 2026-09-12 with `auth.test` (a read, not a message):
 
 - One **live end-to-end run** (a model call → real report → `#incidents`) — it
   spends and waits for the owner's word. The chain itself is proven.
-- **Two-way** receiving (the chat bot): needs Event Subscriptions with a public
-  request URL (an n8n webhook) and scopes like `channels:history`. Not started.
 - **Langfuse traces**: the model field is captured (Collect); span timing + the
   Langfuse POST remain.
+
+## Two-way receiving — the plumbing is live (2026-09-12)
+
+Event Subscriptions are configured and verified. What was done, in order:
+
+- **Socket Mode was ON and had to go OFF.** Socket Mode routes events over a
+  WebSocket and disables the Request URL; an n8n HTTP webhook needs it off. The
+  toggle is under Socket Mode in the app settings.
+- **The listener workflow `slack-listener` (id `oMRowrkAwtnjTVIC`) was activated.**
+  A production webhook (`/webhook/<path>`, not `/webhook-test/`) only answers when
+  the workflow is ACTIVE. It was `active:false`; activated via the n8n API.
+- **Request URL** = `https://dimitarshenkov.app.n8n.cloud/webhook/slack-events`,
+  Verified. The Handle node echoes the `url_verification` challenge; probed with a
+  direct curl before pasting, then Slack verified it (2 successful listener
+  executions recorded).
+- **Bot event** `message.channels` subscribed → Slack auto-added the
+  **`channels:history`** scope.
+- **App reinstalled** (owner asked; the OAuth Allow screen requested
+  `chat:write, chat:write.public, channels:history`). Reinstall did NOT rotate the
+  bot token — `auth.test` still `ok:true`, and `conversations.history` on
+  `#incidents` returns `ok:true`, proving the new scope is granted. The posting
+  credential `eOVr6fQ0yzz3yiwO` is untouched.
+
+Bot user id (anti-loop): `U0C1ELPQCGH`. The Handle node drops anything with a
+`bot_id`, from the bot user, or carrying a subtype — so the bot cannot answer
+itself.
+
+What is NOT built yet on the two-way side:
+
+- **The reply brick**: a thread-lookup + model-reply that answers a human message
+  in the thread. It SPENDS (a model call) and waits for the owner's word.
+- **A live human round-trip**: proven only through the two verification challenges;
+  a real `message.channels` from a person typing in `#incidents` should be
+  confirmed once (check the listener's executions after the owner types).
 
 ## One design note carried from the setup
 
