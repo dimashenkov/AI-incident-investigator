@@ -486,7 +486,11 @@ export function problemPod(
     const rec = p as Record<string, unknown>;
     if (typeof rec["name"] !== "string") continue;
     const ns = typeof rec["namespace"] === "string" ? rec["namespace"] : "";
-    if (ns !== expectedNamespace) continue;
+    // The namespace must MATCH, and absence is not a match. Subagent leak audit
+    // 2026-09-12: `"" !== ""` is false, so a namespace-less pod was named for a
+    // namespace-less incident — absence-matches-absence defeating the
+    // contamination guard. Require both sides to be a real, equal namespace.
+    if (expectedNamespace === "" || ns === "" || ns !== expectedNamespace) continue;
     const name = rec["name"] as string;
     const here = { name, namespace: ns };
     const containers = Array.isArray(rec["containers"]) ? (rec["containers"] as Array<Record<string, unknown>>) : [];
@@ -519,6 +523,7 @@ export function slackReport(
   thread: string[],
   code: string,
   confidence: number,
+  datadogId: string = "",
 ): { blocks: SlackBlock[]; text: string } {
   const service = typeof incident["service"] === "string" ? incident["service"] : "incident";
   const id = typeof incident["incident_id"] === "string" ? incident["incident_id"] : "";
@@ -561,6 +566,12 @@ export function slackReport(
   const rcRest = rc.indexOf(":") > 0 ? rc.slice(rc.indexOf(":") + 1) : "";
   blocks.push(section(`:dart: *Root cause:*  \`${code}\`${rcRest ? `\n${rcRest.trim()}` : ""}`));
   blocks.push(context(`:bar_chart: confidence *${asPercent(confidence)}* — the model's own estimate, nothing here checks it`));
+  // The simulated Datadog record, when one was made. Honest wording (Grok,
+  // 2026-09-12): NOT "registered" (past tense of an action on a real channel) —
+  // "simulated … not sent", so no reader thinks a real Datadog incident exists.
+  if (typeof datadogId === "string" && datadogId !== "") {
+    blocks.push(context(`:test_tube: Datadog (simulated): \`${datadogId}\` — not sent to Datadog`));
+  }
 
   return { blocks, text: thread.join("\n\n") };
 }

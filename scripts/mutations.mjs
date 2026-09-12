@@ -3027,9 +3027,19 @@ export const MUTATIONS = [
     // wrong tenant, in a message posted to a real Slack (Grok, 2026-09-12).
     id: "slack-report-names-a-pod-from-another-namespace",
     file: "src/core/thread.ts",
-    from: "if (ns !== expectedNamespace) continue;",
-    to: "if (ns !== expectedNamespace && false) continue;",
+    from: 'if (expectedNamespace === "" || ns === "" || ns !== expectedNamespace) continue;',
+    to: "if (false) continue;",
     mustFail: "does NOT name a failing pod from another namespace — that is contamination",
+  },
+  {
+    // Absence is not a match. Dropping the empty-namespace guards lets a
+    // namespace-less pod be named for a namespace-less incident (subagent audit
+    // 2026-09-12: "" !== "" is false, so absence matched absence).
+    id: "problem-pod-matches-absent-namespace-to-absent",
+    file: "src/core/thread.ts",
+    from: 'expectedNamespace === "" || ns === "" || ',
+    to: "",
+    mustFail: "does NOT name a namespace-less pod for a namespace-less incident",
   },
   {
     // The post must send the Block Kit blocks. Dropping them falls back to the
@@ -3093,8 +3103,8 @@ export const MUTATIONS = [
     // even though it could have answered from the report.
     id: "listener-data-miss-kills-the-chain",
     file: "scripts/generate-listener.mjs",
-    from: 'onError: "continueRegularOutput"',
-    to: 'onError: "stopWorkflow"',
+    from: 'onError: "continueRegularOutput",\n    parameters: { resource: "row", operation: "get",\n      dataTableId: { __rl: true, mode: "id", value: DATA_TABLE },',
+    to: 'parameters: { resource: "row", operation: "get",\n      dataTableId: { __rl: true, mode: "id", value: DATA_TABLE },',
     mustFail: "enriches the answer with the incident's full data, tolerating a miss",
   },
   {
@@ -3126,5 +3136,43 @@ export const MUTATIONS = [
     from: "if (/^root[ _]cause/i.test(line)) continue;",
     to: "if (/^root cause:/i.test(line)) continue;",
     mustFail: "shows the root cause ONCE — not the agent line AND the conclusion",
+  },
+  {
+    // The Datadog registration is SIMULATED and must say so as a field. Flipping
+    // sent to true claims a real Datadog call was made when none was.
+    id: "datadog-record-claims-it-was-sent",
+    file: "src/core/datadog.ts",
+    from: "sent: false,",
+    to: "sent: true,",
+    mustFail: "is marked simulated and not sent — as FIELDS, not wrapper decoration",
+  },
+  {
+    // The Datadog mock is stored, not sent. Storing nothing (empty record) loses
+    // the registration the owner asked for.
+    id: "datadog-store-records-nothing",
+    file: "scripts/generate-workflow.mjs",
+    from: 'record: "={{ JSON.stringify($json.datadog_record || {}) }}"',
+    to: 'record: "={{ JSON.stringify({}) }}"',
+    mustFail: "registers the incident in Datadog — SIMULATED: builds a record, stores it, sends nothing",
+  },
+  {
+    // Ownership leak fix: the bot answers only in a thread it opened, found by
+    // thread_ts in incident_threads. Looking up by incident_id instead of ts
+    // breaks the ownership check (a thread_ts value never matches an incident_id).
+    id: "listener-ownership-looks-up-wrong-key",
+    file: "scripts/generate-listener.mjs",
+    from: 'keyName: "ts", condition: "eq"',
+    to: 'keyName: "incident_id", condition: "eq"',
+    mustFail: "answers only in a thread the bot itself opened, found by thread_ts in incident_threads",
+  },
+  {
+    // The store branches run only for a SUCCESSFULLY reported item (slack_text
+    // present). Gating on incident.incident_id instead lets a report-refused item
+    // (which still carries the id) through, storing an empty/failed registration.
+    id: "reported-gate-passes-refused-items",
+    file: "scripts/generate-workflow.mjs",
+    from: 'leftValue: "={{ $json.slack_text }}"',
+    to: 'leftValue: "={{ $json.incident.incident_id }}"',
+    mustFail: "gates Slack and the stores on a successful report, not merely on an incident id",
   },
 ];

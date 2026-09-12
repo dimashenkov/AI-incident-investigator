@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from "vitest";
 import {
-  classifyEvent, shouldReply, reportTextFrom, replyMessages, answerFrom, BOT_USER,
+  classifyEvent, shouldReply, reportTextFrom, replyMessages, answerFrom, BOT_USER, DATA_CAP,
 } from "../src/core/reply.js";
 
 describe("classifyEvent", () => {
@@ -108,7 +108,7 @@ describe("replyMessages", () => {
     expect(msgs[1]!.content).toContain("why did it crash?");
   });
 
-  it("lets the model reason and advise, but stays read-only (advice, not actions)", () => {
+  it("the prompt lets the model advise AND states the system is read-only (prompt text, not an enforced control)", () => {
     // The owner asked for more than paraphrase. The prompt must permit remediation
     // suggestions AND state the system takes no actions, so the bot cannot imply
     // it did something.
@@ -116,7 +116,7 @@ describe("replyMessages", () => {
     expect(msgs[0]!.content).toMatch(/read-only|takes no actions|cannot run/i);
   });
 
-  it("keeps the grounding guard — answer from the given facts, not invention", () => {
+  it("the prompt INSTRUCTS grounding — not an enforced guard; nothing in code stops invention", () => {
     expect(msgs[0]!.content).toMatch(/ground|do not.*guess|rather than guessing/i);
   });
 
@@ -131,6 +131,16 @@ describe("replyMessages", () => {
     // knows the raw data was not available.
     expect(msgs[1]!.content).toMatch(/not available/i);
     expect(msgs[1]!.content).not.toContain("raw observations):");
+  });
+
+  it("caps the raw data handed over — bounds how much can be surfaced", () => {
+    // Leak audit 2026-09-12: prompt-only "don't paste secrets" is not a control.
+    // The cap is honest defence-in-depth (not redaction): a huge blob is truncated
+    // before it ever reaches the model, so the reply cannot surface the whole thing.
+    const huge = "A".repeat(DATA_CAP + 5000);
+    const m = replyMessages("report", "q", huge);
+    expect(m[1]!.content).toContain("[truncated at");
+    expect(m[1]!.content.length, "the handed-over data is bounded").toBeLessThan(DATA_CAP + 500);
   });
 });
 

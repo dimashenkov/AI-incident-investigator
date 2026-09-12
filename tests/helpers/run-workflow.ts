@@ -162,12 +162,16 @@ export function runIfExpression(node: { parameters?: { conditions?: { conditions
   }
   const c = list[0]!;
   const op = (c.operator as { operation?: string })?.operation;
-  if (op !== "equals") throw new Error(`the gate compares with ${String(op)}, which this harness does not evaluate`);
   const raw = String(c.leftValue);
   if (!raw.startsWith("={{")) throw new Error("the gate's left side is not an expression");
   const body = raw.slice(raw.indexOf("{{") + 2, raw.lastIndexOf("}}"));
   const left = (new Function("$json", `"use strict"; return (${body});`) as (j: unknown) => unknown)(current);
-  return left === c.rightValue;
+  // The gates that ship use exactly three operators; evaluate each the way n8n
+  // does rather than pretend a fourth would work.
+  if (op === "equals") return left === c.rightValue;
+  if (op === "notEmpty") return left !== undefined && left !== null && left !== "";
+  if (op === "empty") return left === undefined || left === null || left === "";
+  throw new Error(`the gate compares with ${String(op)}, which this harness does not evaluate`);
 }
 
 /**

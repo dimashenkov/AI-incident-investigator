@@ -162,6 +162,7 @@ export async function buildRuntime() {
    */
   const configuration = transpile("src/core/configuration.ts");
   const thread = transpile("src/core/thread.ts");
+  const datadog = transpile("src/core/datadog.ts");
   const prompts = readPrompts();
   const incidents = await assembledIncidents();
 
@@ -218,6 +219,9 @@ ${slice}
 
 // ---- src/core/thread.ts, transpiled in memory ----
 ${thread}
+
+// ---- src/core/datadog.ts, transpiled in memory ----
+${datadog}
 
 // ---- the prompts, verbatim ----
 const PROMPTS = ${JSON.stringify(prompts)};
@@ -582,9 +586,20 @@ return items.map(function (item, index) {
    * the message, so the formatted post leaks no more than the plain thread. If
    * the incident carries no code, the plain thread still posts as the fallback.
    */
-  const slack = slackReport(inc, thread, j.root_cause_code || "", typeof j.confidence === "number" ? j.confidence : 0);
+  /*
+   * The SIMULATED Datadog record (owner, 2026-09-12; Datadog is paid, so it is
+   * mocked). Built here from the concluded incident, stored on an independent
+   * branch off Report (like the observations store), and its id shown in the
+   * report — NOT sent anywhere. The id is derived ONCE, in datadogMockRecord, and
+   * passed to slackReport (Grok, 2026-09-12: do not recompute it in two places).
+   */
+  var code = j.root_cause_code || "";
+  var conf = typeof j.confidence === "number" ? j.confidence : 0;
+  var dpod = problemPod(inc.observations, inc.namespace || "", inc.service || "");
+  var ddRecord = datadogMockRecord(inc, code, conf, dpod ? dpod.name : "");
+  const slack = slackReport(inc, thread, code, conf, ddRecord.datadog_incident_id);
   return { json: Object.assign({}, j, { incident: next, thread: thread,
-    slack_blocks: slack.blocks, slack_text: slack.text }) };
+    slack_blocks: slack.blocks, slack_text: slack.text, datadog_record: ddRecord }) };
 });
 `;
 }

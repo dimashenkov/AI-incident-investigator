@@ -347,6 +347,10 @@ const THREAD_TABLE = "HXGSOCOFnTmnAZtJ";
  * must not leak to Slack; the store is private to the n8n instance). Created
  * 2026-09-12. A pointer, not a secret. */
 const INCIDENT_DATA_TABLE = "rKZEwVRRLB3Xb6LR";
+/* The SIMULATED Datadog registrations, one row per incident_id. A pointer, not a
+ * secret. Created 2026-09-12. Nothing is ever sent to Datadog — this is the mock's
+ * system of record. */
+const DATADOG_TABLE = "A1V7WCnaRAdGhtwW";
 
 export function buildWorkflow(runtime, { name = "AI SRE — incident investigation" } = {}) {
   const code = (id, nodeName, body, position) => ({
@@ -496,10 +500,45 @@ export function buildWorkflow(runtime, { name = "AI SRE — incident investigati
           { id: "data", displayName: "data", type: "string", canBeUsedToMatch: false, required: false, display: true, defaultMatch: false },
         ] } },
   });
-  connections["Report"] = { main: [[
+  // A third independent branch: the SIMULATED Datadog registration (owner asked;
+  // Datadog is paid, so it is mocked — never a real call). Report already built
+  // the mock record (datadog_record); this only stores it, keyed by incident_id,
+  // upsert so a re-run refreshes the one row. Nothing is sent to Datadog.
+  const ddTable = { __rl: true, mode: "id", value: DATADOG_TABLE };
+  nodes.push({
+    id: "store-dd", name: "Record Datadog", type: "n8n-nodes-base.dataTable", typeVersion: 1.1,
+    position: [sx + 1480, 420],
+    parameters: { resource: "row", operation: "upsert", dataTableId: ddTable,
+      filters: { conditions: [{ keyName: "incident_id", condition: "eq",
+        keyValue: "={{ $json.incident.incident_id }}" }] },
+      columns: { mappingMode: "defineBelow",
+        value: { incident_id: "={{ $json.incident.incident_id }}",
+          record: "={{ JSON.stringify($json.datadog_record || {}) }}" },
+        matchingColumns: ["incident_id"], schema: [
+          { id: "incident_id", displayName: "incident_id", type: "string", canBeUsedToMatch: true, required: false, display: true, defaultMatch: false },
+          { id: "record", displayName: "record", type: "string", canBeUsedToMatch: false, required: false, display: true, defaultMatch: false },
+        ] } },
+  });
+  // Reported? — the gate before EVERY downstream branch. Subagent audit
+  // 2026-09-12: Report also emits a refusal shape ({...j, report_refused}) that
+  // still carries incident.incident_id but no slack_blocks / datadog_record, and a
+  // fully-refused item carries no incident at all. Ungated, the stores wrote a row
+  // for a failed report (`|| {}` masking the absence) or threw on the missing
+  // incident. Only a SUCCESSFULLY reported item — one carrying slack_text — passes.
+  nodes.push({
+    id: "reported", name: "Reported", type: "n8n-nodes-base.if", typeVersion: 2.2,
+    position: [sx + 740, -220],
+    parameters: { conditions: { options: ifOptions, combinator: "and", conditions: [{
+      leftValue: "={{ $json.slack_text }}", rightValue: "",
+      operator: { type: "string", operation: "notEmpty" } }] } },
+  });
+  connections["Report"] = { main: [[{ node: "Reported", type: "main", index: 0 }]] };
+  // Reported true -> the three branches; false -> nothing (no post, no stores).
+  connections["Reported"] = { main: [[
     { node: "Slack gate", type: "main", index: 0 },
     { node: "Record incident data", type: "main", index: 0 },
-  ]] };
+    { node: "Record Datadog", type: "main", index: 0 },
+  ], []] };
 
   nodes.push({
     id: "slack-lookup", name: "Slack lookup", type: "n8n-nodes-base.dataTable", typeVersion: 1.1,

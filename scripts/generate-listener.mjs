@@ -18,14 +18,19 @@
  *        → Should reply? ── true → Seen event? (rowNotExists on event_id)
  *              → Mark seen        record event_id BEFORE spending
  *              → Fetch thread     (conversations.replies: the report is the parent)
- *              → Build ask        reportTextFrom + replyMessages (no report → stop)
+ *              → Find incident    (thread_ts in incident_threads → incident_id + OWNERSHIP)
+ *              → Owned? ── true → Fetch data (this incident's full observations)
+ *              → Build ask        report + data + question (no report → stop)
  *              → Has report? ── true → Ask model     (gpt-5 — THIS SPENDS)
  *                    → Build reply     answerFrom (no answer → post nothing)
  *                    → Has answer? ── true → Post reply  (chat.postMessage in the thread)
  *
  * No model is called unless a real, non-bot, threaded question arrives AND its
- * event_id has not been seen AND its incident report was found AND the model
- * returned text. Every other path stops without spending.
+ * event_id has not been seen AND the thread is one the bot itself opened (in
+ * incident_threads) AND the model returned text. Every other path stops without
+ * spending. The ownership check is the leak fix (2026-09-12): the bot answers only
+ * in its own report threads, so a human thread that merely names an incident id
+ * can never pull that incident's private data.
  *
  * DUPLICATE DELIVERY, honestly. Slack Events is at-least-once: a lost 200 or a
  * retry re-delivers the SAME event_id. The fast ACK reduces retries but is NOT
@@ -56,6 +61,10 @@ const SEEN_TABLE = "uBZvrUFgQcderwqF";
  *  incident_id, so the bot can answer detailed questions from raw data. A miss is
  *  tolerated (old incidents have none) — the bot then answers from the report. */
 const DATA_TABLE = "rKZEwVRRLB3Xb6LR";
+/** The threads the incident workflow opened when it posted a report (incident_id
+ *  <-> ts). The bot answers ONLY in these — a reply thread_ts found here proves
+ *  ownership and yields the incident_id. Leak audit 2026-09-12. */
+const THREAD_TABLE = "HXGSOCOFnTmnAZtJ";
 
 /** The reply logic, transpiled so the Code nodes carry it (no imports). */
 const REPLY = transpile("src/core/reply.ts");
@@ -187,33 +196,49 @@ return [{ json: Object.assign({}, c, { reply: shouldReply(c) }) }];`
   });
   connections["Mark seen"] = { main: [[{ node: "Fetch thread", type: "main", index: 0 }]] };
 
-  // 5b. Extract id — pull the incident_id out of the report so the full raw data
-  //     can be looked up. The report text opens with "INC-YYYY-NNNN".
+  // 5b. Find incident — the bot answers ONLY in a thread it opened ITSELF.
+  //     Grok/subagent leak audit (2026-09-12): the old version regex-matched an
+  //     "INC-..." out of WHATEVER text rooted the thread — so a human thread that
+  //     merely mentioned an incident id pulled that incident's full private data
+  //     into a thread the bot never posted. The fix ties the answer to ownership:
+  //     look the reply's thread_ts up in incident_threads (the table the incident
+  //     workflow writes when IT posts a report). A hit gives the incident_id AND
+  //     proves the bot owns this thread. A miss (onError-continue) means not ours.
   nodes.push({
-    id: "extract-id", name: "Extract id", type: "n8n-nodes-base.code", typeVersion: 2,
-    position: pos(),
-    parameters: { language: "javaScript", mode: "runOnceForAllItems", jsCode:
-`${REPLY}
-const report = reportTextFrom(($('Fetch thread').first() && $('Fetch thread').first().json) || {});
-const m = report ? report.match(/INC-\\d{4}-\\d{4}/) : null;
-return [{ json: { incident_id: m ? m[0] : "" } }];`
-    },
+    id: "find-incident", name: "Find incident", type: "n8n-nodes-base.dataTable", typeVersion: 1.1,
+    position: pos(), onError: "continueRegularOutput",
+    parameters: { resource: "row", operation: "get",
+      dataTableId: { __rl: true, mode: "id", value: THREAD_TABLE },
+      filters: { conditions: [{ keyName: "ts", condition: "eq",
+        keyValue: "={{ $('Handle').first().json.thread_ts }}" }] } },
   });
-  connections["Fetch thread"] = { main: [[{ node: "Extract id", type: "main", index: 0 }]] };
+  connections["Fetch thread"] = { main: [[{ node: "Find incident", type: "main", index: 0 }]] };
 
-  // 5c. Fetch data — the FULL observations for this incident, so the bot can
-  //     answer detailed questions, not just paraphrase the summary. `get` errors
-  //     on a miss (an old incident with nothing stored), so onError continues:
-  //     a miss is not fatal, the bot then answers from the report alone.
+  // 5c. Owned? — only a thread found in incident_threads (a report the bot posted)
+  //     is answered. Not ours → stop: no data pull, no reply.
+  nodes.push({
+    id: "owned", name: "Owned", type: "n8n-nodes-base.if", typeVersion: 2.2,
+    position: pos(),
+    parameters: { conditions: { options: ifOptions, combinator: "and", conditions: [{
+      leftValue: "={{ $json.incident_id }}", rightValue: "",
+      operator: { type: "string", operation: "notEmpty" } }] } },
+  });
+  connections["Find incident"] = { main: [[{ node: "Owned", type: "main", index: 0 }]] };
+
+  // 5d. Fetch data — the FULL observations for THIS incident (its id came from the
+  //     ownership lookup, not from arbitrary text). `get` errors on a miss (an old
+  //     incident with nothing stored), so onError continues: the bot then answers
+  //     from the report alone rather than breaking.
   nodes.push({
     id: "fetch-data", name: "Fetch data", type: "n8n-nodes-base.dataTable", typeVersion: 1.1,
     position: pos(), onError: "continueRegularOutput",
     parameters: { resource: "row", operation: "get",
       dataTableId: { __rl: true, mode: "id", value: DATA_TABLE },
       filters: { conditions: [{ keyName: "incident_id", condition: "eq",
-        keyValue: "={{ $json.incident_id }}" }] } },
+        keyValue: "={{ $('Find incident').first().json.incident_id }}" }] } },
   });
-  connections["Extract id"] = { main: [[{ node: "Fetch data", type: "main", index: 0 }]] };
+  // Owned true -> fetch data; false -> nothing (a thread the bot did not open).
+  connections["Owned"] = { main: [[{ node: "Fetch data", type: "main", index: 0 }], []] };
 
   // 6. Build ask — report + raw data + question → model messages. Report is read
   //    from Fetch thread by name (Fetch data replaced $json); data is best-effort

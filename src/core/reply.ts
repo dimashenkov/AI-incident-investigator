@@ -105,11 +105,20 @@ export function reportTextFrom(repliesBody: unknown): string | null {
  *  2. It answers from the raw observation DATA when given, not only the summary
  *     report — so a question about an exact metric or log line can be answered.
  *
- * The grounding guard stays: every claim must rest on the report or the data; if
- * neither contains the answer, say so rather than invent. `data` is a JSON string
- * of the incident's observations, or "" when none was found — in which case only
- * the report is given, and the bot is told the raw data was not available.
+ * Grounding is INSTRUCTED, not enforced (subagent audit 2026-09-12: do not call it
+ * a "guard" — nothing in code stops the model inventing; the prompt asks it to
+ * ground and answerFrom returns whatever comes back). The prompt asks every claim
+ * to rest on the report or the data. `data` is a JSON string of the incident's
+ * observations, or "" when none was found.
+ *
+ * DATA_CAP: the raw data is truncated before it is handed over. It bounds how much
+ * can be surfaced through the reply, and is honest defence-in-depth — but it is NOT
+ * redaction. In this prototype the observations are simulated fixtures with no real
+ * secrets; a real deployment must add code-level redaction, because "do not paste
+ * secrets" is a prompt, not a control. Stated as a limitation, not a solved problem.
  */
+export const DATA_CAP = 6000;
+
 export function replyMessages(
   reportText: string,
   question: string,
@@ -126,8 +135,11 @@ export function replyMessages(
     "not restate the whole report, and answer in prose — do not paste the raw data " +
     "or large JSON blobs into the thread.";
   const hasData = typeof data === "string" && data.trim() !== "";
+  const capped = hasData && data.length > DATA_CAP
+    ? `${data.slice(0, DATA_CAP)}\n…[truncated at ${DATA_CAP} chars]`
+    : data;
   const dataSection = hasData
-    ? `\n\nIncident data (raw observations):\n${data}`
+    ? `\n\nIncident data (raw observations):\n${capped}`
     : "\n\n(The raw observation data was not available; answer from the report.)";
   const user = `Incident report:\n${reportText}${dataSection}\n\nQuestion: ${question}`;
   return [

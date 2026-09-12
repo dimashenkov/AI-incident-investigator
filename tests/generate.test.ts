@@ -133,10 +133,10 @@ describe("the shape of the deployed chain", () => {
     const ri = visited.indexOf("Report");
     expect(ri, "Report must be on the line").toBeGreaterThan(-1);
     expect(visited[ri - 1], "Conclude immediately before Report").toBe("Conclude");
-    expect(visited.slice(ri), "Report then the Slack delivery chain, in order").toEqual([
-      "Report", "Slack gate", "Slack lookup", "Slack post", "Slack took", "Slack ok", "Slack record",
+    expect(visited.slice(ri), "Report, the Reported gate, then the Slack delivery chain, in order").toEqual([
+      "Report", "Reported", "Slack gate", "Slack lookup", "Slack post", "Slack took", "Slack ok", "Slack record",
     ]);
-    expect(visited).toHaveLength(2 + AGENT_ORDER.length * 4 + 2 + 6);
+    expect(visited).toHaveLength(2 + AGENT_ORDER.length * 4 + 2 + 7);
   });
 
   it("routes every gate's refusal past the paid call, and eventually to Conclude", () => {
@@ -253,9 +253,16 @@ describe("the shape of the deployed chain", () => {
     // INDEPENDENT branch so it runs regardless of Slack dedup, and the raw data
     // goes to a private table, NEVER into the Slack body.
     const node = (name: string) => WF.nodes.find((n: { name: string }) => n.name === name);
-    const fans = WF.connections["Report"].main[0].map((c: { node: string }) => c.node);
-    expect(fans, "Report fans to Slack AND the store").toContain("Slack gate");
-    expect(fans, "Report fans to Slack AND the store").toContain("Record incident data");
+    // Report fans out only AFTER the Reported gate (a refused report reaches no
+    // branch). The gate checks slack_text, present only on a successful report.
+    expect(WF.connections["Report"].main[0][0].node, "Report goes through the gate").toBe("Reported");
+    const gate = node("Reported") as { parameters: { conditions: { conditions: Array<{ leftValue: string; operator: { operation: string } }> } } };
+    expect(gate.parameters.conditions.conditions[0]!.leftValue, "gates on a successful report").toContain("slack_text");
+    expect(gate.parameters.conditions.conditions[0]!.operator.operation).toBe("notEmpty");
+    expect(WF.connections["Reported"].main[1] ?? [], "a refused report reaches no branch").toEqual([]);
+    const fans = WF.connections["Reported"].main[0].map((c: { node: string }) => c.node);
+    expect(fans, "the gate fans to Slack AND the store").toContain("Slack gate");
+    expect(fans, "the gate fans to Slack AND the store").toContain("Record incident data");
     const store = node("Record incident data") as {
       type: string; parameters: { operation: string; columns: { value: Record<string, string> } };
     };
@@ -265,6 +272,41 @@ describe("the shape of the deployed chain", () => {
     // The store's data must NOT be in the Slack post body (leak guard).
     const post = node("Slack post") as { parameters: { jsonBody: string } };
     expect(post.parameters.jsonBody, "observations never reach Slack").not.toContain("observations");
+  });
+
+  it("registers the incident in Datadog — SIMULATED: builds a record, stores it, sends nothing", () => {
+    // Owner, 2026-09-12: register in Datadog, but Datadog is paid, so mock it.
+    // Grok reviewed the approach: it must NOT be a sendable API body, and the
+    // Slack line must not claim a real registration. Report builds the mock record
+    // and fans a third branch to store it; no node calls Datadog.
+    const node = (name: string) => WF.nodes.find((n: { name: string }) => n.name === name);
+    const fans = WF.connections["Reported"].main[0].map((c: { node: string }) => c.node);
+    expect(fans, "the gate also fans to the Datadog store").toContain("Record Datadog");
+    const store = node("Record Datadog") as {
+      type: string; parameters: { operation: string; columns: { value: Record<string, string> } };
+    };
+    expect(store.type).toBe("n8n-nodes-base.dataTable");
+    expect(store.parameters.operation, "upsert — one row per incident, idempotent on re-run").toBe("upsert");
+    expect(store.parameters.columns.value.record, "stores the mock record").toContain("datadog_record");
+    // No node anywhere calls Datadog — the whole point of the mock.
+    const text = JSON.stringify(WF);
+    expect(text, "no real Datadog endpoint is ever called").not.toContain("api.datadoghq.com");
+    expect(text, "no Datadog ingest either").not.toContain("datadoghq.com");
+    // The report's Datadog line is honest — simulated/not-sent, never "registered".
+    const report = node("Report") as { parameters: { jsCode: string } };
+    expect(report.parameters.jsCode, "the report builds the mock record").toContain("datadogMockRecord");
+  });
+
+  it("gates Slack and the stores on a successful report, not merely on an incident id", () => {
+    // Subagent audit 2026-09-12: a report-refused item still carries
+    // incident.incident_id, so gating on the id let a failed report write an empty
+    // store row and try to post. The gate must check slack_text — present only when
+    // reportIncident succeeded.
+    const gate = WF.nodes.find((n: { name: string }) => n.name === "Reported") as {
+      parameters: { conditions: { conditions: Array<{ leftValue: string }> } };
+    };
+    expect(gate.parameters.conditions.conditions[0]!.leftValue).toContain("slack_text");
+    expect(gate.parameters.conditions.conditions[0]!.leftValue).not.toContain("incident_id");
   });
 
   it("pins the model and the temperature, so two runs can be compared", () => {

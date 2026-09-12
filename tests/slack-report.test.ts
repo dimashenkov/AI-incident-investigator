@@ -82,6 +82,16 @@ describe("problemPod", () => {
     expect(problemPod(mixed, "production")?.name).toBe("broken");
   });
 
+  it("does NOT name a namespace-less pod for a namespace-less incident", () => {
+    // Subagent audit 2026-09-12: `"" !== ""` is false, so absence matched absence
+    // and a pod with no namespace was named for an incident with no namespace —
+    // defeating the contamination guard. Absence is never a match.
+    const noNs = { kubernetes: { pods: [
+      { name: "someone-elses-pod", containers: [{ name: "c", ready: false }] },
+    ] } };
+    expect(problemPod(noNs, "")).toBeNull();
+  });
+
   it("returns null only when there is no pod in this namespace at all", () => {
     const noKube = { logs: { entries: [] } };
     expect(problemPod(noKube, "production")).toBeNull();
@@ -142,6 +152,20 @@ describe("slackReport", () => {
     const dartSections = (t.match(/:dart:/g) ?? []).length;
     expect(dartSections, "exactly one root-cause block").toBe(1);
     expect(t).toContain("CONTAINER_OOM");
+  });
+
+  it("shows an HONEST Datadog line when given an id — simulated, not sent, never 'registered'", () => {
+    const withDd = slackReport(INCIDENT, THREAD, "CONTAINER_OOM", 0.9, "dd-mock-INC-2026-0101");
+    const t = JSON.stringify(withDd.blocks);
+    expect(t).toContain("dd-mock-INC-2026-0101");
+    expect(t).toMatch(/simulated/i);
+    expect(t).toMatch(/not sent/i);
+    expect(t, "must not claim a real registration happened").not.toMatch(/registered/i);
+  });
+
+  it("shows NO Datadog line when no id is given", () => {
+    const t = JSON.stringify(slackReport(INCIDENT, THREAD, "CONTAINER_OOM", 0.9).blocks);
+    expect(t).not.toMatch(/datadog/i);
   });
 
   it("carries the plain thread as the text fallback", () => {

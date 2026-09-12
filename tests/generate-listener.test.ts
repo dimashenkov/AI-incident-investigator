@@ -76,20 +76,40 @@ describe("the Slack listener is generated, not hand-typed in n8n", () => {
     expect(path, "Ask model is downstream of the dedup").toContain("Ask model");
   });
 
+  it("answers only in a thread the bot itself opened, found by thread_ts in incident_threads", () => {
+    // Leak audit 2026-09-12: the bot must not pull an incident's private data into
+    // a thread it did not open. Ownership is proven by looking the reply's
+    // thread_ts up in incident_threads (the table the incident workflow writes when
+    // IT posts a report). The lookup key is `ts`, NOT an id regex-ed from arbitrary
+    // text; a miss routes to nothing (no data pull, no reply).
+    expect(WF.connections["Fetch thread"].main[0][0].node).toBe("Find incident");
+    const find = node("Find incident") as { type: string; onError?: string;
+      parameters: { operation: string; filters: { conditions: Array<{ keyName: string; keyValue: string }> } } };
+    expect(find.type).toBe("n8n-nodes-base.dataTable");
+    expect(find.parameters.filters.conditions[0]!.keyName, "ownership is by thread ts").toBe("ts");
+    expect(find.parameters.filters.conditions[0]!.keyValue).toContain("thread_ts");
+    // Find incident → Owned? → true: Fetch data ; false: nothing (not our thread).
+    expect(WF.connections["Find incident"].main[0][0].node).toBe("Owned");
+    expect(WF.connections["Owned"].main[0][0].node).toBe("Fetch data");
+    expect(WF.connections["Owned"].main[1] ?? [], "a thread the bot did not open is not answered").toEqual([]);
+    // There is no regex-from-text incident id anywhere in the listener anymore.
+    expect(JSON.stringify(WF), "no INC- regex on arbitrary thread text").not.toContain("INC-\\\\d");
+  });
+
   it("enriches the answer with the incident's full data, tolerating a miss", () => {
-    // The owner asked (2026-09-12) for the bot to answer from full data, not just
-    // the summary. Extract id pulls the incident_id from the report; Fetch data
-    // gets the raw observations; Build ask passes them to replyMessages. A miss
-    // (old incident, nothing stored) must NOT kill the chain — get errors on a
-    // miss, so onError continues and the bot answers from the report alone.
-    expect(WF.connections["Fetch thread"].main[0][0].node).toBe("Extract id");
-    expect(WF.connections["Extract id"].main[0][0].node).toBe("Fetch data");
+    // The owner asked (2026-09-12) for the bot to answer from full data. Fetch data
+    // gets the raw observations by the OWNED incident_id (from Find incident), and
+    // Build ask passes them to replyMessages. A miss (old incident, nothing stored)
+    // must NOT kill the chain — get errors on a miss, so onError continues and the
+    // bot answers from the report alone.
     expect(WF.connections["Fetch data"].main[0][0].node).toBe("Build ask");
     const fd = node("Fetch data") as { type: string; onError?: string;
-      parameters: { operation: string; filters: { conditions: Array<{ keyName: string }> } } };
+      parameters: { operation: string; filters: { conditions: Array<{ keyName: string; keyValue: string }> } } };
     expect(fd.type).toBe("n8n-nodes-base.dataTable");
     expect(fd.onError, "a miss must not kill the chain").toBe("continueRegularOutput");
     expect(fd.parameters.filters.conditions[0]!.keyName).toBe("incident_id");
+    expect(fd.parameters.filters.conditions[0]!.keyValue, "the id came from the ownership lookup")
+      .toContain("Find incident");
     const ba = (node("Build ask") as { parameters: { jsCode: string } }).parameters.jsCode;
     expect(ba, "the raw data is handed to the model").toContain("replyMessages(report, h.text, data)");
     expect(ba, "a missing data row is tolerated as empty").toMatch(/typeof fd\.data === 'string'/);
