@@ -3040,4 +3040,42 @@ export const MUTATIONS = [
     to: "",
     mustFail: "wires the real Slack delivery: dedup by rowNotExists, post the thread only, record only on ok",
   },
+  {
+    // The anti-loop must drop the bot's own messages. Inverting the bot-user
+    // check makes the bot answer itself and ignore humans — an infinite reply
+    // loop in a real Slack.
+    id: "reply-does-not-drop-the-bots-own-message",
+    file: "src/core/reply.ts",
+    from: 'ev["user"] === BOT_USER',
+    to: 'ev["user"] !== BOT_USER',
+    mustFail: "ignores the bot's own message and nulls its text (anti-loop)",
+  },
+  {
+    // A reply is owed only INSIDE an incident thread. Dropping the thread_ts
+    // guard makes the bot answer top-level channel chatter from no incident —
+    // and spend a model call doing it.
+    id: "reply-answers-a-top-level-message-with-no-thread",
+    file: "src/core/reply.ts",
+    from: 'if (typeof c.thread_ts !== "string" || c.thread_ts === "") return false;',
+    to: "if (false) return false;",
+    mustFail: "does NOT reply to a top-level message with no thread — it ties to no incident",
+  },
+  {
+    // The report context must be real text. Accepting an empty parent message
+    // hands the model a blank report and posts an answer built from nothing.
+    id: "reply-accepts-an-empty-report-as-context",
+    file: "src/core/reply.ts",
+    from: 'if (typeof text !== "string" || text.trim() === "") return null;',
+    to: 'if (typeof text !== "string") return null;',
+    mustFail: "returns null when the parent has empty text",
+  },
+  {
+    // The listener's duplicate-delivery dedup. `get` errors on a miss and would
+    // let a re-delivered event double-spend; only rowNotExists drops the hit.
+    id: "listener-dedup-uses-get-not-rownotexists",
+    file: "scripts/generate-listener.mjs",
+    from: 'operation: "rowNotExists", dataTableId: dtSeen',
+    to: 'operation: "get", dataTableId: dtSeen',
+    mustFail: "drops a re-delivered event_id BEFORE the model, closing the retry double-spend",
+  },
 ];
