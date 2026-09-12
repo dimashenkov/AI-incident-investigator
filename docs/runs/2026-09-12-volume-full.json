@@ -1,0 +1,13 @@
+{
+  "note": "The volume-full live demo (a DIFFERENT use case at the owner's request, 2026-09-12). Triggered via run-scenarios volume-full#4 after a re-activation fixed a stale production webhook (the first attempt, #3, created no execution and so cost nothing). n8n execution 383: 3 collection agents (gpt-5-mini) + root cause (gpt-5) concluded VOLUME_FULL at 95%, posted a Block Kit report naming pod media-archiver-7c5f8d6b94-nz4tp, and stored the full observations. Captured when made.",
+  "recorded": "when made, on 2026-09-12, from n8n execution 383 (includeData)",
+  "when": "2026-09-12",
+  "model": "gpt-5-2025-08-07 + gpt-5-mini-2025-08-07 (4 calls)",
+  "temperature": 1,
+  "totals": {
+    "input_tokens": 13589,
+    "output_tokens": 8215,
+    "why": "four calls across two models (gpt-5 root cause + 3 gpt-5-mini collection); neither model is in the PRICES table, so the tokens are recorded (13589 in / 8215 out) but the dollar cost is a floor until a price is added with the date it was read"
+  },
+  "outcome": "correct: VOLUME_FULL at 95%, matching expected.json; formatted report posted to #incidents (ts 1789225759.977389), full data stored for the two-way bot"
+}
