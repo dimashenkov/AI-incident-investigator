@@ -2936,4 +2936,14 @@ export const MUTATIONS = [
     to: "    if (nx && ny) { if (x !== y) return x < y ? -1 : 1; }",
     mustFail: "orders run-9 before run-10 as older, the way a human counts",
   },
+  {
+    // The whole race protection: only the caller who WON putIfAbsent may post.
+    // Promoting a loser to "won" opens a second thread. The concurrent-claim
+    // test is what catches two winners where there must be one.
+    id: "a-losing-claim-is-promoted-to-a-poster",
+    file: "src/providers/thread-index.ts",
+    from: "    if (won) return { state: \"won\" };",
+    to: "    if (true) return { state: \"won\" };",
+    mustFail: "lets exactly one of many concurrent claims win",
+  },
 ];
