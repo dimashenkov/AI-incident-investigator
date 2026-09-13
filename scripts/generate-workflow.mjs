@@ -341,11 +341,14 @@ export const SLACK_CREDENTIAL = {
 };
 const SLACK_CHANNEL = "C0C1AQLTRM4";
 const THREAD_TABLE = "HXGSOCOFnTmnAZtJ";
-/* The raw observations, stored per incident_id so the two-way bot can answer
- * detailed questions from the FULL data, not just the posted summary. Written on
- * an independent branch off Report (never into the Slack body — the observations
- * must not leak to Slack; the store is private to the n8n instance). Created
- * 2026-09-12. A pointer, not a secret. */
+/* The raw observations, stored per incident_id as a durable per-incident record.
+ * Written on an independent branch off Report (never into the Slack body — the
+ * observations must not leak to Slack; the store is private to the n8n instance).
+ * Created 2026-09-12 to let the two-way bot answer from the full data; that reader
+ * was REMOVED 2026-09-13 (Grok leak review — the reply path answers from the
+ * curated report, so a stored credential is never fetched into a model prompt).
+ * The write is kept as an audit record; nothing reads it now. A pointer, not a
+ * secret. */
 const INCIDENT_DATA_TABLE = "rKZEwVRRLB3Xb6LR";
 /* The SIMULATED Datadog registrations, one row per incident_id. A pointer, not a
  * secret. Created 2026-09-12. Nothing is ever sent to Datadog — this is the mock's

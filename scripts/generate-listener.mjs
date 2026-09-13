@@ -19,8 +19,8 @@
  *              → Mark seen        record event_id BEFORE spending
  *              → Fetch thread     (conversations.replies: the report is the parent)
  *              → Find incident    (thread_ts in incident_threads → incident_id + OWNERSHIP)
- *              → Owned? ── true → Fetch data (this incident's full observations)
- *              → Build ask        report + data + question (no report → stop)
+ *              → Owned? ── true → Build ask (answers from the report; NO raw pull)
+ *              → Build ask        report + question (no report → stop)
  *              → Has report? ── true → Ask model     (gpt-5 — THIS SPENDS)
  *                    → Build reply     answerFrom (no answer → post nothing)
  *                    → Has answer? ── true → Post reply  (chat.postMessage in the thread)
@@ -57,10 +57,11 @@ const OUT = resolve(ROOT, "workflows/slack-listener.json");
  *  Created 2026-09-12; a pointer, not a secret, like the other table/credential
  *  ids — drift masks the id and compares surrounding structure. */
 const SEEN_TABLE = "uBZvrUFgQcderwqF";
-/** The table the incident workflow stores full observations in, keyed by
- *  incident_id, so the bot can answer detailed questions from raw data. A miss is
- *  tolerated (old incidents have none) — the bot then answers from the report. */
-const DATA_TABLE = "rKZEwVRRLB3Xb6LR";
+// (removed 2026-09-13) DATA_TABLE / "Fetch data": the reply path no longer pulls the
+// raw observations. Grok's leak review, owner-accepted: answer from the curated
+// report only, so a stored credential is never fetched into a model prompt. The
+// incident workflow still WRITES that table (generate-workflow.mjs); the bot just
+// never reads it.
 /** The threads the incident workflow opened when it posted a report (incident_id
  *  <-> ts). The bot answers ONLY in these — a reply thread_ts found here proves
  *  ownership and yields the incident_id. Leak audit 2026-09-12. */
@@ -225,24 +226,15 @@ return [{ json: Object.assign({}, c, { reply: shouldReply(c) }) }];`
   });
   connections["Find incident"] = { main: [[{ node: "Owned", type: "main", index: 0 }]] };
 
-  // 5d. Fetch data — the FULL observations for THIS incident (its id came from the
-  //     ownership lookup, not from arbitrary text). `get` errors on a miss (an old
-  //     incident with nothing stored), so onError continues: the bot then answers
-  //     from the report alone rather than breaking.
-  nodes.push({
-    id: "fetch-data", name: "Fetch data", type: "n8n-nodes-base.dataTable", typeVersion: 1.1,
-    position: pos(), onError: "continueRegularOutput",
-    parameters: { resource: "row", operation: "get",
-      dataTableId: { __rl: true, mode: "id", value: DATA_TABLE },
-      filters: { conditions: [{ keyName: "incident_id", condition: "eq",
-        keyValue: "={{ $('Find incident').first().json.incident_id }}" }] } },
-  });
-  // Owned true -> fetch data; false -> nothing (a thread the bot did not open).
-  connections["Owned"] = { main: [[{ node: "Fetch data", type: "main", index: 0 }], []] };
+  // 5d. (removed 2026-09-13) There is no "Fetch data" node any more. Grok's leak
+  //     review, accepted by the owner: the reply path must NOT pull the raw
+  //     observations — a credential never fetched cannot be echoed to Slack. The
+  //     bot answers from the curated report alone (the thread parent), the same
+  //     discipline root-cause already follows. Owned true -> Build ask directly.
+  connections["Owned"] = { main: [[{ node: "Build ask", type: "main", index: 0 }], []] };
 
-  // 6. Build ask — report + raw data + question → model messages. Report is read
-  //    from Fetch thread by name (Fetch data replaced $json); data is best-effort
-  //    (empty when the lookup missed). No report → stop.
+  // 6. Build ask — report + question → model messages. The report is the thread
+  //    parent (Fetch thread). No raw data is fetched or passed. No report → stop.
   nodes.push({
     id: "build-ask", name: "Build ask", type: "n8n-nodes-base.code", typeVersion: 2,
     position: pos(),
@@ -251,13 +243,10 @@ return [{ json: Object.assign({}, c, { reply: shouldReply(c) }) }];`
 const h = $('Handle').first().json;
 const report = reportTextFrom(($('Fetch thread').first() && $('Fetch thread').first().json) || {});
 if (report === null) return [{ json: { ok: false, why: "no report found in the thread" } }];
-const fd = ($('Fetch data').first() && $('Fetch data').first().json) || {};
-const data = (typeof fd.data === 'string') ? fd.data : "";
 return [{ json: { ok: true, channel: h.channel, thread_ts: h.thread_ts,
-  messages: replyMessages(report, h.text, data) } }];`
+  messages: replyMessages(report, h.text) } }];`
     },
   });
-  connections["Fetch data"] = { main: [[{ node: "Build ask", type: "main", index: 0 }]] };
 
   nodes.push({
     id: "has-report", name: "Has report", type: "n8n-nodes-base.if", typeVersion: 2.2,

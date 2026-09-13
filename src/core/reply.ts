@@ -14,6 +14,27 @@
  *   model response                   -> answerFrom         -> the text to post back
  *
  * Nothing here calls a model or the network; it only decides and formats.
+ *
+ * Leak posture (Grok, 2026-09-13, "as Grok says"): the PRIMARY control is that the
+ * reply path does NOT fetch the raw observations at all — it answers from the
+ * curated report, the same discipline the root-cause agent already follows. A
+ * denylist on the raw input would have been permission to keep fetching it. The
+ * only remaining net is `redactSecrets` on the OUTPUT — the string that is actually
+ * posted to Slack — for fixed-shape credentials that a report or the model's
+ * reasoning could still surface. That net is deliberately NARROW (see redactSecrets)
+ * so it cannot clobber legitimate incident content.
+ *
+ * NOT addressed here, and named so it is not mistaken for solved (Grok, 2026-09-13):
+ * the FIRST Slack post — the incident report itself — is built by slackReport in
+ * thread.ts and posted by the incident workflow, quoting finding.fact and cited
+ * message lines. It never passes through this module, so a secret an agent quotes
+ * into the report reaches Slack before the bot ever replies. This does NOT require
+ * duplicating redactSecrets: buildRuntime splices core files into every node's
+ * prelude, so a shared redactor could be applied to slack_text AND the Block Kit
+ * text from one source. It is deferred (a backlog brick) rather than impossible —
+ * closing it means redacting the structured blocks too, not just the plain text.
+ * In this prototype the observations are simulated fixtures with no real secrets,
+ * so it is a real-deploy gap, not a live leak.
  */
 
 /** The bot's own Slack user id. A message from it, or carrying a bot_id, or with
@@ -96,52 +117,99 @@ export function reportTextFrom(repliesBody: unknown): string | null {
 }
 
 /**
- * The system+user messages for the model. Two things the owner asked for on
- * 2026-09-12, after seeing the bot only ever paraphrase the report:
+ * Redact fixed-shape credentials from a string BEFORE it is posted to Slack. This
+ * is the OUTPUT net, not the primary control — the primary control is that the
+ * reply path never fetches raw observations. Grok, 2026-09-13, named the boundary:
+ * a Slack leak is the string Post reply sends, so the filter belongs here, on the
+ * text on its way out, not on the model's input.
  *
- *  1. It may REASON and SUGGEST remediation — not just restate the report. But
- *     the suggestions are ADVICE for a human: this system is read-only and takes
- *     no actions, and the prompt says so, so the bot cannot imply it did anything.
- *  2. It answers from the raw observation DATA when given, not only the summary
- *     report — so a question about an exact metric or log line can be answered.
- *
- * Grounding is INSTRUCTED, not enforced (subagent audit 2026-09-12: do not call it
- * a "guard" — nothing in code stops the model inventing; the prompt asks it to
- * ground and answerFrom returns whatever comes back). The prompt asks every claim
- * to rest on the report or the data. `data` is a JSON string of the incident's
- * observations, or "" when none was found.
- *
- * DATA_CAP: the raw data is truncated before it is handed over. It bounds how much
- * can be surfaced through the reply, and is honest defence-in-depth — but it is NOT
- * redaction. In this prototype the observations are simulated fixtures with no real
- * secrets; a real deployment must add code-level redaction, because "do not paste
- * secrets" is a prompt, not a control. Stated as a limitation, not a solved problem.
+ * It is deliberately NARROW. It matches ONLY shapes that a curated incident report
+ * or a remediation suggestion would never legitimately contain:
+ *   - provider keys with a fixed prefix: sk-…, xox[baprs]-…, AKIA…, AIza…, ghp_/gho_…
+ *   - PEM private-key blocks
+ *   - a Bearer token, and credentials embedded in a URL (user:pass@host)
+ *   - the VALUE after a secret-named key: password / passwd / pwd / secret /
+ *     api_key / apikey / access_key / client_secret / dsn — in either `k=v` or
+ *     JSON `"k":"v"` form (the JSON form is the one Grok showed slipping through).
+ * It does NOT touch bare `token=` or JWTs (eyJ…): a Kubernetes service-account
+ * token is legitimate content an operator may be asking about, and eating it would
+ * hide the very evidence they want (Grok's over-redaction case). That is an honest
+ * gap, not an oversight: a denylist catches known shapes, not novel ones, and this
+ * one errs toward keeping evidence readable.
  */
-export const DATA_CAP = 6000;
+export function redactSecrets(text: string): string {
+  if (typeof text !== "string" || text === "") return text;
+  let out = text;
+  const R = "[redacted]";
+  // PEM private-key blocks (any BEGIN…END PRIVATE KEY).
+  out = out.replace(/-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----[\s\S]*?-----END (?:[A-Z]+ )?PRIVATE KEY-----/g, R);
+  // Provider keys with an unambiguous prefix.
+  out = out.replace(/\bsk-[A-Za-z0-9_-]{16,}/g, R);                 // OpenAI
+  out = out.replace(/\bxox[baprs]-[A-Za-z0-9-]{8,}/g, R);           // Slack
+  out = out.replace(/\bAKIA[0-9A-Z]{16}\b/g, R);                    // AWS access key id
+  out = out.replace(/\bAIza[0-9A-Za-z_-]{35}\b/g, R);               // Google API key
+  out = out.replace(/\bgh[posru]_[A-Za-z0-9]{20,}/g, R);            // GitHub tokens
+  // Credentials embedded in a URL: scheme://user:pass@host -> scheme://[redacted]@host
+  out = out.replace(/(\b[a-z][a-z0-9+.-]*:\/\/)[^/\s:@]+:[^/\s@]+@/gi, `$1${R}@`);
+  // A Bearer token. Require length AND a digit so a dictionary word — "Bearer
+  // authentication failed" — is not eaten (Grok, 2026-09-13): a real token is long
+  // and mixed, a prose word is neither.
+  out = out.replace(/\bBearer\s+(?=[^\s]*\d)[A-Za-z0-9._~+/=-]{16,}/g, `Bearer ${R}`);
+  // The value of a secret-named assignment. The key may carry a prefix so it ENDS
+  // in the secret word (DB_PASSWORD, aws_secret_access_key), and the value may be
+  // quoted with spaces — both were slipping before (Grok, 2026-09-13). `key` is an
+  // optionally-quoted identifier ending in a secret word, not preceded by an
+  // identifier char (so it starts a real key, not mid-word).
+  const secretKey = "(?:password|passwd|pwd|secret|api[_-]?key|apikey|access[_-]?key|client[_-]?secret|dsn)";
+  const key = `(?<![A-Za-z0-9_.])"?[A-Za-z0-9_.]*${secretKey}"?`;
+  // A quoted value matched to its TRUE closing quote, so an escaped quote inside the
+  // value does not end the match early and leak the tail (Grok, 2026-09-13):
+  // "say \"hi\" world" is redacted whole, not up to the first \".
+  const dq = '"(?:\\\\.|[^"\\\\])*"';
+  const sq = "'(?:\\\\.|[^'\\\\])*'";
+  // '=' assignment: quoted (escapes handled) or a bare value.
+  out = out.replace(new RegExp(`(${key}\\s*=\\s*)${dq}`, "gi"), `$1"${R}"`);
+  out = out.replace(new RegExp(`(${key}\\s*=\\s*)${sq}`, "gi"), `$1'${R}'`);
+  out = out.replace(new RegExp(`(${key}\\s*=\\s*)[^\\s"',;}]+`, "gi"), `$1${R}`);
+  // ':' with a QUOTED value only (JSON "k":"v" and YAML k: "v"). A BARE value after
+  // ':' is a reference/name — a Kubernetes Secret NAME (secret: partner-gateway-tls)
+  // is content, not a credential, so it is left intact (Grok's over-redaction case).
+  out = out.replace(new RegExp(`(${key}\\s*:\\s*)${dq}`, "gi"), `$1"${R}"`);
+  out = out.replace(new RegExp(`(${key}\\s*:\\s*)${sq}`, "gi"), `$1'${R}'`);
+  return out;
+}
 
+/**
+ * The system+user messages for the model. The bot answers from the curated
+ * incident report — NOT the raw observations. The owner (2026-09-12) asked that
+ * the bot may REASON and SUGGEST remediation, not merely paraphrase; that stands.
+ * What changed on 2026-09-13 (Grok's leak review) is that it no longer receives
+ * the raw observation blob: a credential that is never fetched cannot be echoed.
+ *
+ * Grounding is INSTRUCTED, not enforced (subagent audit 2026-09-12): nothing in
+ * code stops the model inventing, so the prompt asks it to ground every claim in
+ * the report and to say plainly when the report lacks what a question needs.
+ *
+ * The honest cost of answering from the report only: a question about an exact
+ * metric or log line that the report did not summarise cannot be answered from
+ * the thread — the bot says so rather than guessing. A future version could
+ * ALLOWLIST specific safe fields (pod, CPU, restart count) instead of handing over
+ * the whole blob (Grok's suggested shape); that is in the backlog, not built.
+ */
 export function replyMessages(
   reportText: string,
   question: string,
-  data: string = "",
 ): Array<{ role: string; content: string }> {
   const system =
     "You are the incident-investigation assistant answering a question in a Slack " +
-    "thread about ONE incident. You are given the incident report, and sometimes " +
-    "the incident's raw observation data. Answer the specific question concisely. " +
-    "You MAY reason about the facts and SUGGEST remediation steps — but frame them " +
-    "as advice for a human operator: this system is read-only, it takes no actions " +
-    "and cannot run anything. Ground every claim in the report or the data; if " +
-    "they do not contain what is needed, say so plainly rather than guessing. Do " +
-    "not restate the whole report, and answer in prose — do not paste the raw data " +
-    "or large JSON blobs into the thread.";
-  const hasData = typeof data === "string" && data.trim() !== "";
-  const capped = hasData && data.length > DATA_CAP
-    ? `${data.slice(0, DATA_CAP)}\n…[truncated at ${DATA_CAP} chars]`
-    : data;
-  const dataSection = hasData
-    ? `\n\nIncident data (raw observations):\n${capped}`
-    : "\n\n(The raw observation data was not available; answer from the report.)";
-  const user = `Incident report:\n${reportText}${dataSection}\n\nQuestion: ${question}`;
+    "thread about ONE incident. You are given the incident report to answer from. " +
+    "Answer the specific question concisely. You MAY reason about the facts and " +
+    "SUGGEST remediation steps — but frame them as advice for a human operator: " +
+    "this system is read-only, it takes no actions and cannot run anything. Ground " +
+    "every claim in the report; if the report does not contain what is needed, say " +
+    "so plainly rather than guessing. Do not restate the whole report, and answer " +
+    "in prose.";
+  const user = `Incident report:\n${reportText}\n\nQuestion: ${question}`;
   return [
     { role: "system", content: system },
     { role: "user", content: user },
@@ -149,9 +217,11 @@ export function replyMessages(
 }
 
 /**
- * The answer text out of an OpenAI chat.completions response. Returns null when
- * the response has no content — a null answer must not be posted as if the bot
- * had something to say.
+ * The answer text out of an OpenAI chat.completions response, passed through
+ * redactSecrets before it leaves this module. Returns null when the response has
+ * no content — a null answer must not be posted as if the bot had something to
+ * say. Redacting HERE, at the single extraction point, means no caller can obtain
+ * an un-redacted answer to post (Grok: the net belongs on the outgoing string).
  */
 export function answerFrom(openaiBody: unknown): string | null {
   const b = (openaiBody ?? {}) as Record<string, unknown>;
@@ -160,5 +230,5 @@ export function answerFrom(openaiBody: unknown): string | null {
   const msg = ((choices[0] ?? {}) as Record<string, unknown>)["message"];
   const content = ((msg ?? {}) as Record<string, unknown>)["content"];
   if (typeof content !== "string" || content.trim() === "") return null;
-  return content.trim();
+  return redactSecrets(content.trim());
 }

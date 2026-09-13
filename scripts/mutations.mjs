@@ -3095,17 +3095,36 @@ export const MUTATIONS = [
     file: "scripts/generate-workflow.mjs",
     from: 'operation: "upsert", dataTableId: idTable',
     to: 'operation: "insert", dataTableId: idTable',
-    mustFail: "stores the full observations for the two-way bot, on a branch, never into Slack",
+    mustFail: "stores the full observations on an independent branch, never into Slack (durable record; the bot no longer reads it)",
   },
   {
-    // A data miss (old incident, nothing stored) must not kill the reply chain.
-    // Without onError-continue, `get` errors on a miss and the bot answers nothing
-    // even though it could have answered from the report.
-    id: "listener-data-miss-kills-the-chain",
-    file: "scripts/generate-listener.mjs",
-    from: 'onError: "continueRegularOutput",\n    parameters: { resource: "row", operation: "get",\n      dataTableId: { __rl: true, mode: "id", value: DATA_TABLE },',
-    to: 'parameters: { resource: "row", operation: "get",\n      dataTableId: { __rl: true, mode: "id", value: DATA_TABLE },',
-    mustFail: "enriches the answer with the incident's full data, tolerating a miss",
+    // Grok's leak fix (2026-09-13): the model's answer must pass through
+    // redactSecrets before it leaves answerFrom — the single choke point on the
+    // outgoing string. Returning the raw content lets a fixed-shape credential in
+    // the report or the model's reasoning post straight to Slack.
+    id: "reply-answer-skips-the-output-redaction",
+    file: "src/core/reply.ts",
+    from: "return redactSecrets(content.trim());",
+    to: "return content.trim();",
+    mustFail: "passes the model's answer through redactSecrets before it leaves (single choke point)",
+  },
+  {
+    // The output net must catch fixed-prefix provider keys. Neutering the sk-…
+    // rule (OpenAI keys) lets that shape through to the thread.
+    id: "reply-redaction-misses-provider-keys",
+    file: "src/core/reply.ts",
+    from: "out = out.replace(/\\bsk-[A-Za-z0-9_-]{16,}/g, R);                 // OpenAI",
+    to: "out = out;                                                       // OpenAI",
+    mustFail: "redacts fixed-prefix provider keys a report would never legitimately contain",
+  },
+  {
+    // The JSON form "password":"…" is the one Grok showed slipping past a k=v-only
+    // denylist. Dropping the JSON-form rule reopens exactly that gap.
+    id: "reply-redaction-misses-the-json-secret-form",
+    file: "src/core/reply.ts",
+    from: 'out = out.replace(new RegExp(`(${key}\\\\s*:\\\\s*)${dq}`, "gi"), `$1"${R}"`);',
+    to: 'out = out; // JSON/colon secret-form rule removed',
+    mustFail: "redacts the VALUE after a secret-named key in BOTH k=v and JSON forms (Grok's JSON slip)",
   },
   {
     // The affected pod is named even when it is still Running: prefer a not-ready

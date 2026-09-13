@@ -246,12 +246,13 @@ describe("the shape of the deployed chain", () => {
     expect(text).not.toContain("Bearer");
   });
 
-  it("stores the full observations for the two-way bot, on a branch, never into Slack", () => {
-    // The owner asked (2026-09-12) for the bot to answer detailed questions from
-    // the FULL data. Report fans to TWO branches: the Slack post (curated) and a
-    // data store (raw observations, keyed by incident_id). The store is an
-    // INDEPENDENT branch so it runs regardless of Slack dedup, and the raw data
-    // goes to a private table, NEVER into the Slack body.
+  it("stores the full observations on an independent branch, never into Slack (durable record; the bot no longer reads it)", () => {
+    // Report fans to TWO branches: the Slack post (curated) and a data store (raw
+    // observations, keyed by incident_id). The store is an INDEPENDENT branch so it
+    // runs regardless of Slack dedup, and the raw data goes to a private table,
+    // NEVER into the Slack body. The two-way bot USED to read this (2026-09-12);
+    // that reader was removed 2026-09-13 (Grok leak review) — the store is now a
+    // durable audit record only, still on its own branch, still never in Slack.
     const node = (name: string) => WF.nodes.find((n: { name: string }) => n.name === name);
     // Report fans out only AFTER the Reported gate (a refused report reaches no
     // branch). The gate checks slack_text, present only on a successful report.

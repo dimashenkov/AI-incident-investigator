@@ -88,31 +88,26 @@ describe("the Slack listener is generated, not hand-typed in n8n", () => {
     expect(find.type).toBe("n8n-nodes-base.dataTable");
     expect(find.parameters.filters.conditions[0]!.keyName, "ownership is by thread ts").toBe("ts");
     expect(find.parameters.filters.conditions[0]!.keyValue).toContain("thread_ts");
-    // Find incident → Owned? → true: Fetch data ; false: nothing (not our thread).
+    // Find incident → Owned? → true: Build ask ; false: nothing (not our thread).
     expect(WF.connections["Find incident"].main[0][0].node).toBe("Owned");
-    expect(WF.connections["Owned"].main[0][0].node).toBe("Fetch data");
+    expect(WF.connections["Owned"].main[0][0].node).toBe("Build ask");
     expect(WF.connections["Owned"].main[1] ?? [], "a thread the bot did not open is not answered").toEqual([]);
     // There is no regex-from-text incident id anywhere in the listener anymore.
     expect(JSON.stringify(WF), "no INC- regex on arbitrary thread text").not.toContain("INC-\\\\d");
   });
 
-  it("enriches the answer with the incident's full data, tolerating a miss", () => {
-    // The owner asked (2026-09-12) for the bot to answer from full data. Fetch data
-    // gets the raw observations by the OWNED incident_id (from Find incident), and
-    // Build ask passes them to replyMessages. A miss (old incident, nothing stored)
-    // must NOT kill the chain — get errors on a miss, so onError continues and the
-    // bot answers from the report alone.
-    expect(WF.connections["Fetch data"].main[0][0].node).toBe("Build ask");
-    const fd = node("Fetch data") as { type: string; onError?: string;
-      parameters: { operation: string; filters: { conditions: Array<{ keyName: string; keyValue: string }> } } };
-    expect(fd.type).toBe("n8n-nodes-base.dataTable");
-    expect(fd.onError, "a miss must not kill the chain").toBe("continueRegularOutput");
-    expect(fd.parameters.filters.conditions[0]!.keyName).toBe("incident_id");
-    expect(fd.parameters.filters.conditions[0]!.keyValue, "the id came from the ownership lookup")
-      .toContain("Find incident");
+  it("answers from the report ONLY — no Fetch data node, no raw pull (Grok leak review 2026-09-13)", () => {
+    // The primary leak control (owner-accepted "as Grok says"): the reply path
+    // never fetches the raw observations, so a stored credential is never handed to
+    // a model prompt. There must be NO Fetch data node, and Build ask must call
+    // replyMessages with (report, question) only — never a data argument.
+    expect(WF.nodes.find((n: { name: string }) => n.name === "Fetch data"), "the raw-data node is gone").toBeUndefined();
     const ba = (node("Build ask") as { parameters: { jsCode: string } }).parameters.jsCode;
-    expect(ba, "the raw data is handed to the model").toContain("replyMessages(report, h.text, data)");
-    expect(ba, "a missing data row is tolerated as empty").toMatch(/typeof fd\.data === 'string'/);
+    expect(ba, "answers from the report, no data arg").toContain("replyMessages(report, h.text)");
+    expect(ba, "no raw data is read or passed").not.toMatch(/replyMessages\(report, h\.text, /);
+    expect(ba, "no Fetch data lookup").not.toContain("Fetch data");
+    // The output net travels in the transpiled reply code carried by every reply node.
+    expect(ba, "redactSecrets is present in the reply code").toContain("function redactSecrets");
   });
 
   it("spends in exactly ONE place, and only behind Should reply and Has report", () => {
