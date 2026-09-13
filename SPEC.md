@@ -17,12 +17,15 @@ this file.
 A multi-agent Kubernetes incident investigator. A fake Datadog alert enters an
 n8n workflow; three specialist agents (Kubernetes, Logs, Metrics) each read one
 slice of a simulated incident; a Root Cause agent concludes; the result is posted
-to a fake Slack thread (`README.md`, lines 19–30). **Every external system is
-deliberately simulated** — there is no real Datadog, Kubernetes, or Slack
-(`README.md` line 29; `CLAUDE.md` §13 decision of 2026-09-05, "Прототип, и това е
-обхватът"). The deterministic core (providers, scoring, correlation) lives in
-`src/`; the agent prompts live in `prompts/`; the workflow is generated and
-deployed to n8n Cloud (`README.md` lines 32–42).
+to a **real** Slack thread, and a two-way bot answers questions in it. **Every
+other external system is deliberately simulated** — there is no real Datadog or
+Kubernetes, and the cluster/logs/metrics are fixtures (`CLAUDE.md` §13 decision of
+2026-09-05, "Прототип, и това е обхватът"). Slack became real on 2026-09-12
+(`CLAUDE.md` §13, "Реален Slack + Langfuse Cloud"; `docs/slack-setup.md`), which
+supersedes the earlier "there is no real Slack" — the app, channel, token and
+posted reports are live (`docs/runs/2026-09-12-volume-full.json`). The
+deterministic core (providers, scoring, correlation) lives in `src/`; the agent
+prompts live in `prompts/`; the workflow is generated and deployed to n8n Cloud.
 
 ---
 
@@ -47,13 +50,13 @@ the same evidence `scripts/readiness.mjs` counts (`scenariosMeasured`,
 | `CPU_THROTTLING` | `cpu-throttling` | 4 | **Yes** — `correct` (`docs/runs/2026-09-10-webhook-run-9.json`, `2026-09-11-webhook-run-7.json`) |
 | `APPLICATION_STARTUP_FAILURE` | `application-startup-failure` | 6 | **Yes** — once `correct` (`docs/runs/2026-09-10-webhook-run-9.json`); other runs right code but citation missed |
 | `DEPLOYMENT_REGRESSION` | `deployment-regression` | 7 | **Yes**, after repair — `wrong` on 2026-09-10 (`webhook-run-2/4`), then `correct` (`docs/runs/2026-09-10-webhook-run-9.json`, `2026-09-11-webhook-run-7.json`). The `scored` field stores the verdict only, not a confidence; the 90% is PROGRESS.md prose, not a recorded number |
-| `NODE_NOT_READY` | `node-not-ready` | 9 | **No — built, not yet measured.** Scenario and prompt rules exist; the paid run "чака думата" (PROGRESS.md, "Първият нов случай: NODE_NOT_READY"). No `scored` record mentions it |
-| `VOLUME_FULL` | `volume-full` | 10 | **No — built, not yet measured.** Reviewed by three adversarial passes 2026-09-11; awaits the word |
-| `DEPENDENCY_UNAVAILABLE` | `dependency-unavailable` | 11 | **No — built, not yet measured** |
-| `CONNECTION_POOL_EXHAUSTED` | `connection-pool-exhausted` | 12 | **No — built, not yet measured** |
-| `DNS_RESOLUTION_FAILURE` | `dns-resolution-failure` | 13 | **No — built, not yet measured.** Deliberately logs-led; the stated accepted weak point (`scenarios/dns-resolution-failure/expected.json`) |
-| `NETWORK_POLICY_BLOCKED` | `network-policy-blocked` | 14 | **No — built, not yet measured.** The event reports a silent drop; the diagnosis is forced across log, callee health and the drop metric |
-| `CERTIFICATE_EXPIRED` | `certificate-expired` | 15 | **No — built, not yet measured** |
+| `NODE_NOT_READY` | `node-not-ready` | 9 | **Yes — measured correct** (`docs/runs/2026-09-11-webhook-run-10.json`; readiness green) |
+| `VOLUME_FULL` | `volume-full` | 10 | **Yes — measured correct** (`docs/runs/2026-09-11-webhook-run-9.json`; readiness green) |
+| `DEPENDENCY_UNAVAILABLE` | `dependency-unavailable` | 11 | **Yes — measured correct** (`docs/runs/2026-09-11-webhook-run-9.json`; readiness green) |
+| `CONNECTION_POOL_EXHAUSTED` | `connection-pool-exhausted` | 12 | **Yes — measured correct** (`docs/runs/2026-09-11-webhook-run-9.json`; readiness green) |
+| `DNS_RESOLUTION_FAILURE` | `dns-resolution-failure` | 13 | **Yes — measured correct** (`docs/runs/2026-09-11-webhook-run-9.json`; readiness green). Deliberately logs-led |
+| `NETWORK_POLICY_BLOCKED` | `network-policy-blocked` | 14 | **Yes — measured correct** (`docs/runs/2026-09-11-webhook-run-10.json`; readiness green). The event reports a silent drop; the diagnosis is forced across log, callee health and the drop metric |
+| `CERTIFICATE_EXPIRED` | `certificate-expired` | 15 | **Yes — measured correct** (`docs/runs/2026-09-11-webhook-run-9.json`; readiness green) |
 
 Two scenarios exercise **behaviour**, not a new cause:
 
@@ -77,15 +80,16 @@ These are real Kubernetes failure modes. The table in PROGRESS.md ("Какво �
 absent but that an agent facing an unknown case may **press it into the nearest
 code**, which looks like an answer.
 
-**Built, not yet measured — a code in the schema, a scenario in the registry,
-the code listed in all four agent prompts and the distinguishing rule added to the kubernetes and root-cause prompts (the logs and metrics prompts only list the codes), but no scored run yet.** Seven codes
-are in this state: `NODE_NOT_READY`, `VOLUME_FULL`, `DEPENDENCY_UNAVAILABLE`,
+**Built, not yet measured — none remain.** The seven codes that were in this state
+(`NODE_NOT_READY`, `VOLUME_FULL`, `DEPENDENCY_UNAVAILABLE`,
 `CONNECTION_POOL_EXHAUSTED`, `DNS_RESOLUTION_FAILURE`, `NETWORK_POLICY_BLOCKED`,
-`CERTIFICATE_EXPIRED` (§2). They are wired and pass every static check the gate
-runs — the test that refuses a code without a scenario, the test that every
-`must_cite` path resolves — but no model has been asked to produce them, so
-nothing establishes that the agents actually reach these codes rather than press
-the nearest known one. Coverage on paper is not coverage measured.
+`CERTIFICATE_EXPIRED`) were measured on 2026-09-11 and are recorded `correct` (§2;
+`docs/runs/2026-09-11-webhook-run-9.json` and `-10.json`; readiness counts all
+fifteen scenarios green). What that measurement establishes is **coverage, not
+reliability**: each is a single scored run per scenario, so it shows the agents can
+reach the code, not that they do so repeatably. The `gpt-5` non-determinism and the
+k=3 protocol (`docs/next-measurement.md`; `src/core/eval.ts`) are the answer to
+reliability, and the k=3 baseline currently covers four scenarios, not fifteen.
 
 **No code at all — absent from `schemas/common.schema.json` `causeCode` and from
 `scenarios/registry.json` (next free number is 16):**
@@ -181,9 +185,12 @@ through the full process (PROGRESS.md, "Първият нов случай: NODE
 
 A new code is not coverage until it has **also been measured with a model**
 (`docs/measurement-contract.md`). Adding a code without a scenario is "по-дълго
-меню, не по-широк обхват" — a longer menu, not a wider scope (PROGRESS.md). That
-is why `NODE_NOT_READY` is listed in §2 as built-but-not-yet-measured rather than
-as covered.
+меню, не по-широк обхват" — a longer menu, not a wider scope (PROGRESS.md). All
+thirteen codes and the two behavioural scenarios have now been measured `correct`
+at least once (§2; readiness counts fifteen scenarios green) — but a single scored
+run per scenario is **coverage, not reliability**; the k=3 protocol
+(`src/core/eval.ts`) is the answer to reliability, and its baseline covers four
+scenarios so far, not fifteen.
 
 ---
 
