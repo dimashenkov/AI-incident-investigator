@@ -18,6 +18,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 import ts from "typescript";
 
 import { buildCore } from "./build-core.mjs";
@@ -35,6 +36,21 @@ export function readPrompts(dir = resolve(ROOT, "prompts")) {
   const out = {};
   for (const f of readdirSync(dir).filter((n) => n.endsWith("-agent.md")).sort()) {
     out[f.replace(/-agent\.md$/, "")] = readFileSync(resolve(dir, f), "utf8");
+  }
+  return out;
+}
+
+/**
+ * A short content hash per prompt — the PROVENANCE the eval loop needs (Grok,
+ * 2026-09-13): without it a failure blames "the agent" rather than a specific,
+ * editable prompt version. Embedded in the workflow and reported on every run, so a
+ * recorded answer says which prompt text produced it. The model is already recorded
+ * per agent in the answer, so only the prompt version was missing.
+ */
+export function promptVersions(prompts) {
+  const out = {};
+  for (const [agent, text] of Object.entries(prompts)) {
+    out[agent] = createHash("sha256").update(text).digest("hex").slice(0, 12);
   }
   return out;
 }
@@ -225,6 +241,10 @@ ${datadog}
 
 // ---- the prompts, verbatim ----
 const PROMPTS = ${JSON.stringify(prompts)};
+
+// Provenance: the content hash of each prompt this workflow carries, so a recorded
+// run says which prompt version produced it (the model is already on each answer).
+const PROMPT_VERSIONS = ${JSON.stringify(promptVersions(prompts))};
 
 // ---- the assembled incidents, one per scenario ----
 const INCIDENTS = ${JSON.stringify(incidents)};
@@ -599,7 +619,9 @@ return items.map(function (item, index) {
   var ddRecord = datadogMockRecord(inc, code, conf, dpod ? dpod.name : "");
   const slack = slackReport(inc, thread, code, conf, ddRecord.datadog_incident_id);
   return { json: Object.assign({}, j, { incident: next, thread: thread,
-    slack_blocks: slack.blocks, slack_text: slack.text, datadog_record: ddRecord }) };
+    slack_blocks: slack.blocks, slack_text: slack.text, datadog_record: ddRecord,
+    // Provenance for the eval loop: which prompt version produced this run.
+    prompt_versions: PROMPT_VERSIONS }) };
 });
 `;
 }

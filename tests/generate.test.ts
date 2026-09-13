@@ -297,6 +297,24 @@ describe("the shape of the deployed chain", () => {
     expect(report.parameters.jsCode, "the report builds the mock record").toContain("datadogMockRecord");
   });
 
+  it("stamps each run with the prompt versions that produced it (eval-loop provenance)", () => {
+    // Grok, 2026-09-13: without the prompt hash on the record, a failure blames
+    // "the agent", not an editable prompt version. Report embeds a hash per prompt
+    // and outputs prompt_versions; the model is already on each answer.
+    // The output wiring is in reportNodeCode (visible with the toy prelude);
+    // the embedded const is in the real prelude, so read the committed workflow.
+    const report = WF.nodes.find((n: { name: string }) => n.name === "Report") as { parameters: { jsCode: string } };
+    expect(report.parameters.jsCode, "Report outputs prompt_versions").toContain("prompt_versions: PROMPT_VERSIONS");
+    const realWf = JSON.parse(readFileSync(COMMITTED, "utf8"));
+    const realReport = realWf.nodes.find((n: { name: string }) => n.name === "Report");
+    const m = realReport.parameters.jsCode.match(/const PROMPT_VERSIONS = (\{[^}]*\})/);
+    expect(m, "PROMPT_VERSIONS must be embedded in the real workflow").not.toBeNull();
+    const versions = JSON.parse(m![1]);
+    for (const agent of ["kubernetes", "logs", "metrics", "root-cause"]) {
+      expect(versions[agent], `${agent} must have a version hash`).toMatch(/^[0-9a-f]{12}$/);
+    }
+  });
+
   it("gates Slack and the stores on a successful report, not merely on an incident id", () => {
     // Subagent audit 2026-09-12: a report-refused item still carries
     // incident.incident_id, so gating on the id let a failed report write an empty

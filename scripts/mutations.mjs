@@ -3195,4 +3195,41 @@ export const MUTATIONS = [
     to: '  "cookie",',
     mustFail: "redacts EVERY secret-bearing header, nested, any casing — not just the submission token",
   },
+  {
+    // Eval-loop provenance: each run must carry the prompt versions that produced
+    // it. Dropping prompt_versions from the report leaves a failure unattributable
+    // to an editable prompt (Grok, 2026-09-13).
+    id: "report-drops-prompt-version-provenance",
+    file: "scripts/workflow-runtime.mjs",
+    from: "prompt_versions: PROMPT_VERSIONS }) };",
+    to: "}) };",
+    mustFail: "stamps each run with the prompt versions that produced it (eval-loop provenance)",
+  },
+  {
+    // A sticky failure must rank BELOW "not established" — else mixed->fail reads as
+    // an improvement and a change that creates a sticky failure ships (Grok, 2026-09-13).
+    id: "eval-rank-puts-fail-above-not-established",
+    file: "src/core/eval.ts",
+    from: "{ pass: 4, mixed: 3, unknown: 3, insufficient: 3, degraded: 2, fail: 1 }",
+    to: "{ pass: 4, mixed: 0, unknown: 0, insufficient: 0, degraded: 2, fail: 1 }",
+    mustFail: "treats a MIXED scenario becoming a sticky FAIL as a regression (Grok's re-review case)",
+  },
+  {
+    // Fewer than k=3 attempts is not a verdict. Removing the floor lets one wrong run
+    // read as a sticky failure.
+    id: "eval-stickiness-has-no-k-floor",
+    file: "src/core/eval.ts",
+    from: 'total < MIN_K ? "insufficient" : "mixed"',
+    to: '"mixed"',
+    mustFail: "calls fewer than k=3 attempts 'insufficient' — one wrong is not sticky",
+  },
+  {
+    // A rank DROP is a regression. Flipping the comparison lets a worsening pass as
+    // fine, so "keep only if better" no longer holds.
+    id: "eval-keeprule-misreads-regression",
+    file: "src/core/eval.ts",
+    from: "rankOf(a.majority) < rankOf(b.majority)",
+    to: "rankOf(a.majority) > rankOf(b.majority)",
+    mustFail: "REJECTS a change that fixes one but regresses a stable-green scenario",
+  },
 ];
