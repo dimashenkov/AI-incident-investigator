@@ -5,7 +5,7 @@
  * a sticky problem flips to green with no stable-green regression.
  */
 import { describe, it, expect } from "vitest";
-import { grade, stickiness, keepRule, diagnose, attributeMisses, rollupMisses } from "../src/core/eval.js";
+import { grade, stickiness, keepRule, diagnose, attributeMisses, rollupMisses, keepPlan } from "../src/core/eval.js";
 
 describe("grade", () => {
   it("maps score states to pass / degraded / fail / unknown", () => {
@@ -259,5 +259,32 @@ describe("rollupMisses — WHERE-TO-EDIT within ONE set (Grok 2026-09-13: never 
 
   it("is empty for a set with no misses — a clean set names no prompt to edit", () => {
     expect(rollupMisses({})).toEqual([]);
+  });
+});
+
+describe("keepPlan — the keep-rule's real cost, before the edit (Grok brick #5, 2026-09-13)", () => {
+  it("demands EVERY green (mandatory) + ≥1 sticky flip — min is greens+1, not all sticky (Grok re-review)", () => {
+    const before = {
+      oom: sticky(["wrong", "wrong", "wrong"]),           // sticky problem — a flip target
+      net: sticky(["wrong", "wrong", "wrong"]),           // a SECOND sticky — not required to buy
+      dns: sticky(["correct", "correct", "correct"]),      // green that MUST be re-measured
+      cpu: sticky(["correct", "correct", "correct"]),      // green that MUST be re-measured
+    };
+    const p = keepPlan(before);
+    expect(p.canImprove).toBe(true);
+    expect(p.stickyToFlip.sort()).toEqual(["net", "oom"]);
+    expect(p.greensToRemeasure.sort()).toEqual(["cpu", "dns"]);
+    // minimum = 2 greens + 1 sticky target = 3 scenarios × k=3 = 9; NOT all 4 (12).
+    expect(p.minRuns, "2 greens + 1 sticky target × k=3").toBe(9);
+    expect(p.fullRuns, "re-measuring both sticky too × k=3").toBe(12);
+    expect(p.minRuns, "the floor must not charge for every sticky").toBeLessThan(p.fullRuns);
+  });
+
+  it("says NO edit can be kept when nothing is broken — a clean set cannot demonstrate improvement", () => {
+    const before = { dns: sticky(["correct", "correct", "correct"]), cpu: sticky(["correct", "correct", "correct"]) };
+    const p = keepPlan(before);
+    expect(p.canImprove, "no sticky problem means nothing to flip").toBe(false);
+    expect(p.stickyToFlip).toEqual([]);
+    expect(p.why).toMatch(/nothing to flip|surface a real failure/i);
   });
 });

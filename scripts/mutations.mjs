@@ -3305,4 +3305,23 @@ export const MUTATIONS = [
     to: ".sort((a, b) => a.misses - b.misses);",
     mustFail: "ranks the most-missed agent first — the prompt to open first",
   },
+  {
+    // keepPlan must say NO edit can be kept when there is no sticky problem — a clean
+    // set cannot demonstrate improvement. Treating an empty sticky list as improvable
+    // would promise a keepable run that the keep-rule will always reject.
+    id: "eval-plan-claims-improvable-with-no-sticky-problem",
+    file: "src/core/eval.ts",
+    from: "const canImprove = stickyToFlip.length > 0;",
+    to: "const canImprove = stickyToFlip.length >= 0;",
+    mustFail: "says NO edit can be kept when nothing is broken — a clean set cannot demonstrate improvement",
+  },
+  {
+    // keepPlan's minimum must charge for ONE sticky target, not every sticky — the
+    // keep-rule needs >=1 flip, not all re-measured. Charging all overstates the cost.
+    id: "eval-plan-minimum-overstates-by-charging-all-sticky",
+    file: "src/core/eval.ts",
+    from: "const minRuns = (greensToRemeasure.length + (canImprove ? 1 : 0)) * k;",
+    to: "const minRuns = (greensToRemeasure.length + stickyToFlip.length) * k;",
+    mustFail: "demands EVERY green (mandatory) + ≥1 sticky flip — min is greens+1, not all sticky (Grok re-review)",
+  },
 ];

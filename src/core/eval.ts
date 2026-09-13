@@ -282,3 +282,35 @@ export function rollupMisses(attributionsByScenario: Record<string, AgentMiss[]>
     .map(([agent, e]) => ({ agent, misses: e.misses, scenarios: e.scenarios.size }))
     .sort((a, b) => b.misses - a.misses);
 }
+
+export type KeepPlan = {
+  greensToRemeasure: string[];  // MANDATORY: every stable green, or the keep-rule blocks
+  stickyToFlip: string[];       // TARGETS: the sticky problems; an edit must flip >=1
+  minRuns: number;              // the floor: every green + ONE sticky target, at k
+  fullRuns: number;             // re-measuring every green AND every sticky, at k
+  canImprove: boolean;          // false when no sticky problem exists — nothing to flip
+  why: string;
+};
+
+/**
+ * What the keep-rule will DEMAND of the next paid run, printed BEFORE the edit so the
+ * price is known first (Grok's brick #5, 2026-09-13; corrected after his review). It
+ * is NOT a discounted subset AND it does not overstate: keepRule requires EVERY prior
+ * green re-measured (an unmeasured green blocks the keep) plus AT LEAST ONE sticky
+ * problem flipped — not every sticky re-measured. So the mandatory floor is
+ * `greens + 1 sticky target` at k; re-measuring all sticky (fullRuns) shows more but
+ * is not required to keep. When there is NO sticky problem, no edit can be kept
+ * against this set — there is nothing to flip — said plainly, not papered over: the
+ * honest next step is to surface a real failure first (extend the baseline).
+ */
+export function keepPlan(before: Record<string, Stickiness>, k: number = MIN_K): KeepPlan {
+  const greensToRemeasure = Object.entries(before).filter(([, s]) => s.stableGreen).map(([n]) => n).sort();
+  const stickyToFlip = Object.entries(before).filter(([, s]) => s.stickyProblem).map(([n]) => n).sort();
+  const canImprove = stickyToFlip.length > 0;
+  const minRuns = (greensToRemeasure.length + (canImprove ? 1 : 0)) * k;
+  const fullRuns = (greensToRemeasure.length + stickyToFlip.length) * k;
+  const why = canImprove
+    ? `to KEEP an edit: re-measure EVERY green {${greensToRemeasure.join(", ") || "(none)"}} (mandatory) AND flip ≥1 of {${stickyToFlip.join(", ")}} with no regression — minimum k=${k} of ${greensToRemeasure.length} green(s) + 1 sticky target = ${minRuns} runs; re-measuring all ${stickyToFlip.length} sticky = ${fullRuns} runs`
+    : `no sticky problem in this set — nothing to flip, so NO edit can be kept here (the keep-rule needs a fixed failure). Re-measuring the ${greensToRemeasure.length} green(s) alone cannot keep a change; surface a real failure first (extend the baseline)`;
+  return { greensToRemeasure, stickyToFlip, minRuns, fullRuns, canImprove, why };
+}

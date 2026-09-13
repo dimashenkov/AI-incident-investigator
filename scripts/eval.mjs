@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { score, scenarioOf, owningSlot } from "./score-run.mjs";
 // eval.ts is TypeScript; node's type-stripping runs it, and .ts imports resolve.
-import { stickiness, keepRule, diagnose, attributeMisses, rollupMisses } from "../src/core/eval.ts";
+import { stickiness, keepRule, diagnose, attributeMisses, rollupMisses, keepPlan } from "../src/core/eval.ts";
 
 /** Which prompt file an owning slot points at — so the rollup names WHAT to edit,
  *  not just which agent. An unattributed miss names no file. */
@@ -84,6 +84,7 @@ function main() {
   const flag = (name) => { const i = argv.indexOf(name); return i === -1 ? undefined : argv[i + 1]; };
   const before = flag("--before");
   const after = flag("--after");
+  const plan = argv.includes("--plan");
 
   const byKey = readAllAnswers();
 
@@ -114,6 +115,30 @@ function main() {
     const setId = setIdOf(pv) ?? "(no provenance)";
     const scenario = scenarioOf(key.split("@")[0]);
     ((bySet[setId] ??= {})[scenario] ??= []).push(score(scenario, answer));
+  }
+
+  // --plan: BEFORE an edit, print what the keep-rule will demand of the next paid
+  // run — the actual requirement, not a discounted subset (Grok's brick #5). Only
+  // for versioned sets; a mixed (no-provenance) set cannot be a valid "before".
+  if (plan) {
+    process.stdout.write("EVAL PLAN — what a keepable edit will cost, per prompt-version set\n");
+    let any = false;
+    for (const [setId, scenarios] of Object.entries(bySet)) {
+      if (setId === "(no provenance)") continue;
+      any = true;
+      const stick = {};
+      for (const [scenario, results] of Object.entries(scenarios)) stick[scenario] = stickiness(results.map((r) => r.state));
+      const p = keepPlan(stick);
+      process.stdout.write(`\nprompt set ${setId}\n`);
+      process.stdout.write(`  ${p.why}\n`);
+      if (p.canImprove) {
+        process.stdout.write(`  mandatory greens: ${p.greensToRemeasure.join(", ") || "(none)"}\n`);
+        process.stdout.write(`  flip ≥1 of:       ${p.stickyToFlip.join(", ")}\n`);
+        process.stdout.write(`  minimum ${p.minRuns} runs · all-sticky ${p.fullRuns} runs (k=3)\n`);
+      }
+    }
+    if (!any) process.stdout.write("\nNo versioned set yet — produce a k>=3 baseline under one frozen prompt set first (that spends).\n");
+    return;
   }
 
   process.stdout.write("EVAL READ — recorded runs, scored, by prompt-version set then stickiness\n");
