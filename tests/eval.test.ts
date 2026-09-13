@@ -5,7 +5,7 @@
  * a sticky problem flips to green with no stable-green regression.
  */
 import { describe, it, expect } from "vitest";
-import { grade, stickiness, keepRule } from "../src/core/eval.js";
+import { grade, stickiness, keepRule, diagnose } from "../src/core/eval.js";
 
 describe("grade", () => {
   it("maps score states to pass / degraded / fail / unknown", () => {
@@ -124,5 +124,85 @@ describe("keepRule", () => {
     const v = keepRule(before, after);
     expect(v.keep).toBe(false);
     expect(v.unmeasuredGreens).toContain("dns");
+  });
+});
+
+describe("diagnose — WHERE a scenario fails, as detail under the verdict (Grok 2026-09-13)", () => {
+  it("aggregates wrong-code confusion with counts, most frequent first", () => {
+    const d = diagnose([
+      { state: "wrong", got: "APPLICATION_STARTUP_FAILURE", expected: "DEPLOYMENT_REGRESSION" },
+      { state: "wrong", got: "APPLICATION_STARTUP_FAILURE", expected: "DEPLOYMENT_REGRESSION" },
+      { state: "wrong", got: "CONFIG_ERROR", expected: "DEPLOYMENT_REGRESSION" },
+    ]);
+    expect(d.codeConfusion[0]).toEqual({ got: "APPLICATION_STARTUP_FAILURE", want: "DEPLOYMENT_REGRESSION", count: 2 });
+    expect(d.lines[0]).toContain("got APPLICATION_STARTUP_FAILURE, want DEPLOYMENT_REGRESSION");
+  });
+
+  it("unions missed citations across attempts with per-path counts", () => {
+    const d = diagnose([
+      { state: "correct-without-its-evidence", code: "OOM", missingCitations: ["metrics.series[0].points[3]"] },
+      { state: "correct-without-its-evidence", code: "OOM", missingCitations: ["metrics.series[0].points[3]", "logs.lines[2]"] },
+      { state: "correct", code: "OOM", missingCitations: [] },
+    ]);
+    expect(d.uncited).toBe(2);
+    expect(d.missedCitations[0]).toEqual({ path: "metrics.series[0].points[3]", count: 2 });
+    expect(d.lines.some((l) => l.includes("metrics.series[0].points[3] (×2)"))).toBe(true);
+  });
+
+  it("reports the unqualified axis with its reason", () => {
+    const d = diagnose([
+      { state: "correct-but-unqualified", code: "OOM", why: "confidence 0.8 exceeds the 0.6 ceiling", missingCitations: [] },
+      { state: "correct", code: "OOM", missingCitations: [] },
+      { state: "correct", code: "OOM", missingCitations: [] },
+    ]);
+    expect(d.unqualified).toBe(1);
+    expect(d.lines.some((l) => l.startsWith("unqualified") && l.includes("0.6 ceiling"))).toBe(true);
+  });
+
+  it("reads `why` as the string[] score() actually returns for correct-but-unqualified (Grok re-review)", () => {
+    // The live object is a LIST, not a string: score() returns why: [...] for this
+    // state. A string-only reader would stringify "[object]" or dedup a Set by
+    // reference. diagnose must surface the actual reason text.
+    const d = diagnose([
+      { state: "correct-but-unqualified", code: "OOM", why: ["confidence 0.8 exceeds the 0.6 ceiling"], missingCitations: [] },
+      { state: "correct-but-unqualified", code: "OOM", why: ["confidence 0.8 exceeds the 0.6 ceiling"], missingCitations: [] },
+      { state: "correct", code: "OOM", missingCitations: [] },
+    ]);
+    expect(d.unqualifiedReasons).toEqual(["confidence 0.8 exceeds the 0.6 ceiling"]); // deduped by value, not reference
+    expect(d.lines.some((l) => l.startsWith("unqualified") && l.includes("0.6 ceiling"))).toBe(true);
+  });
+
+  it("gives each axis its OWN reason — an unasked reason never rides the unqualified line (Grok's swap case)", () => {
+    // The shared-reasons bug: reasons[0] was the first-by-attempt-order, so an
+    // unasked scenario's "no answer" text printed on the unqualified line and the
+    // real unqualified reason moved to unresolved. Each axis must carry its own.
+    const d = diagnose([
+      { state: "unasked", expected: "OOM", why: "no answer was recorded" },
+      { state: "correct-but-unqualified", code: "OOM", why: ["confidence 0.8 exceeds the 0.6 ceiling"], missingCitations: [] },
+      { state: "correct", code: "OOM", missingCitations: [] },
+    ]);
+    const unq = d.lines.find((l) => l.startsWith("unqualified"))!;
+    const unr = d.lines.find((l) => l.startsWith("unresolved"))!;
+    expect(unq, "unqualified line carries the ceiling reason").toContain("0.6 ceiling");
+    expect(unq, "not the unasked reason").not.toContain("no answer");
+    expect(unr, "unresolved line carries the unasked reason").toContain("no answer was recorded");
+    expect(unr).not.toContain("0.6 ceiling");
+  });
+
+  it("is DETAIL only — a clean sweep yields no lines, so it never speaks over a green verdict", () => {
+    const d = diagnose([
+      { state: "correct", code: "OOM", missingCitations: [] },
+      { state: "correct", code: "OOM", missingCitations: [] },
+      { state: "correct", code: "OOM", missingCitations: [] },
+    ]);
+    expect(d.lines).toEqual([]);
+    expect(d.codeConfusion).toEqual([]);
+    expect(d.missedCitations).toEqual([]);
+  });
+
+  it("does not invent a reason where none was recorded", () => {
+    const d = diagnose([{ state: "unasked", expected: "OOM", why: "no answer was recorded" }]);
+    expect(d.unresolved).toBe(1);
+    expect(d.lines[0]).toContain("no answer was recorded");
   });
 });

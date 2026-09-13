@@ -3251,4 +3251,22 @@ export const MUTATIONS = [
     to: "rankOf(a.majority) > rankOf(b.majority)",
     mustFail: "REJECTS a change that fixes one but regresses a stable-green scenario",
   },
+  {
+    // diagnose must COUNT repeated wrong-code confusions, not just record one, so
+    // "got X twice" is visible. Dropping the increment loses the count.
+    id: "eval-diagnose-does-not-count-code-confusion",
+    file: "src/core/eval.ts",
+    from: "confusion.set(key, (confusion.get(key) ?? 0) + 1);",
+    to: "confusion.set(key, 1);",
+    mustFail: "aggregates wrong-code confusion with counts, most frequent first",
+  },
+  {
+    // diagnose must UNION missed citations across attempts with per-path counts.
+    // Overwriting with 1 loses how many attempts missed the same required path.
+    id: "eval-diagnose-does-not-count-missed-citations",
+    file: "src/core/eval.ts",
+    from: "for (const c of r.missingCitations ?? []) citations.set(c, (citations.get(c) ?? 0) + 1);",
+    to: "for (const c of r.missingCitations ?? []) citations.set(c, 1);",
+    mustFail: "unions missed citations across attempts with per-path counts",
+  },
 ];

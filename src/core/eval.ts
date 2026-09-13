@@ -129,3 +129,95 @@ export function keepRule(
   else why = "reject: fixed no sticky problem — different, not better";
   return { keep, flipped, regressed, unmeasuredGreens, why };
 }
+
+/** One scored attempt, reduced to the fields diagnosis reads. score-run.mjs returns
+ *  more; diagnose ignores the rest. */
+export type ScoredAttempt = {
+  state: string;
+  expected?: string;
+  got?: string;
+  code?: string;
+  why?: string | string[];  // score() returns a string for most states, a string[] for correct-but-unqualified
+  missingCitations?: string[];
+};
+
+export type Diagnosis = {
+  /** wrong-code confusions: which `got` stood in for `want`, and how often. */
+  codeConfusion: Array<{ got: string; want: string; count: number }>;
+  /** required citations that were missing, unioned across attempts, with counts. */
+  missedCitations: Array<{ path: string; count: number }>;
+  /** how many attempts landed on each soft-fail axis. */
+  uncited: number;      // correct code, a required citation missing
+  unqualified: number;  // correct code, confidence over the ceiling / unqualified refusal
+  unresolved: number;   // could not be established (no answer, unresolvable citation)
+  /** reasons per axis, each carrying ONLY its own (Grok, 2026-09-13: a shared list
+   *  read positionally attributes one axis's reason to another). Deduped by value. */
+  unqualifiedReasons: string[];
+  unresolvedReasons: string[];
+  /** both axes' reasons, for a caller that wants them together. */
+  reasons: string[];
+  /** ready-to-print diagnosis lines; empty when nothing is wrong. */
+  lines: string[];
+};
+
+/**
+ * Turn the k scored attempts of ONE scenario into a diagnosis of WHERE it fails —
+ * the "read" the eval loop was missing (Grok, 2026-09-13): stickiness says a
+ * scenario is a problem, diagnose says on which axis, so the next prompt edit has a
+ * target instead of a guess.
+ *
+ * This is DETAIL, never a verdict. It deliberately does not re-tally a majority or
+ * decide keep/reject — splitting k attempts across four axes would make every
+ * scenario "insufficient" (Grok's warning). stickiness owns the verdict; diagnose
+ * only describes the failures under it, and returns empty `lines` when every attempt
+ * passed clean.
+ */
+export function diagnose(results: ScoredAttempt[]): Diagnosis {
+  const confusion = new Map<string, number>();       // "got→want" -> count
+  const citations = new Map<string, number>();        // path -> count
+  let uncited = 0, unqualified = 0, unresolved = 0;
+  const unqualifiedReasons: string[] = [];
+  const unresolvedReasons: string[] = [];
+  // score() returns `why` as a STRING for unasked/unestablished but as a STRING[]
+  // for correct-but-unqualified (Grok, 2026-09-13). Normalise to a list, and dedup
+  // by VALUE (a Set keyed on an array would never match two equal arrays), into the
+  // axis's OWN list so no reason is attributed to the wrong axis.
+  const addReasons = (list: string[], why?: string | string[]) => {
+    const items = Array.isArray(why) ? why : why == null ? [] : [why];
+    for (const w of items) if (w && !list.includes(w)) list.push(w);
+  };
+
+  for (const r of results) {
+    if (r.state === "wrong") {
+      const key = `${r.got ?? "(none)"}→${r.expected ?? "(unknown)"}`;
+      confusion.set(key, (confusion.get(key) ?? 0) + 1);
+    } else if (r.state === "correct-without-its-evidence") {
+      uncited += 1;
+    } else if (r.state === "correct-but-unqualified") {
+      unqualified += 1;
+      addReasons(unqualifiedReasons, r.why);
+    } else if (r.state === "unestablished" || r.state === "unasked") {
+      unresolved += 1;
+      addReasons(unresolvedReasons, r.why);
+    }
+    for (const c of r.missingCitations ?? []) citations.set(c, (citations.get(c) ?? 0) + 1);
+  }
+
+  const codeConfusion = [...confusion.entries()]
+    .map(([k, count]) => { const [got, want] = k.split("→"); return { got: got!, want: want!, count }; })
+    .sort((a, b) => b.count - a.count);
+  const missedCitations = [...citations.entries()]
+    .map(([path, count]) => ({ path, count }))
+    .sort((a, b) => b.count - a.count);
+
+  const lines: string[] = [];
+  for (const c of codeConfusion) lines.push(`wrong ×${c.count}: got ${c.got}, want ${c.want}`);
+  if (missedCitations.length > 0) {
+    lines.push(`uncited: ${missedCitations.map((m) => `${m.path} (×${m.count})`).join(", ")}`);
+  }
+  // Each axis prints ITS OWN reason, not a positional guess into a shared list.
+  if (unqualified > 0) lines.push(`unqualified ×${unqualified}${unqualifiedReasons.length ? `: ${unqualifiedReasons[0]}` : ""}`);
+  if (unresolved > 0) lines.push(`unresolved ×${unresolved}${unresolvedReasons.length ? `: ${unresolvedReasons[0]}` : ""}`);
+  const reasons = [...unqualifiedReasons, ...unresolvedReasons];
+  return { codeConfusion, missedCitations, uncited, unqualified, unresolved, unqualifiedReasons, unresolvedReasons, reasons, lines };
+}

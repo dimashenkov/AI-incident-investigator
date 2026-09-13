@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { score, scenarioOf } from "./score-run.mjs";
 // eval.ts is TypeScript; node's type-stripping runs it, and .ts imports resolve.
-import { stickiness, keepRule } from "../src/core/eval.ts";
+import { stickiness, keepRule, diagnose } from "../src/core/eval.ts";
 
 /** A short id for a WHOLE prompt-version set (all agents), so a comparison is
  *  between two frozen sets — not "any agent's hash matches", which mixes versions
@@ -120,9 +120,13 @@ function main() {
     for (const { scenario, s, results } of rows) {
       const mark = s.stableGreen ? "✓" : s.stickyProblem ? "✗" : s.majority === "insufficient" ? "·" : "~";
       const counts = `${s.pass}✓ ${s.degraded}~ ${s.fail}✗ ${s.unknown}?`;
-      const wrong = results.find((r) => r.state === "wrong");
-      const detail = wrong ? `  got ${wrong.got} want ${wrong.expected}` : "";
-      process.stdout.write(`  ${mark} ${scenario.padEnd(28)} ${String(s.majority).padEnd(12)} [${counts} of ${s.total}]${detail}\n`);
+      process.stdout.write(`  ${mark} ${scenario.padEnd(28)} ${String(s.majority).padEnd(12)} [${counts} of ${s.total}]\n`);
+      // Diagnosis is DETAIL under a non-green scenario — the axis of failure, so the
+      // next prompt edit has a target. It never changes the verdict above (Grok,
+      // 2026-09-13). A stable green with a clean sweep prints nothing extra.
+      if (!s.stableGreen) {
+        for (const line of diagnose(results).lines) process.stdout.write(`      ↳ ${line}\n`);
+      }
     }
     const problems = rows.filter((r) => r.s.stickyProblem).length;
     const thin = rows.filter((r) => r.s.majority === "insufficient").length;
