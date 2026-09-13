@@ -108,7 +108,7 @@ type Item = { json: Record<string, unknown> };
  * Written here rather than assumed by the Set node: if the envelope changes,
  * this is the one place that has to change, and every test notices.
  */
-export function envelope(answer: Reply, usage?: Record<string, unknown>): Record<string, unknown> {
+export function envelope(answer: Reply, usage?: Record<string, unknown>, model?: string): Record<string, unknown> {
   /*
    * `usage` is part of what the API returns, and the harness could not carry it
    * until 2026-09-11 — so the expression that reads it had no test, and a live
@@ -120,6 +120,10 @@ export function envelope(answer: Reply, usage?: Record<string, unknown>): Record
     choices: [{ message: { content: answer === null ? "not json at all" : JSON.stringify(answer) } }],
   };
   if (usage !== undefined) out["usage"] = usage;
+  // The API names the model that SERVED the call (which can differ from the one asked
+  // — a fallback to Grok, or a provider downgrade). The harness carries it so the
+  // expression that stamps model_by_agent can be exercised (2026-09-13).
+  if (model !== undefined) out["model"] = model;
   return out;
 }
 
@@ -194,11 +198,14 @@ export function runSetExpression(
   }
   const body = raw.slice(raw.indexOf("{{") + 2, raw.lastIndexOf("}}"));
   const $ = (name: string) => {
-    if (typeof earlier === "function") return { item: { json: earlier(name) } };
-    if (previousName !== undefined && name !== previousName) {
+    // n8n exposes both `.item` (paired) and `.first()`. The nodes reached through an
+    // error branch use `.first()` (paired-item is fragile there); the flow carries one
+    // incident, so both resolve to the same json here (2026-09-13).
+    const json = typeof earlier === "function" ? earlier(name) : earlier;
+    if (typeof earlier !== "function" && previousName !== undefined && name !== previousName) {
       throw new Error(`the expression reaches for ${name}, which is not the node before it`);
     }
-    return { item: { json: earlier } };
+    return { item: { json }, first: () => ({ json }) };
   };
   const fn = new Function("$json", "$", `"use strict"; return (${body});`) as
     (j: unknown, d: unknown) => string;
@@ -324,16 +331,19 @@ export async function runScenario(
        * `usage_by_agent` while the code looked right.
        */
       let spokenUsage: Record<string, unknown> | undefined = undefined;
+      let spokenModel: string | undefined = undefined;
       let spokenAnswer: Reply = answered;
-      if (answered !== null && typeof answered === "object" && "__usage" in answered) {
+      if (answered !== null && typeof answered === "object" && ("__usage" in answered || "__model" in answered)) {
         const copy: Record<string, unknown> = { ...(answered as Record<string, unknown>) };
-        spokenUsage = copy["__usage"] as Record<string, unknown>;
-        delete copy["__usage"];
+        if ("__usage" in copy) { spokenUsage = copy["__usage"] as Record<string, unknown>; delete copy["__usage"]; }
+        // A stub that wants to say WHICH model answered (a Grok fallback in a test)
+        // returns `__model`, lifted into the envelope's `model` where the API puts it.
+        if ("__model" in copy) { spokenModel = copy["__model"] as string; delete copy["__model"]; }
         spokenAnswer = copy as Reply;
       }
       item = (answered !== null && typeof answered === "object" && "__rawBody" in answered)
         ? (answered as { __rawBody: Record<string, unknown> }).__rawBody
-        : envelope(spokenAnswer, spokenUsage);
+        : envelope(spokenAnswer, spokenUsage, spokenModel);
     } else if (next.type === "n8n-nodes-base.set") {
       item = runSetExpression(next, item, lastOf);
     } else if (next.type === "n8n-nodes-base.code") {

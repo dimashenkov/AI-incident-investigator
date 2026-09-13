@@ -12,7 +12,7 @@ import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
 // @ts-expect-error — plain .mjs, the same file node runs.
-import { buildWorkflow, serialise, generate, WEBHOOK_PATH, MODEL, OPENAI_CREDENTIAL, SLACK_CREDENTIAL } from "../scripts/generate-workflow.mjs";
+import { buildWorkflow, serialise, generate, WEBHOOK_PATH, MODEL, OPENAI_CREDENTIAL, SLACK_CREDENTIAL, GROK_CREDENTIAL, GROK_MODEL } from "../scripts/generate-workflow.mjs";
 // @ts-expect-error — plain .mjs, the same file node runs.
 import { transpile, AGENT_ORDER } from "../scripts/workflow-runtime.mjs";
 
@@ -456,6 +456,53 @@ describe("what the transpiler refuses to deploy", () => {
     // transpiler that rejected everything.
     for (const f of ["src/core/merge.ts", "src/agents/slice.ts"]) {
       expect(() => transpile(f), `${f} can no longer be deployed`).not.toThrow();
+    }
+  });
+});
+
+describe("the Grok fallback — every agent falls over to Grok on a provider error (owner, 2026-09-13, variant A)", () => {
+  const AGENTS = AGENT_ORDER;
+
+  it("gives every Ask node an error output that routes to its Grok node, success to Collect", () => {
+    // Without onError:continueErrorOutput a provider error (429/quota/5xx) kills the
+    // whole execution and records unestablished with no reason. The error output
+    // (index 1) must go to the agent's Grok node; success (index 0) to Collect.
+    for (const agent of AGENTS) {
+      const ask = node(`Ask ${agent}`) as { onError?: string };
+      expect(ask.onError, `Ask ${agent} must not die on a provider error`).toBe("continueErrorOutput");
+      const out = WF.connections[`Ask ${agent}`].main;
+      expect(out[0][0].node, "success -> Collect").toBe(`Collect ${agent}`);
+      expect(out[1]?.[0]?.node, "error -> Grok fallback").toBe(`Grok ${agent}`);
+    }
+  });
+
+  it("each Grok node calls the xAI API with the grok credential and the chosen model, then joins the SAME Collect", () => {
+    for (const agent of AGENTS) {
+      const g = node(`Grok ${agent}`) as {
+        type: string; onError?: string; credentials: Record<string, { id: string }>;
+        parameters: { url: string; jsonBody: string; authentication: string; genericAuthType: string } };
+      expect(g.type).toBe("n8n-nodes-base.httpRequest");
+      expect(g.onError, "Grok's own failure must not kill the run after paying").toBe("continueErrorOutput");
+      expect(g.parameters.url, "the xAI endpoint, not OpenAI").toBe("https://api.x.ai/v1/chat/completions");
+      expect(g.parameters.authentication).toBe("genericCredentialType");
+      expect(g.parameters.genericAuthType).toBe("httpHeaderAuth");
+      expect(g.credentials.httpHeaderAuth?.id, "the grok credential, by id").toBe(GROK_CREDENTIAL.id);
+      expect(g.parameters.jsonBody, "asks the chosen fallback model").toContain(JSON.stringify(GROK_MODEL));
+      // reads prompt/payload from the GATE with .first() (paired-item is fragile on an
+      // error branch — the listener uses .first() for the same reason), not the errored item
+      expect(g.parameters.jsonBody, "prompt from the gate via .first()").toContain(`$('Ask ${agent}?').first().json.prompt`);
+      expect(g.parameters.jsonBody, "not the fragile .item on the error branch").not.toContain(`$('Ask ${agent}?').item.json`);
+      const gc = WF.connections[`Grok ${agent}`].main;
+      expect(gc[0][0].node, "Grok success rejoins Collect").toBe(`Collect ${agent}`);
+      expect(gc[1]?.[0]?.node, "Grok's OWN error also lands in Collect (unestablished, not death)").toBe(`Collect ${agent}`);
+    }
+  });
+
+  it("the fallback does NOT reach OpenAI — a Grok node never carries the OpenAI credential or URL", () => {
+    for (const agent of AGENTS) {
+      const g = node(`Grok ${agent}`) as { credentials: Record<string, unknown>; parameters: { url: string } };
+      expect(g.parameters.url).not.toContain("openai.com");
+      expect(Object.keys(g.credentials), "grok uses header auth, not openAiApi").not.toContain("openAiApi");
     }
   });
 });

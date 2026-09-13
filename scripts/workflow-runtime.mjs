@@ -377,6 +377,15 @@ return items.map(function (item, index) {
      */
     const costSoFar = Object.assign({}, j.usage_by_agent || {});
     if (j.usage && typeof j.usage === "object") costSoFar[AGENT] = j.usage;
+    /*
+     * WHICH model answered each agent, carried like the cost — the announcement of
+     * a fallback (Grok, 2026-09-13). Collect stamps j.model from the reply; Record
+     * built a fresh object and dropped it, so a Grok failover was invisible to the
+     * record and to eval. grok-4.3 here vs the OpenAI model is how a reader sees the
+     * primary was bypassed. Missing stays null, never the pinned model restated.
+     */
+    const modelsSoFar = Object.assign({}, j.model_by_agent || {});
+    if (typeof j.model === "string" && j.model) modelsSoFar[AGENT] = j.model;
     const reply = j.reply;
     if (typeof reply !== "object" || reply === null) {
       /*
@@ -393,7 +402,7 @@ return items.map(function (item, index) {
        * money already bought.
        */
       return { json: Object.assign({}, j, { index, state: "refused", agent: AGENT, raw,
-        raw_answers: wordsSoFar, usage_by_agent: costSoFar,
+        raw_answers: wordsSoFar, usage_by_agent: costSoFar, model_by_agent: modelsSoFar,
         reason: AGENT + " returned nothing that could be read as an answer" }) };
     }
     // The node knows who it asked, and says so. The schema spells root-cause
@@ -411,7 +420,7 @@ return items.map(function (item, index) {
     const recorded = recordAgentResult(validate, incident, reply, AGENT.replace("-", "_"), readsByCode);
     if (recorded.state !== "recorded") {
       return { json: Object.assign({}, j, { index, state: "refused", agent: AGENT, raw,
-        raw_answers: wordsSoFar, usage_by_agent: costSoFar,
+        raw_answers: wordsSoFar, usage_by_agent: costSoFar, model_by_agent: modelsSoFar,
         reason: AGENT + ": " + recorded.reason, errors: recorded.errors || [] }) };
     }
     j.incident = recorded.incident;
@@ -447,11 +456,12 @@ return items.map(function (item, index) {
      * hides every defect in reading it.
      */
     j.usage_by_agent = costSoFar;
+    j.model_by_agent = modelsSoFar;
   }
 
   if (NEXT === null) {
     return { json: { index, state: "recorded", agent: AGENT, scenario: j.scenario,
-      incident: j.incident, normalised: j.normalised || 0, raw_answers: j.raw_answers || {}, usage_by_agent: j.usage_by_agent || {},
+      incident: j.incident, normalised: j.normalised || 0, raw_answers: j.raw_answers || {}, usage_by_agent: j.usage_by_agent || {}, model_by_agent: j.model_by_agent || {},
       payloads_sent: j.payloads_sent || {} } };
   }
 
@@ -483,7 +493,7 @@ return items.map(function (item, index) {
       : (j.payloads_sent || {});
     return { json: { index, state: "asking", agent: NEXT, scenario: j.scenario,
       incident: j.incident, prompt: ctx.prompt, payload: ctx.payload,
-      normalised: j.normalised || 0, raw_answers: j.raw_answers || {}, usage_by_agent: j.usage_by_agent || {},
+      normalised: j.normalised || 0, raw_answers: j.raw_answers || {}, usage_by_agent: j.usage_by_agent || {}, model_by_agent: j.model_by_agent || {},
       payloads_sent: sent } };
   }
 
@@ -534,7 +544,7 @@ return items.map(function (item, index) {
   const record = collection[slot] || {};
   if (record.state === "nothing" && ctx.why === "empty-slot") {
     return { json: { index, state: "skipped", agent: NEXT, scenario: j.scenario,
-      incident: j.incident, normalised: j.normalised || 0, raw_answers: j.raw_answers || {}, usage_by_agent: j.usage_by_agent || {},
+      incident: j.incident, normalised: j.normalised || 0, raw_answers: j.raw_answers || {}, usage_by_agent: j.usage_by_agent || {}, model_by_agent: j.model_by_agent || {},
       payloads_sent: j.payloads_sent || {},
       skipped_because: NEXT + " had nothing to read: the provider reported an established absence" } };
   }
@@ -678,7 +688,7 @@ return items.map(function (item, index) {
      * that a verdict from a corrected scorer must be recomputed before any
      * dependent spending has nothing to recompute from.
      */
-    raw_answers: j.raw_answers || {}, usage_by_agent: j.usage_by_agent || {},
+    raw_answers: j.raw_answers || {}, usage_by_agent: j.usage_by_agent || {}, model_by_agent: j.model_by_agent || {},
     /*
      * Carried to the caller for the same reason the raw answers are: a run that
      * has been paid for must be re-judgeable from what came back, and "what was

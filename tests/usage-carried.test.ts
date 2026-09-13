@@ -47,3 +47,35 @@ describe("the cost of each call leaves the chain with the answer", () => {
       .toEqual({});
   });
 });
+
+// A stub wrapper that stamps which MODEL answered each agent — the fallback
+// announcement (Grok, 2026-09-13). A run where root-cause was served by Grok must
+// leave the chain saying so, or eval cannot tell a failover from a normal run.
+const withModel = (base: Record<string, Stub>, models: Record<string, string>): Record<string, Stub> => {
+  const out: Record<string, Stub> = {};
+  for (const [agent, stub] of Object.entries(base)) {
+    out[agent] = (payload) => {
+      const said = stub(payload);
+      if (said === null) return said;
+      return { ...said, __model: models[agent] ?? "gpt-5" };
+    };
+  }
+  return out;
+};
+
+describe("which model answered leaves the chain — the fallback announcement", () => {
+  it("records model_by_agent, so a Grok failover is visible to the record and to eval", async () => {
+    const out = await runScenario("container-oom",
+      withModel(STUB_AGENTS, { "root-cause": "grok-4.3" }));
+    const by = out["model_by_agent"] as Record<string, string>;
+    expect(by, "the field must survive Record and Conclude, not be dropped").toBeDefined();
+    expect(by["root-cause"], "root-cause was served by the fallback and the record says so").toBe("grok-4.3");
+    expect(by["kubernetes"], "the others were the primary").toBe("gpt-5");
+  });
+
+  it("leaves model_by_agent empty when the reply names no model, rather than restating the pinned one", async () => {
+    const out = await runScenario("container-oom", STUB_AGENTS);
+    expect(out["model_by_agent"], "a reply that carried no model name is unestablished, not the pinned model")
+      .toEqual({});
+  });
+});

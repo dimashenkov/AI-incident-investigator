@@ -1870,7 +1870,7 @@ export const MUTATIONS = [
     // has only the failing agent's words to read.
     id: "a-refusal-discards-what-was-already-paid-for",
     file: "scripts/workflow-runtime.mjs",
-    from: "      return { json: Object.assign({}, j, { index, state: \"refused\", agent: AGENT, raw,\n        raw_answers: wordsSoFar, usage_by_agent: costSoFar,\n        reason: AGENT + \" returned nothing that could be read as an answer\" }) };",
+    from: "      return { json: Object.assign({}, j, { index, state: \"refused\", agent: AGENT, raw,\n        raw_answers: wordsSoFar, usage_by_agent: costSoFar, model_by_agent: modelsSoFar,\n        reason: AGENT + \" returned nothing that could be read as an answer\" }) };",
     to: "      return { json: { index, state: \"refused\", agent: AGENT, raw,\n        reason: AGENT + \" returned nothing that could be read as an answer\" } };",
     mustFail: "keeps what the earlier agents were paid for when a later one refuses",
   },
@@ -3323,5 +3323,43 @@ export const MUTATIONS = [
     from: "const minRuns = (greensToRemeasure.length + (canImprove ? 1 : 0)) * k;",
     to: "const minRuns = (greensToRemeasure.length + stickyToFlip.length) * k;",
     mustFail: "demands EVERY green (mandatory) + ≥1 sticky flip — min is greens+1, not all sticky (Grok re-review)",
+  },
+  {
+    // The Grok fallback depends on the Ask node surviving a provider error. Without
+    // continueErrorOutput the node dies and the run records unestablished with no
+    // reason — the fallback never fires.
+    id: "ask-node-dies-on-provider-error-no-fallback",
+    file: "scripts/generate-workflow.mjs",
+    from: 'onError: "continueErrorOutput",\n    credentials: { openAiApi: { id: OPENAI_CREDENTIAL.id, name: OPENAI_CREDENTIAL.name } },',
+    to: 'credentials: { openAiApi: { id: OPENAI_CREDENTIAL.id, name: OPENAI_CREDENTIAL.name } },',
+    mustFail: "gives every Ask node an error output that routes to its Grok node, success to Collect",
+  },
+  {
+    // The error output must route to the agent's Grok node. Dropping the second
+    // (error) branch means an errored Ask has nowhere to fall over to.
+    id: "ask-error-output-does-not-reach-grok",
+    file: "scripts/generate-workflow.mjs",
+    from: 'connections[ask] = { main: [[{ node: collect, type: "main", index: 0 }], [{ node: grok, type: "main", index: 0 }]] };',
+    to: 'connections[ask] = { main: [[{ node: collect, type: "main", index: 0 }]] };',
+    mustFail: "gives every Ask node an error output that routes to its Grok node, success to Collect",
+  },
+  {
+    // The fallback must hit the xAI endpoint, not OpenAI again — a Grok node pointed
+    // back at OpenAI is not a second provider.
+    id: "grok-fallback-points-back-at-openai",
+    file: "scripts/generate-workflow.mjs",
+    from: "url: GROK_URL,",
+    to: 'url: "https://api.openai.com/v1/chat/completions",',
+    mustFail: "each Grok node calls the xAI API with the grok credential and the chosen model, then joins the SAME Collect",
+  },
+  {
+    // The announcement — WHICH model answered — must survive Record, or a Grok
+    // failover is invisible to the record and to eval. Dropping the assignment leaves
+    // model_by_agent empty (the defect Grok found: stamped in Collect, erased here).
+    id: "record-drops-which-model-answered",
+    file: "scripts/workflow-runtime.mjs",
+    from: "    j.model_by_agent = modelsSoFar;\n",
+    to: "",
+    mustFail: "records model_by_agent, so a Grok failover is visible to the record and to eval",
   },
 ];

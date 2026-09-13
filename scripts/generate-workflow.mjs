@@ -58,6 +58,10 @@ function askNode(agent, position) {
     type: "n8n-nodes-base.httpRequest",
     typeVersion: 4.2,
     position,
+    // On a provider error (429, quota, 5xx) DO NOT kill the execution — send the item
+    // out the error output (index 1) so it can fall over to Grok, announced. Without
+    // this the whole run dies and records `unestablished` with no reason (2026-09-13).
+    onError: "continueErrorOutput",
     credentials: { openAiApi: { id: OPENAI_CREDENTIAL.id, name: OPENAI_CREDENTIAL.name } },
     parameters: {
       method: "POST",
@@ -86,6 +90,57 @@ function askNode(agent, position) {
         + "response_format: { type: 'json_object' }, messages: [ "
         + "{ role: 'system', content: $json.prompt }, "
         + "{ role: 'user', content: JSON.stringify($json.payload) } ] }) }}",
+      options: {},
+    },
+  };
+}
+
+/**
+ * The Grok fallback for one agent (owner, 2026-09-13, variant A — every agent).
+ *
+ * Reached only from `Ask <agent>`'s ERROR output. It re-asks the SAME question of
+ * Grok over the xAI API (OpenAI-compatible, so the response shape Collect unwraps is
+ * identical), then feeds the SAME `Collect <agent>` node — so the failover is
+ * transparent to everything downstream except that the reply now names grok-4.3
+ * rather than the OpenAI model, which is the announcement: the trace shows Grok
+ * answered, never a silent swap. prompt and payload are read from the gate node (a
+ * shared upstream), not from the errored item, so they are always present.
+ *
+ * LIMITATIONS, stated not hidden (Grok, 2026-09-13): (1) the failover is announced by
+ * WHICH model answered (model_by_agent carries grok-4.3), but the primary's error
+ * REASON — the 429 or quota text — is not carried into the record; the n8n execution
+ * log has it, the answer does not. (2) An OpenAI call that times out or 5xx's AFTER it
+ * was accepted can be billed even though Grok then answers too — one incident, two
+ * charges. Neither is a live leak; both are real-deploy costs to weigh.
+ */
+function grokNode(agent, position) {
+  const gate = `Ask ${agent}?`;
+  return {
+    id: `grok-${agent}`,
+    name: `Grok ${agent}`,
+    type: "n8n-nodes-base.httpRequest",
+    typeVersion: 4.2,
+    position,
+    // If Grok ALSO fails (e.g. the API rejects response_format), do not kill the
+    // execution after already paying — send the item on so Collect records it as
+    // unreadable (unestablished) rather than the run dying (Grok, 2026-09-13).
+    onError: "continueErrorOutput",
+    credentials: { httpHeaderAuth: { id: GROK_CREDENTIAL.id, name: GROK_CREDENTIAL.name } },
+    parameters: {
+      method: "POST",
+      url: GROK_URL,
+      authentication: "genericCredentialType",
+      genericAuthType: "httpHeaderAuth",
+      sendBody: true,
+      specifyBody: "json",
+      // prompt/payload read from the gate with `.first()`, not `.item`: the item
+      // arrives here through Ask's ERROR output, and paired-item across an error
+      // branch is fragile (the listener uses `.first()` for the same reason). The
+      // flow carries one incident, so `.first()` is the same item, robustly.
+      jsonBody: "={{ JSON.stringify({ model: " + JSON.stringify(GROK_MODEL) + ", "
+        + "response_format: { type: 'json_object' }, messages: [ "
+        + "{ role: 'system', content: $('" + gate + "').first().json.prompt }, "
+        + "{ role: 'user', content: JSON.stringify($('" + gate + "').first().json.payload) } ] }) }}",
       options: {},
     },
   };
@@ -170,7 +225,7 @@ function collectNode(agent, from, position) {
        * second value through every one of them is how the raw text would come to
        * be dropped on the path nobody tested. This one has a single return.
        */
-      jsonOutput: `={{ JSON.stringify(Object.assign({}, $('${from}').item.json, { raw: (function () {`
+      jsonOutput: `={{ JSON.stringify(Object.assign({}, $('${from}').first().json, { raw: (function () {`
         + ` var c = $json && $json.choices;`
         + ` var m = Array.isArray(c) && c.length > 0 && c[0] ? c[0].message : null;`
         + ` var t = m ? m.content : null;`
@@ -322,6 +377,24 @@ export const OPENAI_CREDENTIAL = {
 };
 
 /*
+ * The fallback model provider (owner, 2026-09-13): a SECOND model, Grok via the xAI
+ * API, that answers when the primary (OpenAI) call errors — announced, not silent, so
+ * the trace shows Grok answered and never blends the failover into a normal answer.
+ * xAI is OpenAI-compatible (same /chat/completions body and response shape), reached
+ * over a generic Header Auth credential (`Authorization: Bearer <xai key>`) exactly
+ * like Slack — the key never enters this file. The credential id/name and the model
+ * are constants for the same hermetic reason as OPENAI_CREDENTIAL. GROK_MODEL is the
+ * cheapest clean xAI model at the time of writing; the exact id is server-validated,
+ * confirmed only on the first live call. See docs/credentials.md.
+ */
+export const GROK_CREDENTIAL = {
+  id: "Sreprau5RgIFeMqG",
+  name: "grok",
+};
+export const GROK_MODEL = "grok-4.3";
+const GROK_URL = "https://api.x.ai/v1/chat/completions";
+
+/*
  * The real Slack post (decision B, 2026-09-12). The whole chain — rowNotExists ->
  * post -> took -> IF -> insert — was built and proven live in a scratch workflow
  * before being written here: the first run posted to #incidents and recorded the
@@ -404,8 +477,10 @@ export function buildWorkflow(runtime, { name = "AI SRE — incident investigati
     const collect = `Collect ${agent}`;
     const record = `Record ${agent}`;
 
+    const grok = `Grok ${agent}`;
     nodes.push(gateNode(agent, [x, 0]));
     nodes.push(askNode(agent, [x + 180, 0]));
+    nodes.push(grokNode(agent, [x + 180, 180]));
     nodes.push(collectNode(agent, previous, [x + 360, 0]));
     nodes.push(code(`record-${agent}`, record, recordNodeCode(agent, next), [x + 540, 0]));
 
@@ -413,7 +488,12 @@ export function buildWorkflow(runtime, { name = "AI SRE — incident investigati
     // Output 0 is true, output 1 is false. The false branch is filled in below,
     // once the node it should jump to is known.
     connections[gate] = { main: [[{ node: ask, type: "main", index: 0 }], []] };
-    connections[ask] = { main: [[{ node: collect, type: "main", index: 0 }]] };
+    // Ask output 0 is success -> Collect; output 1 is the ERROR output (onError:
+    // continueErrorOutput) -> Grok fallback, which then joins the SAME Collect.
+    connections[ask] = { main: [[{ node: collect, type: "main", index: 0 }], [{ node: grok, type: "main", index: 0 }]] };
+    // Grok's success (0) AND its error (1) both go to Collect: a Grok that also fails
+    // must land as an unreadable reply (unestablished), not kill the run after paying.
+    connections[grok] = { main: [[{ node: collect, type: "main", index: 0 }], [{ node: collect, type: "main", index: 0 }]] };
     connections[collect] = { main: [[{ node: record, type: "main", index: 0 }]] };
 
     // False goes to this agent's Record node, not past it.
