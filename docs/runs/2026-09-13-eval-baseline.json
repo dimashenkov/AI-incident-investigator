@@ -1,0 +1,13 @@
+{
+  "note": "Eval baseline: k=3 on 4 scenarios (deployment-regression, conflicting-evidence, container-oom, cpu-throttling) = 12 live incident runs, all provenance-stamped under prompt set 2c121d3550c3. Result: all 4 stable-green (0 sticky problems) \u2014 the earlier 'deployment-regression sticky failure' was pre-provenance runs from an older prompt era. This is the durable 'before' for any future prompt-change keep-rule comparison. Collected from executions 392-409 by submission token; onReceived means the runner recorded no reply, so answers were collected via collect-execution.",
+  "recorded": "when made, on 2026-09-13, from n8n executions 392-409",
+  "when": "2026-09-13",
+  "model": "gpt-5-2025-08-07 + gpt-5-mini-2025-08-07 (12 runs x 4 calls)",
+  "temperature": 1,
+  "totals": {
+    "input_tokens": 160243,
+    "output_tokens": 102069,
+    "why": "12 runs across gpt-5 (root cause) + gpt-5-mini (collection); neither model is in the PRICES table, so tokens are recorded (160243 in / 102069 out) but the dollar cost is a floor until a price is added with the date it was read"
+  },
+  "outcome": "eval baseline established under prompt set 2c121d3550c3: 4/4 scenarios stable-green at k=3; 0 sticky problems"
+}
