@@ -562,6 +562,29 @@ export function resolvesForAgent(answer, cited) {
 }
 
 /**
+ * Which specialist slot OWNS a required citation path, decided by the scenario's
+ * FIXTURES — the frozen oracle (Grok, 2026-09-13: freeze slot ownership from the
+ * fixtures/`must_cite`, do NOT add a second expected). A `must_cite` path like
+ * `pods[0]…` lives in `kubernetes.json`, `lines[3]…` in `logs.json`, `series[0]…`
+ * in `metrics.json`. Reads the fixture slices and returns the first SCORE_SLOT whose
+ * file resolves the path — or null when none does, so an unattributable requirement
+ * is SAID, not silently blamed on an agent. Ownership comes from the fixture, not
+ * the answer, so a total miss (an answer that carried no observations) still has a
+ * definite owner to name.
+ */
+export function owningSlot(scenario, path) {
+  const dir = join(SCENARIOS, scenarioOf(scenario));
+  for (const slot of SCORE_SLOTS) {
+    const file = join(dir, `${slot}.json`);
+    if (!existsSync(file)) continue;
+    let data;
+    try { data = JSON.parse(readFileSync(file, "utf8")); } catch { continue; }
+    if (resolvesIn(data, path)) return slot;
+  }
+  return null;
+}
+
+/**
  * Every answer scored, including attempts.
  *
  * The scenarios on disk decide what MUST be answered — an absent one is

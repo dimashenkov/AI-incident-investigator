@@ -15,7 +15,7 @@ import { readdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 // @ts-expect-error - plain .mjs script, no types
-import { SCORE_SLOTS, score, scoreAll, expectedFor, format, citationCovers, recordInto, scenarioOf, attemptOf, compareConfidences, resolvesInSomeSlot, refusalCeiling, exitCodeFor } from "../scripts/score-run.mjs";
+import { SCORE_SLOTS, score, scoreAll, expectedFor, format, citationCovers, recordInto, scenarioOf, attemptOf, compareConfidences, resolvesInSomeSlot, refusalCeiling, exitCodeFor, owningSlot } from "../scripts/score-run.mjs";
 
 const SCENARIOS = new URL("../scenarios/", import.meta.url).pathname;
 /**
@@ -1017,5 +1017,25 @@ describe("the citation axis is read for every verdict, not only the last one", (
     const r = score("conflicting-evidence", overCeilingCitingNothing(), SCENARIOS);
     expect(format([r]), "scored and never shown is the same as not scored")
       .toMatch(/AND MISSING/);
+  });
+});
+
+describe("owningSlot — which specialist a required path belongs to, from the FIXTURES", () => {
+  // Grok's brick #2 oracle (2026-09-13): ownership comes from the scenario's fixture
+  // slices, not the answer, so a total miss still has a definite owner. Uses real
+  // scenario fixtures on disk.
+  it("attributes a pods/events/deployment path to kubernetes", () => {
+    expect(owningSlot("container-oom", "pods[0].containers[0].limits.memory")).toBe("kubernetes");
+    expect(owningSlot("deployment-regression", "events[0].message")).toBe("kubernetes");
+    expect(owningSlot("image-pull-failure", "deployment.image")).toBe("kubernetes");
+  });
+
+  it("attributes a series path to metrics and a lines path to logs", () => {
+    expect(owningSlot("conflicting-evidence", "series[0].points[3].value")).toBe("metrics");
+    expect(owningSlot("deployment-regression", "lines[3].message")).toBe("logs");
+  });
+
+  it("returns null for a path no fixture slot resolves — an unattributable requirement is not silently blamed", () => {
+    expect(owningSlot("container-oom", "nonexistent.field")).toBeNull();
   });
 });

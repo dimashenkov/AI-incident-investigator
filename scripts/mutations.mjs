@@ -3269,4 +3269,40 @@ export const MUTATIONS = [
     to: "for (const c of r.missingCitations ?? []) citations.set(c, 1);",
     mustFail: "unions missed citations across attempts with per-path counts",
   },
+  {
+    // attributeMisses must rank the agent with the MOST misses first, so the rollup
+    // names the prompt to edit first. Sorting ascending buries it.
+    id: "eval-attribute-ranks-least-missed-agent-first",
+    file: "src/core/eval.ts",
+    from: ".sort((a, b) => b.total - a.total);",
+    to: ".sort((a, b) => a.total - b.total);",
+    mustFail: "groups missed paths by owning agent, most-missed agent first",
+  },
+  {
+    // A path no slot owns must be SHOWN as "(unattributed)", not silently blamed on
+    // a real agent. Dropping the fallback loses the honest "we could not attribute".
+    id: "eval-attribute-hides-the-unattributable-path",
+    file: "src/core/eval.ts",
+    from: 'const agent = owningAgent(path) ?? "(unattributed)";',
+    to: "const agent = owningAgent(path);",
+    mustFail: "shows an unattributable path rather than hiding it — a path no slot owns is named, not dropped",
+  },
+  {
+    // owningSlot must return the slot whose FIXTURE actually resolves the path.
+    // Returning the first slot regardless attributes every path to kubernetes.
+    id: "owning-slot-ignores-which-fixture-resolves-the-path",
+    file: "scripts/score-run.mjs",
+    from: "if (resolvesIn(data, path)) return slot;",
+    to: "if (data) return slot;",
+    mustFail: "attributes a series path to metrics and a lines path to logs",
+  },
+  {
+    // The WHERE-TO-EDIT rollup must rank the most-missed specialist first, so the
+    // prompt to open first is at the top. Ascending buries it.
+    id: "eval-rollup-ranks-least-missed-agent-first",
+    file: "src/core/eval.ts",
+    from: ".sort((a, b) => b.misses - a.misses);",
+    to: ".sort((a, b) => a.misses - b.misses);",
+    mustFail: "ranks the most-missed agent first — the prompt to open first",
+  },
 ];

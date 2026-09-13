@@ -221,3 +221,64 @@ export function diagnose(results: ScoredAttempt[]): Diagnosis {
   const reasons = [...unqualifiedReasons, ...unresolvedReasons];
   return { codeConfusion, missedCitations, uncited, unqualified, unresolved, unqualifiedReasons, unresolvedReasons, reasons, lines };
 }
+
+export type AgentMiss = {
+  agent: string;                                   // owning slot, or "(unattributed)"
+  paths: Array<{ path: string; count: number }>;   // missed required paths, most-missed first
+  total: number;                                   // total misses attributed to this agent
+};
+
+/**
+ * Attribute missed required citations to the SPECIALIST that should have supplied
+ * them — Grok's brick #2, 2026-09-13. `missedCitations` is diagnose()'s aggregated
+ * {path,count} list for one scenario; `owningAgent` maps a required path to the slot
+ * that owns it (from the fixtures, injected so this stays pure and testable). Groups
+ * the misses by owning agent so the operator knows WHICH prompt to edit — the logs
+ * agent's misses point at prompts/logs-agent.md, not "the agent". A path no slot
+ * claims falls to "(unattributed)" and is shown, not hidden (the fixture oracle can
+ * be incomplete, and silence would read as "attributed").
+ */
+export function attributeMisses(
+  missedCitations: Array<{ path: string; count: number }>,
+  owningAgent: (path: string) => string | null,
+): AgentMiss[] {
+  const byAgent = new Map<string, Map<string, number>>();
+  for (const { path, count } of missedCitations) {
+    const agent = owningAgent(path) ?? "(unattributed)";
+    const paths = byAgent.get(agent) ?? new Map<string, number>();
+    paths.set(path, (paths.get(path) ?? 0) + count);
+    byAgent.set(agent, paths);
+  }
+  return [...byAgent.entries()]
+    .map(([agent, paths]) => ({
+      agent,
+      paths: [...paths.entries()].map(([path, count]) => ({ path, count })).sort((a, b) => b.count - a.count),
+      total: [...paths.values()].reduce((s, c) => s + c, 0),
+    }))
+    .sort((a, b) => b.total - a.total);
+}
+
+export type AgentRollup = { agent: string; misses: number; scenarios: number };
+
+/**
+ * Roll up one PROMPT-VERSION SET's per-scenario attributions into a ranked
+ * "which specialist to edit" list. Grok, 2026-09-13: this must NEVER cross sets —
+ * stickiness deliberately keeps versions apart, and summing an old era's misses with
+ * a new one's points at a dead prompt. So it takes ONE set's attributions
+ * ({scenario -> AgentMiss[]}) and nothing else; the caller invokes it per set.
+ * `scenarios` counts DISTINCT scenarios an agent missed in, `misses` the total.
+ */
+export function rollupMisses(attributionsByScenario: Record<string, AgentMiss[]>): AgentRollup[] {
+  const acc = new Map<string, { misses: number; scenarios: Set<string> }>();
+  for (const [scenario, attrs] of Object.entries(attributionsByScenario)) {
+    for (const a of attrs) {
+      const e = acc.get(a.agent) ?? { misses: 0, scenarios: new Set<string>() };
+      e.misses += a.total;
+      e.scenarios.add(scenario);
+      acc.set(a.agent, e);
+    }
+  }
+  return [...acc.entries()]
+    .map(([agent, e]) => ({ agent, misses: e.misses, scenarios: e.scenarios.size }))
+    .sort((a, b) => b.misses - a.misses);
+}

@@ -5,7 +5,7 @@
  * a sticky problem flips to green with no stable-green regression.
  */
 import { describe, it, expect } from "vitest";
-import { grade, stickiness, keepRule, diagnose } from "../src/core/eval.js";
+import { grade, stickiness, keepRule, diagnose, attributeMisses, rollupMisses } from "../src/core/eval.js";
 
 describe("grade", () => {
   it("maps score states to pass / degraded / fail / unknown", () => {
@@ -204,5 +204,60 @@ describe("diagnose — WHERE a scenario fails, as detail under the verdict (Grok
     const d = diagnose([{ state: "unasked", expected: "OOM", why: "no answer was recorded" }]);
     expect(d.unresolved).toBe(1);
     expect(d.lines[0]).toContain("no answer was recorded");
+  });
+});
+
+describe("attributeMisses — which specialist owns each missed citation (Grok brick #2, 2026-09-13)", () => {
+  // A stub owner mapping the same roots score-run's fixtures do: pods/events/
+  // deployment -> kubernetes, lines -> logs, series -> metrics.
+  const owner = (p: string) =>
+    p.startsWith("series") ? "metrics"
+    : p.startsWith("lines") ? "logs"
+    : /^(pods|events|deployment)/.test(p) ? "kubernetes"
+    : null;
+
+  it("groups missed paths by owning agent, most-missed agent first", () => {
+    const a = attributeMisses(
+      [{ path: "pods[0].limits.memory", count: 5 }, { path: "series[0].points[3]", count: 3 }, { path: "deployment.image", count: 2 }],
+      owner,
+    );
+    expect(a[0]).toEqual({ agent: "kubernetes", paths: [{ path: "pods[0].limits.memory", count: 5 }, { path: "deployment.image", count: 2 }], total: 7 });
+    expect(a[1]).toEqual({ agent: "metrics", paths: [{ path: "series[0].points[3]", count: 3 }], total: 3 });
+  });
+
+  it("sums counts for two paths the same agent owns", () => {
+    const a = attributeMisses([{ path: "pods[0].a", count: 2 }, { path: "events[0].b", count: 4 }], owner);
+    expect(a).toHaveLength(1);
+    expect(a[0]!.agent).toBe("kubernetes");
+    expect(a[0]!.total).toBe(6);
+  });
+
+  it("shows an unattributable path rather than hiding it — a path no slot owns is named, not dropped", () => {
+    const a = attributeMisses([{ path: "mystery.field", count: 1 }], owner);
+    expect(a[0]!.agent).toBe("(unattributed)");
+    expect(a[0]!.total).toBe(1);
+  });
+
+  it("returns nothing for no misses — a clean scenario attributes nothing", () => {
+    expect(attributeMisses([], owner)).toEqual([]);
+  });
+});
+
+describe("rollupMisses — WHERE-TO-EDIT within ONE set (Grok 2026-09-13: never cross sets)", () => {
+  const am = (agent: string, total: number) => ({ agent, paths: [{ path: "x", count: total }], total });
+
+  it("sums an agent's misses across scenarios and counts distinct scenarios", () => {
+    const r = rollupMisses({ oom: [am("kubernetes", 5)], apf: [am("kubernetes", 2), am("metrics", 1)] });
+    expect(r[0]).toEqual({ agent: "kubernetes", misses: 7, scenarios: 2 });
+    expect(r.find((x) => x.agent === "metrics")).toEqual({ agent: "metrics", misses: 1, scenarios: 1 });
+  });
+
+  it("ranks the most-missed agent first — the prompt to open first", () => {
+    const r = rollupMisses({ a: [am("logs", 1)], b: [am("kubernetes", 9)] });
+    expect(r[0]!.agent).toBe("kubernetes");
+  });
+
+  it("is empty for a set with no misses — a clean set names no prompt to edit", () => {
+    expect(rollupMisses({})).toEqual([]);
   });
 });
