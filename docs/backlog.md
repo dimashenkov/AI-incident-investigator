@@ -196,17 +196,38 @@ Root-cause is told those lists are empty (`prompts/root-cause-agent.md`). Meanwh
 `src/core/configuration.ts` + `src/core/slice.ts` hand the concluder code-read
 observations, and `src/core/merge.ts` lets those refs satisfy citations.
 
+**What it really is (verified 2026-09-14): a contradiction between the prompts.**
+`prompts/root-cause-agent.md:103` tells the concluder the specialists are "forbidden
+to diagnose" and their `hypotheses` lists are "empty by design"; but
+`prompts/kubernetes-agent.md:245` (and logs/metrics) tell each specialist to "return a
+hypothesis ONLY when your own observation states the cause outright" (e.g. `OOMKilled`).
+Both cannot hold: a specialist that names the cause fills a list the concluder was told
+is always empty, so `gpt-5-mini` can name the cause and `gpt-5` weighs a handed verdict
+without its prompt acknowledging it.
+
 **Why it matters (attribution, not a wrong answer today).** `gpt-5-mini` (a collector)
 can NAME the cause; then `gpt-5` (the concluder) only weighs a handed verdict, or cites
 a field no specialist extracted — and `WHERE TO EDIT` points at the wrong prompt. The
 baseline is all-green at k=3, so this is a latent correctness/attribution risk, not a
 live wrong answer.
 
-**The fix shape (Grok's):**
-- schema: forbid a non-empty `hypotheses` unless `agent === root_cause`;
-- generate the 13-code list into the root-cause prompt ONLY, not the extractors;
-- score specialist extraction even on green scenarios (extend the existing specialist
-  scoring), so a concluder that was handed the answer is caught.
+**A hard constraint on any fix (tested, 2026-09-05):** the two cause-code enums
+(`schemas/common.schema.json` `causeCode` and the agent-result `hypotheses` code list)
+must stay EQUAL — a code an agent cannot propose makes a scenario unsolvable
+(`CPU_THROTTLING` was recordable while no agent could propose it). `tests/agents.test.ts`
+enforces this in both directions. So Grok's literal "move the 13-code list into root-cause
+only" is NOT free to take — it collides with this decision.
+
+**The fork the owner must pick (both change prompts -> both need a paid re-measurement):**
+- (a) Make the extractors TRULY never diagnose: delete the "states the cause outright"
+  permission from the three extractor prompts; the concluder prompt already claims this.
+  Cleaner separation, closest to Grok's intent — but the enum stays shared (a).
+- (b) Keep the narrow "states the cause outright" permission and FIX the concluder prompt:
+  remove the false "forbidden to diagnose / empty by design", so it acknowledges a
+  specialist may hand it a candidate it must still weigh.
+
+Free either way but not enough on its own: extend specialist scoring to score extraction
+on green scenarios too, so a concluder handed the answer is visible.
 
 **Why it is not free.** The first two items change the extractor and root-cause prompts.
 A prompt change invalidates the k=3 baseline (`2c121d3550c3`): to know the agent still
