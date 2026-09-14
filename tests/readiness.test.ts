@@ -195,6 +195,56 @@ describe("a readiness figure that admits what it does not know", () => {
     } finally { rmSync(d, { recursive: true, force: true }); }
   });
 
+  /*
+   * The model-blind second carrier (Grok, 2026-09-14). latestScoredPerScenario took the
+   * newest record per scenario by DATE alone. A grok fallback run — proven live, exec 415 —
+   * that is later scored and recorded would then override the gpt-5 baseline: a newer grok
+   * `wrong` drags a scenario red off the fallback, or a grok `correct` masks a gpt-5
+   * regression. A fallback is a different configuration, not a re-measurement of the primary.
+   *
+   * These set model_by_agent BY HAND, so they prove the demotion LOGIC, not the live path:
+   * the recording path does not yet stamp the model into a docs/runs scored record, so on real
+   * data the guard is latent (a live grok record is unmarked -> primary). That half is a
+   * recorded limitation in docs/backlog.md, not a claim of "fixed" (Grok, 2026-09-14).
+   */
+  it("does not let a newer grok-fallback verdict supersede a gpt-5 one for the same scenario", () => {
+    const d = tmp();
+    try {
+      mkdirSync(join(d, "runs"), { recursive: true });
+      writeFileSync(join(d, "runs", "2026-01-01-gpt5.json"),
+        JSON.stringify({ when: "2026-01-01", model_by_agent: { "root-cause": "gpt-5-2025-08-07" }, scored: { alpha: "correct" } }));
+      writeFileSync(join(d, "runs", "2026-06-06-grok.json"),
+        JSON.stringify({ when: "2026-06-06", model_by_agent: { "root-cause": "grok-4.3" }, scored: { alpha: "wrong" } }));
+      const r = latestScoredPerScenario(join(d, "runs"));
+      expect(r.scored.alpha, "the primary gpt-5 verdict stands; the newer grok one is demoted").toBe("correct");
+      expect(r.from.alpha).toBe("2026-01-01-gpt5.json");
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it("still uses a grok verdict when NO primary record established the scenario", () => {
+    const d = tmp();
+    try {
+      mkdirSync(join(d, "runs"), { recursive: true });
+      writeFileSync(join(d, "runs", "2026-06-06-grok.json"),
+        JSON.stringify({ when: "2026-06-06", model_by_agent: { "root-cause": "grok-4.3" }, scored: { beta: "correct" } }));
+      const r = latestScoredPerScenario(join(d, "runs"));
+      expect(r.scored.beta, "a fallback verdict beats none when nothing primary answered").toBe("correct");
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
+  it("treats a record naming no model as primary — the gpt-5 era wrote no marker", () => {
+    const d = tmp();
+    try {
+      mkdirSync(join(d, "runs"), { recursive: true });
+      writeFileSync(join(d, "runs", "2026-01-01-unmarked.json"),
+        JSON.stringify({ when: "2026-01-01", scored: { gamma: "correct" } }));
+      writeFileSync(join(d, "runs", "2026-06-06-grok.json"),
+        JSON.stringify({ when: "2026-06-06", model_by_agent: { "root-cause": "grok-4.3" }, scored: { gamma: "wrong" } }));
+      expect(latestScoredPerScenario(join(d, "runs")).scored.gamma,
+        "an unmarked (pre-marker) record is primary and is not superseded by a grok one").toBe("correct");
+    } finally { rmSync(d, { recursive: true, force: true }); }
+  });
+
   it("does not treat an empty scored object as a run that answered nothing", () => {
     const d = tmp();
     try {

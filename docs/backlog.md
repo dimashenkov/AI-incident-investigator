@@ -161,8 +161,9 @@ until then.
 
 ## Brick · readiness is model-blind when picking the latest verdict · latent
 
-**State:** OPEN (found 2026-09-14 by a subagent hunting the second carrier of the
-`eval.mjs` scoring defect; the `eval.mjs` carrier was fixed in the same round).
+**State:** PARTIAL — the demotion guard is in, the marker is not yet written (2026-09-14). `latestScoredPerScenario` now processes PRIMARY records (gpt-*, or naming no model) before non-primary ones, so a grok record — IF it carries `model_by_agent` naming a non-gpt model — claims a scenario only where nothing primary established it. `recordIsPrimary` (tested) reads `model_by_agent`/`model`; the demotion logic is proven in `tests/readiness.test.ts`.
+
+**The remaining half (Grok, 2026-09-14): the recording path does NOT stamp the model into `docs/runs`.** `recordInto`/`recordShape` write no `model_by_agent`, and every current `docs/runs` scored record names no model — so a LIVE grok-fallback record, once scored and recorded, is still unmarked → treated as primary → still wins by date. The tests set the field by hand, so they prove the classifier, not the live path. The guard is therefore LATENT: it closes the defect only once a scored `docs/runs` record carries the model marker. Full closure = stamp `model_by_agent` (from the answer's own field, which the workflow already produces) into the scored run record at write time. Recorded honestly rather than claimed fixed.
 
 `scripts/readiness.mjs` `latestScoredPerScenario` picks the newest run record per
 scenario purely by the record's `when`, ignoring `model_by_agent`. So a gpt-5

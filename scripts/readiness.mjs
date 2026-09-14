@@ -215,6 +215,19 @@ function base(key) {
   return i === -1 ? key : key.slice(0, i);
 }
 
+/** Whether a run record's verdict came from the primary model family (gpt-*), and so may
+ *  supersede an older one. A record that names no model is primary — the gpt-5 era wrote no
+ *  marker; only a record explicitly naming a non-gpt model (a grok fallback) is not. Reads
+ *  both `model_by_agent` (per agent) and a top-level `model` string. */
+export function recordIsPrimary(rec) {
+  if (rec === null || typeof rec !== "object") return true;
+  const mba = rec.model_by_agent;
+  const perAgent = mba !== null && typeof mba === "object" && !Array.isArray(mba) ? Object.values(mba) : [];
+  const top = typeof rec.model === "string" ? [rec.model] : [];
+  const named = [...perAgent, ...top].filter((m) => typeof m === "string");
+  return !named.some((m) => !m.startsWith("gpt-"));
+}
+
 export function latestScoredPerScenario(runsDir) {
   const ordered = orderedRecords(runsDir);
   if (ordered.unreadable !== undefined) {
@@ -250,7 +263,26 @@ export function latestScoredPerScenario(runsDir) {
    */
   const claimed = new Set();
   const fallbackClaimed = new Set();
-  for (const { f, rec } of ordered.records) {
+  /*
+   * A verdict from a non-primary model must not supersede one from the primary gpt family.
+   *
+   * latestScoredPerScenario took the newest record per scenario by date alone. A grok
+   * fallback run (proven, exec 415) that was scored and recorded later would then override
+   * the gpt-5 baseline it was never meant to replace — a newer grok `wrong` dragging a
+   * scenario red off the fallback, or a grok `correct` masking a gpt-5 regression (Grok's
+   * second carrier of the model-blind defect, 2026-09-14). So PRIMARY records claim first,
+   * non-primary only where nothing primary established the scenario. The model is read from
+   * the record if present; a record naming no model is treated as primary — the gpt-5 era
+   * wrote no marker — so this demotes ONLY a record explicitly carrying a non-gpt model.
+   *
+   * LATENT, honestly (Grok, 2026-09-14): the recording path (recordInto/recordShape) does
+   * NOT yet stamp model_by_agent into a docs/runs scored record, so a live grok-fallback
+   * record is still unmarked here and this guard does not fire on it. The demotion logic is
+   * correct and tested; it closes the defect only once a scored run record carries the
+   * marker. See the readiness brick in docs/backlog.md — recorded as a limitation, not fixed.
+   */
+  for (const { f, rec } of [...ordered.records.filter((r) => recordIsPrimary(r.rec)),
+                            ...ordered.records.filter((r) => !recordIsPrimary(r.rec))]) {
     const s = rec?.scored;
     if (s === null || typeof s !== "object" || Array.isArray(s)) continue;
     const here = new Set();
