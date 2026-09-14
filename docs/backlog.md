@@ -158,3 +158,59 @@ claim to point to the artifact it comes from — the ethos of SPEC.
 
 **Cost:** $0. The README already qualifies SPEC as an earlier phase, so it does not mislead
 until then.
+
+## Brick · readiness is model-blind when picking the latest verdict · latent
+
+**State:** OPEN (found 2026-09-14 by a subagent hunting the second carrier of the
+`eval.mjs` scoring defect; the `eval.mjs` carrier was fixed in the same round).
+
+`scripts/readiness.mjs` `latestScoredPerScenario` picks the newest run record per
+scenario purely by the record's `when`, ignoring `model_by_agent`. So a gpt-5
+verdict and a grok-fallback verdict for the same scenario are interchangeable
+evidence. A newer grok-fallback record scoring `conflicting-evidence` `wrong` would
+overwrite an older gpt-5 `correct` and drag readiness RED off the fallback (and the
+reverse — a grok `correct` masking a gpt-5 regression — is equally possible).
+
+**Why it is latent, not live:** no grok *scenario-answer* run has a non-empty
+`scored` map recorded yet — the only `grok-4.6` records in `docs/runs/` are review
+runs with `scored:{}`. It becomes live the first time a grok fallback answer run is
+scored and recorded (the fallback is proven, exec 415, so the path is reachable).
+
+**The fix when it is due:** either carry the model into the run record's `scored`
+map and have readiness prefer/segregate by the primary (`gpt-*`) family, or at least
+refuse to let a non-primary-model record supersede a primary one. Mirrors the
+`eval.mjs` `bucketOf` fix (a fallback is a different configuration), and the correct
+pattern already exists in `src/core/review.ts` (`versionStamp` folds the model into
+`core_sha`, so a grok review never shares a bucket with a gpt-5 one).
+
+## Brick · the four-agent split leaks the cause into the extractors · needs a paid run
+
+**State:** OPEN (Grok implementation review, 2026-09-14). NOT started, because closing
+it changes the PROMPTS and therefore needs a paid re-measurement — it is not a free fix.
+
+**The leak.** The three extractor prompts (`prompts/kubernetes-agent.md`,
+`prompts/logs-agent.md`, `prompts/metrics-agent.md`) still enumerate all 13 cause codes
+and allow a hypothesis "when the observation states the cause"; the schema
+(`schemas/agent-result.schema.json`) accepts a non-empty `hypotheses` from any agent.
+Root-cause is told those lists are empty (`prompts/root-cause-agent.md`). Meanwhile
+`src/core/configuration.ts` + `src/core/slice.ts` hand the concluder code-read
+observations, and `src/core/merge.ts` lets those refs satisfy citations.
+
+**Why it matters (attribution, not a wrong answer today).** `gpt-5-mini` (a collector)
+can NAME the cause; then `gpt-5` (the concluder) only weighs a handed verdict, or cites
+a field no specialist extracted — and `WHERE TO EDIT` points at the wrong prompt. The
+baseline is all-green at k=3, so this is a latent correctness/attribution risk, not a
+live wrong answer.
+
+**The fix shape (Grok's):**
+- schema: forbid a non-empty `hypotheses` unless `agent === root_cause`;
+- generate the 13-code list into the root-cause prompt ONLY, not the extractors;
+- score specialist extraction even on green scenarios (extend the existing specialist
+  scoring), so a concluder that was handed the answer is caught.
+
+**Why it is not free.** The first two items change the extractor and root-cause prompts.
+A prompt change invalidates the k=3 baseline (`2c121d3550c3`): to know the agent still
+answers all 15 correctly, the eval must be re-run with a model — that SPENDS, and needs
+the owner's `harchi`. So this brick is a code change that is cheap to write but cannot be
+accepted without a paid measurement, which is the owner's decision. `eval.mjs --plan`
+prints exactly what that re-run would cost before it is bought.

@@ -19,7 +19,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
-import { score, scenarioOf, owningSlot } from "./score-run.mjs";
+import { score, scenarioOf, owningSlot, compareConfidences } from "./score-run.mjs";
 // eval.ts is TypeScript; node's type-stripping runs it, and .ts imports resolve.
 import { stickiness, keepRule, diagnose, attributeMisses, rollupMisses, keepPlan } from "../src/core/eval.ts";
 
@@ -38,6 +38,36 @@ function setIdOf(promptVersions) {
   if (promptVersions === null || typeof promptVersions !== "object") return null;
   const stable = JSON.stringify(Object.keys(promptVersions).sort().map((k) => [k, promptVersions[k]]));
   return createHash("sha256").update(stable).digest("hex").slice(0, 12);
+}
+
+/** The model tag appended to a set's bucket id. A stickiness bucket must hold runs
+ *  from ONE configuration; a `grok-*` fallback (proven, exec 415) is a DIFFERENT
+ *  configuration from the primary `gpt-*` family and must not share a bucket with it
+ *  (Grok, 2026-09-14: a model swap otherwise reads as a prompt effect).
+ *
+ *  It tags by the NON-primary models PRESENT, not by the full agent->model map: the
+ *  recorded `model_by_agent` is unevenly populated (some runs list four agents, some
+ *  one), so keying on the whole map would split the all-gpt-5 baseline `2c121d3550c3`
+ *  into three buckets on data-quality noise and break its k=3 stickiness. Keying on
+ *  "which non-gpt model appears" leaves every gpt-5 run — however many agents it
+ *  recorded — in the primary bucket (empty tag), and isolates only a real fallback. */
+function fallbackTag(modelByAgent) {
+  if (modelByAgent === null || typeof modelByAgent !== "object") return "";
+  const nonPrimary = [...new Set(
+    Object.values(modelByAgent).filter((m) => typeof m === "string" && !m.startsWith("gpt-")),
+  )].sort();
+  return nonPrimary.length ? "·" + nonPrimary.join("+") : "";
+}
+
+/** The stickiness bucket for an answer: its frozen prompt set, plus a fallback tag so a
+ *  `grok-*` run is separated from the primary `gpt-*` baseline. The primary bucket keeps
+ *  the bare prompt-set id (empty tag), so the documented `2c121d3550c3` still resolves and
+ *  `--before <id> --after <id>` compares clean gpt-5 runs only. No provenance -> null. */
+function bucketOf(answer) {
+  const pv = answer && typeof answer === "object" ? answer.prompt_versions : undefined;
+  const base = setIdOf(pv);
+  if (base === null) return null;
+  return base + fallbackTag(answer && typeof answer === "object" ? answer.model_by_agent : undefined);
 }
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -61,21 +91,55 @@ function readAllAnswers(dir = ANSWERS) {
   return byKey;
 }
 
-/** The attempts whose WHOLE prompt-version set matches `setId` — a comparison is
- *  between two frozen sets, so a run counts only if every agent's prompt matches.
- *  Returns { stick: scenario->Stickiness, n: matched attempt count }. */
-function statesForSet(byKey, setId) {
-  const out = {};
-  let n = 0;
+/** This bucket's members grouped BY SOURCE FILE, each file's answers keyed by their original
+ *  scenario/attempt key. A file is one recorded execution, so `conflicting-evidence#N` and
+ *  `container-oom#N` in it are the same run and the DoD-3 comparison pairs them file-scoped
+ *  — never across files, which is exactly why readAllAnswers keeps the `@file` suffix. An
+ *  earlier version stripped `@file` to key the whole bucket by attempt; that collapsed the
+ *  eight bare `conflicting-evidence` answers spread across the no-provenance files into one
+ *  (last write wins) and paired a stale comparable (Grok, 2026-09-14). Keys are unique within
+ *  one file, so grouping by file and keeping the original key loses nothing. */
+function filesForBucket(byKey, bucketId) {
+  const files = {};
   for (const [key, answer] of Object.entries(byKey)) {
-    const pv = answer && typeof answer === "object" ? answer.prompt_versions : undefined;
-    if (setIdOf(pv) !== setId) continue;
-    n += 1;
-    const scenario = scenarioOf(key.split("@")[0]);
-    (out[scenario] ??= []).push(score(scenario, answer).state);
+    if ((bucketOf(answer) ?? "(no provenance)") !== bucketId) continue;
+    // The FIRST "@" is the separator: readAllAnswers builds `${origKey}@${file}` and an
+    // origKey (scenario or scenario#N) never contains "@", so a filename that does contain
+    // one still ends up wholly in `file` — lastIndexOf would have split it wrong (Grok, 2026-09-14).
+    const at = key.indexOf("@");
+    const origKey = at === -1 ? key : key.slice(0, at);
+    const file = at === -1 ? "" : key.slice(at + 1);
+    (files[file] ??= {})[origKey] = answer;
   }
+  return files;
+}
+
+/** Score a bucket: each file scored as ONE run through compareConfidences, the corrected
+ *  results aggregated and grouped by scenario. Bare `score()` returns `conflicting-evidence`
+ *  "correct" without the `container-oom` reduction (DoD-3), so the keep-rule and the read
+ *  both graded it in isolation — a prompt that fails the reduction could be kept green
+ *  (Grok, 2026-09-14). Returns scenario -> scored results[] (compareConfidences-corrected). */
+function scoredByScenario(files) {
+  const out = {};
+  for (const answersMap of Object.values(files)) {
+    const results = compareConfidences(
+      Object.keys(answersMap).sort().map((k) => score(k, answersMap[k])),
+      answersMap,
+    );
+    for (const r of results) (out[scenarioOf(r.scenario)] ??= []).push(r);
+  }
+  return out;
+}
+
+/** The runs whose bucket (frozen prompt set + model configuration) matches `bucketId` — a
+ *  comparison is between two frozen buckets, so a run counts only if every agent's prompt AND
+ *  the model configuration match. Returns { stick: scenario->Stickiness, n: attempt count }. */
+function statesForSet(byKey, bucketId) {
+  const files = filesForBucket(byKey, bucketId);
+  const byScenario = scoredByScenario(files);
   const stick = {};
-  for (const [s, states] of Object.entries(out)) stick[s] = stickiness(states);
+  for (const [s, results] of Object.entries(byScenario)) stick[s] = stickiness(results.map((r) => r.state));
+  const n = Object.values(files).reduce((a, m) => a + Object.keys(m).length, 0);
   return { stick, n };
 }
 
@@ -107,14 +171,14 @@ function main() {
     process.exit(v.keep ? 0 : 1);
   }
 
-  // Group by prompt-version SET first — stickiness is only honest within one frozen
-  // set. Mixing versions/eras into one number is what Grok warned against.
+  // Group by BUCKET first (frozen prompt set + model configuration) — stickiness is only
+  // honest within one frozen configuration. Mixing versions/eras, or a gpt-5 baseline with
+  // a grok fallback, into one number is what Grok warned against. Each bucket is scored
+  // through compareConfidences, so conflicting-evidence carries its DoD-3 reduction here too
+  // — not only in the keep-rule path (the second carrier of the same defect).
   const bySet = {};
-  for (const [key, answer] of Object.entries(byKey)) {
-    const pv = answer && typeof answer === "object" ? answer.prompt_versions : undefined;
-    const setId = setIdOf(pv) ?? "(no provenance)";
-    const scenario = scenarioOf(key.split("@")[0]);
-    ((bySet[setId] ??= {})[scenario] ??= []).push(score(scenario, answer));
+  for (const setId of new Set(Object.values(byKey).map((a) => bucketOf(a) ?? "(no provenance)"))) {
+    bySet[setId] = scoredByScenario(filesForBucket(byKey, setId));
   }
 
   // --plan: BEFORE an edit, print what the keep-rule will demand of the next paid
@@ -196,4 +260,10 @@ function rank(majority) {
   return { fail: 0, degraded: 1, mixed: 2, unknown: 3, pass: 4 }[majority] ?? 5;
 }
 
-main();
+// The helpers are exported so the keep-rule and read paths can be tested with synthetic
+// answers — without this, eval.mjs was CLI-only and the grading glue had no coverage, which
+// is how the "green without the confidence comparison" defect (Grok, 2026-09-14) survived.
+export { setIdOf, fallbackTag, bucketOf, filesForBucket, scoredByScenario, statesForSet };
+
+// Run main() only when invoked directly, not when imported by a test.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
