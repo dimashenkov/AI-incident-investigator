@@ -68,7 +68,7 @@ that expects it` го отказва поименно.
 
 ## Тухла · redaction и на report-пътя (първия Slack пост) · безплатна
 
-**Състояние:** не започната. Записана 2026-09-13 (Grok re-review на reply redaction).
+**Състояние:** ✅ ГОТОВО 2026-09-14 (Grok преглед clear). Споделен `src/core/redact.ts` guard-ва и двата Slack поста (доклад + reply) от един източник; Report node редактира slack_text + Block Kit блокове; listener Build reply редактира отговора. 1087 теста.
 
 **Какво е.** `redactSecrets` сега пази само reply-пътя (отговорите на бота). Първият
 Slack пост — самият incident доклад — се сглобява от `slackReport` (thread.ts) и
