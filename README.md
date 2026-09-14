@@ -57,7 +57,7 @@ What is proven, each from a recorded artifact:
 | **Two-way bot** | hears a question in the thread and answers; anti-loop catches its own answer — `docs/runs/2026-09-12-slack-reply.json`, execution 374 |
 | **Simulated Datadog** | fake Datadog registration, tested live |
 | **Trace viewer** | local, read-only web view of the runs, node-by-node |
-| **Eval baseline** | `k=3` on **all 15 scenarios**, 0 sticky problems, under one prompt set (`2c121d3550c3`) — `docs/answers/2026-09-14-baseline-extend.json` |
+| **Eval baseline** | `k=3` on **all 15 scenarios**, 0 sticky problems, under the current prompt set (`2af733c60b5d`, option (b)) — `docs/answers/2026-09-14-option-b-verify.json` (#40) + `docs/answers/2026-09-14-option-b-k3.json` (#41, #42). The pre-(b) set `2c121d3550c3` (`2026-09-14-baseline-extend.json`) is its predecessor. |
 | **Fallback model (Grok)** | on an OpenAI failure all 4 agents fall to Grok; **proven live** — n8n execution 415, the whole chain concluded on `grok-4.3` |
 | **Output redaction** | a narrow `redactSecrets` (`src/core/redact.ts`) guards **both** Slack posts — the report and the reply — from one source |
 
@@ -110,7 +110,7 @@ unresolved with their reasons — so the next prompt edit has a target, not
 a guess. The diagnosis is a **detail**, not a verdict: it does not touch the keep-rule. It also
 **attributes** a missed citation to the owning agent (kubernetes/logs/metrics) and
 says which prompt to edit; `--plan` prints the cost of an edit before you
-write it. **The baseline now covers all 15 scenarios at k=3, 0 sticky** — that is,
+write it. **The baseline now covers all 15 scenarios at k=3, 0 sticky, under the current (b) prompt set `2af733c60b5d`** — that is,
 the agent passes everything under the current prompts, and every future edit will be kept
 only if it is measurably better against the full set.
 
