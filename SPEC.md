@@ -89,7 +89,7 @@ fifteen scenarios green). What that measurement establishes is **coverage, not
 reliability**: each is a single scored run per scenario, so it shows the agents can
 reach the code, not that they do so repeatably. The `gpt-5` non-determinism and the
 k=3 protocol (`docs/next-measurement.md`; `src/core/eval.ts`) are the answer to
-reliability, and the k=3 baseline currently covers four scenarios, not fifteen.
+reliability, and the k=3 baseline now covers all fifteen scenarios (`docs/answers/2026-09-14-baseline-extend.json`; 0 sticky problems under set `2c121d3550c3`).
 
 **No code at all — absent from `schemas/common.schema.json` `causeCode` and from
 `scenarios/registry.json` (next free number is 16):**
@@ -189,8 +189,8 @@ menu, not a wider scope" — a longer menu, not a wider scope (PROGRESS.md). All
 thirteen codes and the two behavioural scenarios have now been measured `correct`
 at least once (§2; readiness counts fifteen scenarios green) — but a single scored
 run per scenario is **coverage, not reliability**; the k=3 protocol
-(`src/core/eval.ts`) is the answer to reliability, and its baseline covers four
-scenarios so far, not fifteen.
+(`src/core/eval.ts`) is the answer to reliability, and its baseline now covers all
+fifteen scenarios (k=3, 0 sticky, set `2c121d3550c3`).
 
 ---
 
