@@ -15,26 +15,16 @@
  *
  * Nothing here calls a model or the network; it only decides and formats.
  *
- * Leak posture (Grok, 2026-09-13, "as Grok says"): the PRIMARY control is that the
- * reply path does NOT fetch the raw observations at all — it answers from the
- * curated report, the same discipline the root-cause agent already follows. A
- * denylist on the raw input would have been permission to keep fetching it. The
- * only remaining net is `redactSecrets` on the OUTPUT — the string that is actually
- * posted to Slack — for fixed-shape credentials that a report or the model's
- * reasoning could still surface. That net is deliberately NARROW (see redactSecrets)
- * so it cannot clobber legitimate incident content.
- *
- * NOT addressed here, and named so it is not mistaken for solved (Grok, 2026-09-13):
- * the FIRST Slack post — the incident report itself — is built by slackReport in
- * thread.ts and posted by the incident workflow, quoting finding.fact and cited
- * message lines. It never passes through this module, so a secret an agent quotes
- * into the report reaches Slack before the bot ever replies. This does NOT require
- * duplicating redactSecrets: buildRuntime splices core files into every node's
- * prelude, so a shared redactor could be applied to slack_text AND the Block Kit
- * text from one source. It is deferred (a backlog brick) rather than impossible —
- * closing it means redacting the structured blocks too, not just the plain text.
- * In this prototype the observations are simulated fixtures with no real secrets,
- * so it is a real-deploy gap, not a live leak.
+ * Leak posture (Grok, 2026-09-13/14): the PRIMARY control is that the reply path does
+ * NOT fetch the raw observations — it answers from the curated report, the discipline
+ * root-cause already follows. The output net is `redactSecrets` (src/core/redact.ts,
+ * the single source), applied at the NODE that posts to Slack. As of 2026-09-14 that
+ * same net guards BOTH Slack-bound strings from one source: the two-way reply here,
+ * AND the FIRST incident post (slackReport's slack_text and Block Kit, redacted in
+ * the Report node) — closing the report-path gap this comment used to name as open.
+ * The net is deliberately NARROW (see redact.ts) so it cannot clobber legitimate
+ * incident content. In this prototype the fixtures carry no real secrets, so it is a
+ * real-deploy safeguard, not a live-leak fix.
  */
 
 /** The bot's own Slack user id. A message from it, or carrying a bot_id, or with
@@ -117,69 +107,6 @@ export function reportTextFrom(repliesBody: unknown): string | null {
 }
 
 /**
- * Redact fixed-shape credentials from a string BEFORE it is posted to Slack. This
- * is the OUTPUT net, not the primary control — the primary control is that the
- * reply path never fetches raw observations. Grok, 2026-09-13, named the boundary:
- * a Slack leak is the string Post reply sends, so the filter belongs here, on the
- * text on its way out, not on the model's input.
- *
- * It is deliberately NARROW. It matches ONLY shapes that a curated incident report
- * or a remediation suggestion would never legitimately contain:
- *   - provider keys with a fixed prefix: sk-…, xox[baprs]-…, AKIA…, AIza…, ghp_/gho_…
- *   - PEM private-key blocks
- *   - a Bearer token, and credentials embedded in a URL (user:pass@host)
- *   - the VALUE after a secret-named key: password / passwd / pwd / secret /
- *     api_key / apikey / access_key / client_secret / dsn — in either `k=v` or
- *     JSON `"k":"v"` form (the JSON form is the one Grok showed slipping through).
- * It does NOT touch bare `token=` or JWTs (eyJ…): a Kubernetes service-account
- * token is legitimate content an operator may be asking about, and eating it would
- * hide the very evidence they want (Grok's over-redaction case). That is an honest
- * gap, not an oversight: a denylist catches known shapes, not novel ones, and this
- * one errs toward keeping evidence readable.
- */
-export function redactSecrets(text: string): string {
-  if (typeof text !== "string" || text === "") return text;
-  let out = text;
-  const R = "[redacted]";
-  // PEM private-key blocks (any BEGIN…END PRIVATE KEY).
-  out = out.replace(/-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----[\s\S]*?-----END (?:[A-Z]+ )?PRIVATE KEY-----/g, R);
-  // Provider keys with an unambiguous prefix.
-  out = out.replace(/\bsk-[A-Za-z0-9_-]{16,}/g, R);                 // OpenAI
-  out = out.replace(/\bxox[baprs]-[A-Za-z0-9-]{8,}/g, R);           // Slack
-  out = out.replace(/\bAKIA[0-9A-Z]{16}\b/g, R);                    // AWS access key id
-  out = out.replace(/\bAIza[0-9A-Za-z_-]{35}\b/g, R);               // Google API key
-  out = out.replace(/\bgh[posru]_[A-Za-z0-9]{20,}/g, R);            // GitHub tokens
-  // Credentials embedded in a URL: scheme://user:pass@host -> scheme://[redacted]@host
-  out = out.replace(/(\b[a-z][a-z0-9+.-]*:\/\/)[^/\s:@]+:[^/\s@]+@/gi, `$1${R}@`);
-  // A Bearer token. Require length AND a digit so a dictionary word — "Bearer
-  // authentication failed" — is not eaten (Grok, 2026-09-13): a real token is long
-  // and mixed, a prose word is neither.
-  out = out.replace(/\bBearer\s+(?=[^\s]*\d)[A-Za-z0-9._~+/=-]{16,}/g, `Bearer ${R}`);
-  // The value of a secret-named assignment. The key may carry a prefix so it ENDS
-  // in the secret word (DB_PASSWORD, aws_secret_access_key), and the value may be
-  // quoted with spaces — both were slipping before (Grok, 2026-09-13). `key` is an
-  // optionally-quoted identifier ending in a secret word, not preceded by an
-  // identifier char (so it starts a real key, not mid-word).
-  const secretKey = "(?:password|passwd|pwd|secret|api[_-]?key|apikey|access[_-]?key|client[_-]?secret|dsn)";
-  const key = `(?<![A-Za-z0-9_.])"?[A-Za-z0-9_.]*${secretKey}"?`;
-  // A quoted value matched to its TRUE closing quote, so an escaped quote inside the
-  // value does not end the match early and leak the tail (Grok, 2026-09-13):
-  // "say \"hi\" world" is redacted whole, not up to the first \".
-  const dq = '"(?:\\\\.|[^"\\\\])*"';
-  const sq = "'(?:\\\\.|[^'\\\\])*'";
-  // '=' assignment: quoted (escapes handled) or a bare value.
-  out = out.replace(new RegExp(`(${key}\\s*=\\s*)${dq}`, "gi"), `$1"${R}"`);
-  out = out.replace(new RegExp(`(${key}\\s*=\\s*)${sq}`, "gi"), `$1'${R}'`);
-  out = out.replace(new RegExp(`(${key}\\s*=\\s*)[^\\s"',;}]+`, "gi"), `$1${R}`);
-  // ':' with a QUOTED value only (JSON "k":"v" and YAML k: "v"). A BARE value after
-  // ':' is a reference/name — a Kubernetes Secret NAME (secret: partner-gateway-tls)
-  // is content, not a credential, so it is left intact (Grok's over-redaction case).
-  out = out.replace(new RegExp(`(${key}\\s*:\\s*)${dq}`, "gi"), `$1"${R}"`);
-  out = out.replace(new RegExp(`(${key}\\s*:\\s*)${sq}`, "gi"), `$1'${R}'`);
-  return out;
-}
-
-/**
  * The system+user messages for the model. The bot answers from the curated
  * incident report — NOT the raw observations. The owner (2026-09-12) asked that
  * the bot may REASON and SUGGEST remediation, not merely paraphrase; that stands.
@@ -217,11 +144,13 @@ export function replyMessages(
 }
 
 /**
- * The answer text out of an OpenAI chat.completions response, passed through
- * redactSecrets before it leaves this module. Returns null when the response has
- * no content — a null answer must not be posted as if the bot had something to
- * say. Redacting HERE, at the single extraction point, means no caller can obtain
- * an un-redacted answer to post (Grok: the net belongs on the outgoing string).
+ * The answer text out of an OpenAI chat.completions response. Returns null when the
+ * response has no content — a null answer must not be posted as if the bot had
+ * something to say. The secret-redaction net is applied at the NODE that posts to
+ * Slack (Build reply calls redactSecrets from the shared redact.ts, spliced into the
+ * node), NOT here — the same net now guards the report path too, from one source
+ * (2026-09-14). Keeping answerFrom a pure extraction lets it stay import-free while
+ * the redactor lives once in redact.ts.
  */
 export function answerFrom(openaiBody: unknown): string | null {
   const b = (openaiBody ?? {}) as Record<string, unknown>;
@@ -230,5 +159,5 @@ export function answerFrom(openaiBody: unknown): string | null {
   const msg = ((choices[0] ?? {}) as Record<string, unknown>)["message"];
   const content = ((msg ?? {}) as Record<string, unknown>)["content"];
   if (typeof content !== "string" || content.trim() === "") return null;
-  return redactSecrets(content.trim());
+  return content.trim();
 }

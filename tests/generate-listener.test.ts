@@ -106,8 +106,14 @@ describe("the Slack listener is generated, not hand-typed in n8n", () => {
     expect(ba, "answers from the report, no data arg").toContain("replyMessages(report, h.text)");
     expect(ba, "no raw data is read or passed").not.toMatch(/replyMessages\(report, h\.text, /);
     expect(ba, "no Fetch data lookup").not.toContain("Fetch data");
-    // The output net travels in the transpiled reply code carried by every reply node.
-    expect(ba, "redactSecrets is present in the reply code").toContain("function redactSecrets");
+  });
+
+  it("the Build reply node redacts the answer through the shared net before posting", () => {
+    // redactSecrets moved to the shared redact.ts (2026-09-14) so it guards the report
+    // path too; the reply node splices redact.ts and applies it to the outgoing answer.
+    const br = (node("Build reply") as { parameters: { jsCode: string } }).parameters.jsCode;
+    expect(br, "the shared redactor is spliced into the posting node").toContain("function redactSecrets");
+    expect(br, "and applied to the answer before it is posted").toContain("redactSecrets(raw)");
   });
 
   it("spends in exactly ONE place, and only behind Should reply and Has report", () => {

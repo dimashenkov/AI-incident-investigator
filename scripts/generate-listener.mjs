@@ -69,6 +69,9 @@ const THREAD_TABLE = "HXGSOCOFnTmnAZtJ";
 
 /** The reply logic, transpiled so the Code nodes carry it (no imports). */
 const REPLY = transpile("src/core/reply.ts");
+/** The shared secret net, transpiled so the posting node can redact the answer —
+ *  one source with the incident workflow's Report node (redact.ts, 2026-09-14). */
+const REDACT = transpile("src/core/redact.ts");
 
 const ifOptions = { caseSensitive: true, typeValidation: "strict", version: 2 };
 
@@ -273,10 +276,14 @@ return [{ json: { ok: true, channel: h.channel, thread_ts: h.thread_ts,
     id: "build-reply", name: "Build reply", type: "n8n-nodes-base.code", typeVersion: 2,
     position: pos(),
     parameters: { language: "javaScript", mode: "runOnceForAllItems", jsCode:
-`${REPLY}
+`${REDACT}
+${REPLY}
 const ba = $('Build ask').first().json;
-const answer = answerFrom(($input.first() && $input.first().json) || {});
-if (answer === null) return [{ json: { ok: false, why: "the model returned no answer" } }];
+const raw = answerFrom(($input.first() && $input.first().json) || {});
+if (raw === null) return [{ json: { ok: false, why: "the model returned no answer" } }];
+// The output net, from the shared redact.ts spliced above — applied HERE, on the
+// string about to be posted, the same net the Report node uses (2026-09-14).
+const answer = redactSecrets(raw);
 return [{ json: { ok: true, channel: ba.channel, thread_ts: ba.thread_ts, text: answer } }];`
     },
   });

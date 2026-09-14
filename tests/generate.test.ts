@@ -506,3 +506,16 @@ describe("the Grok fallback — every agent falls over to Grok on a provider err
     }
   });
 });
+
+describe("the first Slack post is redacted too — the report path (Grok 2026-09-14)", () => {
+  it("the Report node runs slack_text and the Block Kit blocks through the shared redactor", () => {
+    // The report is a Slack-bound string, not just the two-way reply. Since 2026-09-14
+    // the shared redact.ts guards it too: slack_text through redactSecrets, the blocks
+    // through redactBlocks (which deep-redacts every string leaf). Without this a
+    // secret an agent quotes into the report reaches Slack.
+    const rc = (node("Report") as { parameters: { jsCode: string } }).parameters.jsCode;
+    expect(rc, "plain-text fallback redacted").toContain("redactSecrets(slack.text)");
+    expect(rc, "Block Kit blocks redacted").toContain("redactBlocks(slack.blocks)");
+    expect(rc, "the report node no longer emits the raw slack text").not.toMatch(/slack_text:\s*slack\.text\b/);
+  });
+});

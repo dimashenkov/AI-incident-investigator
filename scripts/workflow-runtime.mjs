@@ -179,6 +179,7 @@ export async function buildRuntime() {
   const configuration = transpile("src/core/configuration.ts");
   const thread = transpile("src/core/thread.ts");
   const datadog = transpile("src/core/datadog.ts");
+  const redact = transpile("src/core/redact.ts");
   const prompts = readPrompts();
   const incidents = await assembledIncidents();
 
@@ -238,6 +239,9 @@ ${thread}
 
 // ---- src/core/datadog.ts, transpiled in memory ----
 ${datadog}
+
+// ---- src/core/redact.ts, transpiled in memory (the shared secret net) ----
+${redact}
 
 // ---- the prompts, verbatim ----
 const PROMPTS = ${JSON.stringify(prompts)};
@@ -629,7 +633,12 @@ return items.map(function (item, index) {
   var ddRecord = datadogMockRecord(inc, code, conf, dpod ? dpod.name : "");
   const slack = slackReport(inc, thread, code, conf, ddRecord.datadog_incident_id);
   return { json: Object.assign({}, j, { incident: next, thread: thread,
-    slack_blocks: slack.blocks, slack_text: slack.text, datadog_record: ddRecord,
+    // The report is a Slack-bound string too — redact it through the shared net
+    // (src/core/redact.ts, spliced into this prelude) before it leaves, in BOTH the
+    // Block Kit blocks and the plain-text fallback (Grok, 2026-09-14). Narrow, so a
+    // pod name / code / metric is untouched; a fixed-shape credential quoted into the
+    // report is not.
+    slack_blocks: redactBlocks(slack.blocks), slack_text: redactSecrets(slack.text), datadog_record: ddRecord,
     // Provenance for the eval loop: which prompt version produced this run.
     prompt_versions: PROMPT_VERSIONS }) };
 });

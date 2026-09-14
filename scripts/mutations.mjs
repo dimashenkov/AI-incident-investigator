@@ -3102,17 +3102,17 @@ export const MUTATIONS = [
     // redactSecrets before it leaves answerFrom — the single choke point on the
     // outgoing string. Returning the raw content lets a fixed-shape credential in
     // the report or the model's reasoning post straight to Slack.
-    id: "reply-answer-skips-the-output-redaction",
-    file: "src/core/reply.ts",
-    from: "return redactSecrets(content.trim());",
-    to: "return content.trim();",
-    mustFail: "passes the model's answer through redactSecrets before it leaves (single choke point)",
+    id: "reply-node-skips-the-output-redaction",
+    file: "scripts/generate-listener.mjs",
+    from: "const answer = redactSecrets(raw);",
+    to: "const answer = raw;",
+    mustFail: "the Build reply node redacts the answer through the shared net before posting",
   },
   {
     // The output net must catch fixed-prefix provider keys. Neutering the sk-…
     // rule (OpenAI keys) lets that shape through to the thread.
     id: "reply-redaction-misses-provider-keys",
-    file: "src/core/reply.ts",
+    file: "src/core/redact.ts",
     from: "out = out.replace(/\\bsk-[A-Za-z0-9_-]{16,}/g, R);                 // OpenAI",
     to: "out = out;                                                       // OpenAI",
     mustFail: "redacts fixed-prefix provider keys a report would never legitimately contain",
@@ -3121,7 +3121,7 @@ export const MUTATIONS = [
     // The JSON form "password":"…" is the one Grok showed slipping past a k=v-only
     // denylist. Dropping the JSON-form rule reopens exactly that gap.
     id: "reply-redaction-misses-the-json-secret-form",
-    file: "src/core/reply.ts",
+    file: "src/core/redact.ts",
     from: 'out = out.replace(new RegExp(`(${key}\\\\s*:\\\\s*)${dq}`, "gi"), `$1"${R}"`);',
     to: 'out = out; // JSON/colon secret-form rule removed',
     mustFail: "redacts the VALUE after a secret-named key in BOTH k=v and JSON forms (Grok's JSON slip)",
@@ -3361,5 +3361,14 @@ export const MUTATIONS = [
     from: "    j.model_by_agent = modelsSoFar;\n",
     to: "",
     mustFail: "records model_by_agent, so a Grok failover is visible to the record and to eval",
+  },
+  {
+    // The report path must be redacted too (Grok, 2026-09-14). Emitting the raw
+    // slack.text lets a secret an agent quoted into the report reach Slack.
+    id: "report-node-posts-unredacted-slack-text",
+    file: "scripts/workflow-runtime.mjs",
+    from: "slack_blocks: redactBlocks(slack.blocks), slack_text: redactSecrets(slack.text), datadog_record: ddRecord,",
+    to: "slack_blocks: slack.blocks, slack_text: slack.text, datadog_record: ddRecord,",
+    mustFail: "the Report node runs slack_text and the Block Kit blocks through the shared redactor",
   },
 ];
