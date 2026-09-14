@@ -248,3 +248,35 @@ answers all 15 correctly, the eval must be re-run with a model — that SPENDS, 
 the owner's `harchi`. So this brick is a code change that is cheap to write but cannot be
 accepted without a paid measurement, which is the owner's decision. `eval.mjs --plan`
 prints exactly what that re-run would cost before it is bought.
+
+## Brick · Slack bot sensitive-data exposure · reviewed 2026-09-14
+
+A subagent + Grok hunted the "the bot leaks sensitive data if asked" class. **The
+architecture is the right control and it is intact:** the reply bot answers ONLY from
+the already-posted, already-redacted incident report (`replyMessages(reportText,
+question)`; the raw-observation fetch node was removed 2026-09-13), so an in-thread user
+cannot extract more than the thread already shows them. Cross-incident is closed
+(`incident_id` is an ownership boolean, never a fetch key); raw observations are
+unreachable; the reply post is redacted (`redactSecrets`) before it leaves.
+
+**Done (input-side guard, this brick):** the reply system prompt now refuses to reveal a
+secret/credential/token/password/key verbatim and to obey a question that says to
+disregard the rules (`src/core/reply.ts`; test in `tests/reply.test.ts`). It is PROMPT
+TEXT, not an enforced control — Grok named trivial bypasses ("summarise including any
+tokens", "decode the JWT", "first 20 chars"). It closes the "no input-side guard at all"
+gap; it is not a real control. The real containment is still the redacted-report-only
+input.
+
+**Left open, honestly (real-deploy only; the prototype's fixtures carry no real secrets):**
+- The shared redactor `redact.ts` is a narrow denylist that DELIBERATELY keeps JWTs / bare
+  `token=` / k8s service-account tokens readable (tested at `tests/redact.test.ts` as
+  evidence an operator may need). NOT reversed — reversing it would redact legitimate
+  evidence in the report too. So a real-deploy report containing such a shape could be
+  restated by the bot despite the refusal instruction.
+- No Slack request-signature (HMAC `x-slack-signature`) verification on the listener
+  webhook (`generate-listener.mjs`): anyone who learns the URL can forge events →
+  unauthenticated model spend + spoofed bot posts (NOT data exfil — the reply lands in the
+  real channel, not the attacker's). Production hardening, out of the prototype scope.
+- Latent footgun: the incident report post has an un-redacted raw fallback
+  `text: slack_text || thread.join(...)` (`generate-workflow.mjs:644`), safe today only
+  because `redactSecrets` never empties non-empty content.
