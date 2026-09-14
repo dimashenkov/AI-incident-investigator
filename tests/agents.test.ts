@@ -161,9 +161,16 @@ const REQUIRED_RULES: Record<string, Array<{ id: string; prose: RegExp }>> = {
     { id: "confidence-reads-both-directions", prose: /0\.8 to 0\.95/ },
     { id: "insufficient-evidence-is-an-answer", prose: /Not enough to tell is a real answer/ },
     // Measured live on 2026-09-06: the metrics agent found the throttling, this
-    // agent cited it, and then said there was not enough evidence — because no
-    // agent had named a cause, and none of them is allowed to.
-    { id: "naming-the-cause-is-this-agents-job", prose: /forbidden\*\* to diagnose|are \*\*forbidden\*\*/ },
+    // agent cited it, and then said there was not enough evidence — because it
+    // waited for a name that is its own to give. Naming the cause is this agent's
+    // job whether or not a specialist handed it a candidate first.
+    { id: "naming-the-cause-is-this-agents-job", prose: /Naming the cause is your job/ },
+    // A specialist MAY hand a candidate in the outright case (kubernetes named
+    // CONTAINER_OOM in green runs; the extend named a cause 24 times). The old
+    // prompt called that "forbidden … empty by design", which was false and let the
+    // concluder rubber-stamp a handed answer. It must WEIGH such a candidate, not
+    // copy it (Grok adjudicated the fork to option (b), 2026-09-14).
+    { id: "concluder-weighs-a-handed-candidate", prose: /you do not copy it/ },
     { id: "every-answer-carries-five-fields", prose: /All five fields, always/ },
     { id: "cause-code-from-the-list", prose: /A hypothesis `code` must be one of these, exactly/ },
     { id: "record-contradicting-evidence", prose: /Contradicting evidence is recorded, not dropped/ },
@@ -359,6 +366,22 @@ describe("every prompt carries the rules its schema will enforce", () => {
         expect(refs.has(one), `${agent}'s example supports a hypothesis with ${one}, which its findings never cite`)
           .toBe(true);
       }
+    }
+  });
+
+  it("does not carry the retired 'specialists are forbidden to diagnose' claim", () => {
+    /*
+     * Option (b), 2026-09-14 (Grok adjudicated the fork). The concluder prompt used to
+     * claim the specialists are "forbidden to diagnose", their hypotheses "empty by
+     * design", naming a cause "because none of them was allowed to" — all false: an
+     * extractor DOES name an obvious cause (kubernetes named CONTAINER_OOM in green runs).
+     * The rule was fixed in one paragraph; Grok caught a second carrier 28 lines below it
+     * that a positive prose check would never see. This is the negative guard: the claim
+     * must be ABSENT, or a future edit that reintroduces it in any spot passes silently.
+     */
+    const text = readPrompt("root-cause")!;
+    for (const banned of [/forbidden[^\n]{0,6}to diagnose/i, /empty by design/i, /none of them (?:was|were|is|are) allowed/i, /(?:cannot|can't|not allowed to) diagnose/i]) {
+      expect(text, `retired false claim present: ${banned}`).not.toMatch(banned);
     }
   });
 

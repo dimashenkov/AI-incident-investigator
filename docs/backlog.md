@@ -185,8 +185,18 @@ pattern already exists in `src/core/review.ts` (`versionStamp` folds the model i
 
 ## Brick · the four-agent split leaks the cause into the extractors · needs a paid run
 
-**State:** OPEN (Grok implementation review, 2026-09-14). NOT started, because closing
-it changes the PROMPTS and therefore needs a paid re-measurement — it is not a free fix.
+**State:** RESOLVED IN CODE, awaits a paid re-measurement (2026-09-14). Grok
+adjudicated the fork to **(b)** with evidence: the extractors named a cause 28 times
+across the green baseline (kubernetes `CONTAINER_OOM` 4×, the extend 24×), so (a) —
+forbidding them — would break exactly what 15/15 already does. (b) fixes only
+`prompts/root-cause-agent.md`: the false "forbidden to diagnose / empty by design /
+none of them was allowed" is removed (two carriers, 28 lines apart — Grok caught the
+second), replaced with "a specialist may hand you a candidate you WEIGH, not copy".
+A negative test (`tests/agents.test.ts`) now guards the claim's ABSENCE. Extractors
+unchanged; the two cause-code enums stay equal; workflow regenerated; 1093 tests pass;
+Grok cleared the commit. **What still needs `harchi`:** the prompt changed, so the k=3
+baseline `2c121d3550c3` no longer applies — a paid re-run confirms all 15 still answer
+correctly under the new prompt set. That measurement is the owner's spend decision.
 
 **The leak.** The three extractor prompts (`prompts/kubernetes-agent.md`,
 `prompts/logs-agent.md`, `prompts/metrics-agent.md`) still enumerate all 13 cause codes

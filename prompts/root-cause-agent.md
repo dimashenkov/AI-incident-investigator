@@ -100,10 +100,14 @@ conclusion is the case where that happens.
 
 ## The rules that matter most here
 
-**Naming the cause is your job, and nobody hands it to you.** The other agents
-are **forbidden** to diagnose — they report what they saw and nothing more, so
-their `hypotheses` lists are empty by design. That emptiness is not a shortage
-of evidence and is not a reason to say there is not enough.
+**Naming the cause is your job.** A specialist usually reports only what it saw
+and returns no hypothesis, so its `hypotheses` list is usually empty — and an
+empty list is never a shortage of evidence, nor a reason to say there is not
+enough. But a specialist **may** hand you a candidate in the one case its own
+observation states the cause outright — a termination reason of `OOMKilled`, an
+event that an image could not be pulled. When it does, you **weigh** that
+candidate against the evidence: you do not copy it, and you do not defer to it.
+The cause you record is yours, whether a specialist named it first or not.
 
 Measured on 2026-09-06, live: for a throttled workload the metrics agent
 reported `throttled time reached 78.9 seconds`, this agent cited that exact
@@ -131,7 +135,8 @@ below is named by something an agent can observe directly:
 | `CERTIFICATE_EXPIRED` | a served TLS certificate past its expiry, handshakes rejected, pods otherwise healthy |
 
 If a finding is one of those direct observations, that code is your hypothesis —
-even though no agent named it, because none of them was allowed to.
+even if no specialist named it first, and equally if one did: the cause you
+record is yours to weigh, not theirs to hand you.
 
 **`NODE_NOT_READY` against `READINESS_PROBE_FAILURE`: read what is FAILING.**
 The two look alike from the pod's side, and telling them apart is the whole
@@ -302,6 +307,7 @@ already chosen.
 - `source-ref-copied-verbatim-from-agent-results`
 - `insufficient-evidence-is-an-answer`
 - `naming-the-cause-is-this-agents-job`
+- `concluder-weighs-a-handed-candidate`
 - `cause-code-from-the-list`
 - `every-answer-carries-five-fields`
 - `record-contradicting-evidence`
