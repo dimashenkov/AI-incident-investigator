@@ -30092,5 +30092,3440 @@
    "metrics": "97038bf71973",
    "root-cause": "b417c9346204"
   }
+ },
+ "certificate-expired#23": {
+  "index": 0,
+  "state": "concluded",
+  "scenario": "certificate-expired",
+  "normalised": 5,
+  "raw_answers": {
+   "kubernetes": "{\n  \"agent\": \"kubernetes\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"the event says: the certificate partner-gateway-tls served on :8443 expired at 2026-09-14T02:16:00Z; cert-manager renewal order partner-gateway-tls-4 is in state invalid and the expired secret is still in place\",\n      \"source_ref\": \"events[0].message\"\n    },\n    {\n      \"fact\": \"the event last_seen is 2026-09-14T02:17:10Z\",\n      \"source_ref\": \"events[0].last_seen\"\n    },\n    {\n      \"fact\": \"the event says: Scaled up replica set partner-gateway-7c4d9f8b65 to 3 for image registry.internal/partner-gateway:5.0.4\",\n      \"source_ref\": \"events[1].message\"\n    },\n    {\n      \"fact\": \"the event last_seen is 2026-09-06T10:41:07Z\",\n      \"source_ref\": \"events[1].last_seen\"\n    },\n    {\n      \"fact\": \"pod partner-gateway-7c4d9f8b65-j5vwc phase is Running\",\n      \"source_ref\": \"pods[0].phase\"\n    },\n    {\n      \"fact\": \"container partner-gateway ready is true\",\n      \"source_ref\": \"pods[0].containers[0].ready\"\n    },\n    {\n      \"fact\": \"container partner-gateway restart_count is 0\",\n      \"source_ref\": \"pods[0].containers[0].restart_count\"\n    },\n    {\n      \"fact\": \"the deployment image is registry.internal/partner-gateway:5.0.4\",\n      \"source_ref\": \"deployment.image\"\n    },\n    {\n      \"fact\": \"the container's cpu limit is 1000m\",\n      \"source_ref\": \"pods[0].containers[0].limits.cpu\"\n    },\n    {\n      \"fact\": \"the container's memory limit is 1Gi\",\n      \"source_ref\": \"pods[0].containers[0].limits.memory\"\n    }\n  ],\n  \"hypotheses\": [\n    {\n      \"code\": \"CERTIFICATE_EXPIRED\",\n      \"statement\": \"The certificate partner-gateway-tls expired and cert-manager renewal is in an invalid state, causing TLS handshake errors for the service.\",\n      \"supported_by\": [\n        \"events[0].message\"\n      ]\n    }\n  ],\n  \"confidence\": 0.9\n}",
+   "logs": "{\n  \"agent\": \"logs\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"session summary: 1187 partner sessions established in the last 5 minutes\",\n      \"source_ref\": \"lines[0].message\"\n    },\n    {\n      \"fact\": \"tls: handshake error from 10.2.9.31:51044: remote error: tls: bad certificate\",\n      \"source_ref\": \"lines[1].message\"\n    },\n    {\n      \"fact\": \"tls: handshake error from 10.2.9.44:38210: remote error: tls: bad certificate\",\n      \"source_ref\": \"lines[2].message\"\n    },\n    {\n      \"fact\": \"0 successful sessions in the last 5 minutes, 412 handshake failures\",\n      \"source_ref\": \"lines[3].message\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+   "metrics": "{\n  \"agent\": \"metrics\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached 0 seconds at 2026-09-14T02:16:00Z.\",\n      \"source_ref\": \"observation.series[0].points[2].value\"\n    },\n    {\n      \"fact\": \"certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached -180 seconds at 2026-09-14T02:19:00Z.\",\n      \"source_ref\": \"observation.series[0].points[3].value\"\n    },\n    {\n      \"fact\": \"tls_handshake_failures_total reached 149 count at 2026-09-14T02:16:00Z.\",\n      \"source_ref\": \"observation.series[1].points[2].value\"\n    },\n    {\n      \"fact\": \"tls_handshake_failures_total reached 412 count at 2026-09-14T02:19:00Z.\",\n      \"source_ref\": \"observation.series[1].points[3].value\"\n    },\n    {\n      \"fact\": \"container_cpu_cfs_throttled_seconds_total was 0 seconds at 2026-09-14T02:19:00Z.\",\n      \"source_ref\": \"observation.series[2].points[2].value\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.9\n}",
+   "root-cause": "{\n  \"agent\": \"root_cause\",\n  \"status\": \"ok\",\n  \"findings\": [\n    { \"fact\": \"the event says: the certificate partner-gateway-tls served on :8443 expired at 2026-09-14T02:16:00Z; cert-manager renewal order partner-gateway-tls-4 is in state invalid and the expired secret is still in place\", \"source_ref\": \"events[0].message\" },\n    { \"fact\": \"the event last_seen is 2026-09-14T02:17:10Z\", \"source_ref\": \"events[0].last_seen\" },\n    { \"fact\": \"tls: handshake error from 10.2.9.31:51044: remote error: tls: bad certificate\", \"source_ref\": \"lines[1].message\" },\n    { \"fact\": \"tls: handshake error from 10.2.9.44:38210: remote error: tls: bad certificate\", \"source_ref\": \"lines[2].message\" },\n    { \"fact\": \"0 successful sessions in the last 5 minutes, 412 handshake failures\", \"source_ref\": \"lines[3].message\" },\n    { \"fact\": \"certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached 0 seconds at 2026-09-14T02:16:00Z.\", \"source_ref\": \"series[0].points[2].value\" },\n    { \"fact\": \"certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached -180 seconds at 2026-09-14T02:19:00Z.\", \"source_ref\": \"series[0].points[3].value\" },\n    { \"fact\": \"tls_handshake_failures_total reached 412 count at 2026-09-14T02:19:00Z.\", \"source_ref\": \"series[1].points[3].value\" }\n  ],\n  \"hypotheses\": [\n    {\n      \"code\": \"CERTIFICATE_EXPIRED\",\n      \"statement\": \"The partner-gateway TLS certificate expired at 2026-09-14T02:16:00Z and renewal is in an invalid state, leading clients\u2019 TLS handshakes on :8443 to be rejected with 'bad certificate'.\",\n      \"supported_by\": [\n        \"events[0].message\",\n        \"series[0].points[2].value\",\n        \"series[0].points[3].value\",\n        \"lines[1].message\",\n        \"lines[2].message\",\n        \"lines[3].message\",\n        \"series[1].points[3].value\"\n      ]\n    }\n  ],\n  \"confidence\": 0.92\n}"
+  },
+  "usage_by_agent": {
+   "kubernetes": {
+    "prompt_tokens": 4215,
+    "completion_tokens": 3244,
+    "cached_tokens": 4096
+   },
+   "logs": {
+    "prompt_tokens": 1966,
+    "completion_tokens": 790,
+    "cached_tokens": 1792
+   },
+   "metrics": {
+    "prompt_tokens": 2104,
+    "completion_tokens": 1739,
+    "cached_tokens": 2048
+   },
+   "root-cause": {
+    "prompt_tokens": 5873,
+    "completion_tokens": 3533,
+    "cached_tokens": 3968
+   }
+  },
+  "model_by_agent": {
+   "kubernetes": "gpt-5-mini-2025-08-07",
+   "logs": "gpt-5-mini-2025-08-07",
+   "metrics": "gpt-5-mini-2025-08-07",
+   "root-cause": "gpt-5-2025-08-07"
+  },
+  "payloads_sent": {
+   "root-cause": {
+    "incident_id": "INC-2026-1501",
+    "agent_results": [
+     {
+      "agent": "kubernetes",
+      "status": "ok",
+      "findings": [
+       {
+        "fact": "the event says: the certificate partner-gateway-tls served on :8443 expired at 2026-09-14T02:16:00Z; cert-manager renewal order partner-gateway-tls-4 is in state invalid and the expired secret is still in place",
+        "source_ref": "events[0].message"
+       },
+       {
+        "fact": "the event last_seen is 2026-09-14T02:17:10Z",
+        "source_ref": "events[0].last_seen"
+       },
+       {
+        "fact": "the event says: Scaled up replica set partner-gateway-7c4d9f8b65 to 3 for image registry.internal/partner-gateway:5.0.4",
+        "source_ref": "events[1].message"
+       },
+       {
+        "fact": "the event last_seen is 2026-09-06T10:41:07Z",
+        "source_ref": "events[1].last_seen"
+       },
+       {
+        "fact": "pod partner-gateway-7c4d9f8b65-j5vwc phase is Running",
+        "source_ref": "pods[0].phase"
+       },
+       {
+        "fact": "container partner-gateway ready is true",
+        "source_ref": "pods[0].containers[0].ready"
+       },
+       {
+        "fact": "container partner-gateway restart_count is 0",
+        "source_ref": "pods[0].containers[0].restart_count"
+       },
+       {
+        "fact": "the deployment image is registry.internal/partner-gateway:5.0.4",
+        "source_ref": "deployment.image"
+       },
+       {
+        "fact": "the container's cpu limit is 1000m",
+        "source_ref": "pods[0].containers[0].limits.cpu"
+       },
+       {
+        "fact": "the container's memory limit is 1Gi",
+        "source_ref": "pods[0].containers[0].limits.memory"
+       }
+      ],
+      "hypotheses": [
+       {
+        "code": "CERTIFICATE_EXPIRED",
+        "statement": "The certificate partner-gateway-tls expired and cert-manager renewal is in an invalid state, causing TLS handshake errors for the service.",
+        "supported_by": [
+         "events[0].message"
+        ]
+       }
+      ],
+      "confidence": 0.9
+     },
+     {
+      "agent": "logs",
+      "status": "ok",
+      "findings": [
+       {
+        "fact": "session summary: 1187 partner sessions established in the last 5 minutes",
+        "source_ref": "lines[0].message"
+       },
+       {
+        "fact": "tls: handshake error from 10.2.9.31:51044: remote error: tls: bad certificate",
+        "source_ref": "lines[1].message"
+       },
+       {
+        "fact": "tls: handshake error from 10.2.9.44:38210: remote error: tls: bad certificate",
+        "source_ref": "lines[2].message"
+       },
+       {
+        "fact": "0 successful sessions in the last 5 minutes, 412 handshake failures",
+        "source_ref": "lines[3].message"
+       }
+      ],
+      "hypotheses": [],
+      "confidence": 0
+     },
+     {
+      "agent": "metrics",
+      "status": "ok",
+      "findings": [
+       {
+        "fact": "certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached 0 seconds at 2026-09-14T02:16:00Z.",
+        "source_ref": "series[0].points[2].value"
+       },
+       {
+        "fact": "certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached -180 seconds at 2026-09-14T02:19:00Z.",
+        "source_ref": "series[0].points[3].value"
+       },
+       {
+        "fact": "tls_handshake_failures_total reached 149 count at 2026-09-14T02:16:00Z.",
+        "source_ref": "series[1].points[2].value"
+       },
+       {
+        "fact": "tls_handshake_failures_total reached 412 count at 2026-09-14T02:19:00Z.",
+        "source_ref": "series[1].points[3].value"
+       },
+       {
+        "fact": "container_cpu_cfs_throttled_seconds_total was 0 seconds at 2026-09-14T02:19:00Z.",
+        "source_ref": "series[2].points[2].value"
+       }
+      ],
+      "hypotheses": [],
+      "confidence": 0.9
+     }
+    ],
+    "configuration_read_by_code": [
+     {
+      "slot": "kubernetes",
+      "ref": "pods[0].containers[0].limits.memory",
+      "value": "1Gi",
+      "kind": "resource-limit"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[0].containers[0].limits.cpu",
+      "value": "1000m",
+      "kind": "resource-limit"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[0].containers[0].requests.memory",
+      "value": "512Mi",
+      "kind": "resource-request"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[0].containers[0].requests.cpu",
+      "value": "500m",
+      "kind": "resource-request"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[0].containers[0].ready",
+      "value": "true",
+      "kind": "container-readiness"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[1].containers[0].limits.memory",
+      "value": "1Gi",
+      "kind": "resource-limit"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[1].containers[0].limits.cpu",
+      "value": "1000m",
+      "kind": "resource-limit"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[1].containers[0].requests.memory",
+      "value": "512Mi",
+      "kind": "resource-request"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[1].containers[0].requests.cpu",
+      "value": "500m",
+      "kind": "resource-request"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[1].containers[0].ready",
+      "value": "true",
+      "kind": "container-readiness"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[2].containers[0].limits.memory",
+      "value": "1Gi",
+      "kind": "resource-limit"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[2].containers[0].limits.cpu",
+      "value": "1000m",
+      "kind": "resource-limit"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[2].containers[0].requests.memory",
+      "value": "512Mi",
+      "kind": "resource-request"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[2].containers[0].requests.cpu",
+      "value": "500m",
+      "kind": "resource-request"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[2].containers[0].ready",
+      "value": "true",
+      "kind": "container-readiness"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "deployment.image",
+      "value": "registry.internal/partner-gateway:5.0.4",
+      "kind": "deployment-image"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "events[0].last_seen",
+      "value": "2026-09-14T02:17:10Z",
+      "kind": "observed-at"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "events[1].last_seen",
+      "value": "2026-09-06T10:41:07Z",
+      "kind": "observed-at"
+     },
+     {
+      "slot": "logs",
+      "ref": "lines[0].ts",
+      "value": "2026-09-14T02:11:03Z",
+      "kind": "observed-at"
+     },
+     {
+      "slot": "logs",
+      "ref": "lines[1].ts",
+      "value": "2026-09-14T02:16:20Z",
+      "kind": "observed-at"
+     },
+     {
+      "slot": "logs",
+      "ref": "lines[2].ts",
+      "value": "2026-09-14T02:17:02Z",
+      "kind": "observed-at"
+     },
+     {
+      "slot": "logs",
+      "ref": "lines[3].ts",
+      "value": "2026-09-14T02:17:38Z",
+      "kind": "observed-at"
+     },
+     {
+      "slot": "metrics",
+      "ref": "series[0].points[0].value",
+      "value": "360",
+      "kind": "series-endpoint",
+      "ts": "2026-09-14T02:10:00Z",
+      "series": "certmanager_certificate_seconds_until_expiry:partner-gateway-tls",
+      "unit": "seconds"
+     },
+     {
+      "slot": "metrics",
+      "ref": "series[0].points[3].value",
+      "value": "-180",
+      "kind": "series-endpoint",
+      "ts": "2026-09-14T02:19:00Z",
+      "series": "certmanager_certificate_seconds_until_expiry:partner-gateway-tls",
+      "unit": "seconds"
+     },
+     {
+      "slot": "metrics",
+      "ref": "series[1].points[0].value",
+      "value": "3",
+      "kind": "series-endpoint",
+      "ts": "2026-09-14T02:10:00Z",
+      "series": "tls_handshake_failures_total",
+      "unit": "count"
+     },
+     {
+      "slot": "metrics",
+      "ref": "series[1].points[3].value",
+      "value": "412",
+      "kind": "series-endpoint",
+      "ts": "2026-09-14T02:19:00Z",
+      "series": "tls_handshake_failures_total",
+      "unit": "count"
+     },
+     {
+      "slot": "metrics",
+      "ref": "series[2].points[0].value",
+      "value": "0",
+      "kind": "series-endpoint",
+      "ts": "2026-09-14T02:10:00Z",
+      "series": "container_cpu_cfs_throttled_seconds_total",
+      "unit": "seconds"
+     },
+     {
+      "slot": "metrics",
+      "ref": "series[2].points[2].value",
+      "value": "0",
+      "kind": "series-endpoint",
+      "ts": "2026-09-14T02:19:00Z",
+      "series": "container_cpu_cfs_throttled_seconds_total",
+      "unit": "seconds"
+     }
+    ]
+   }
+  },
+  "root_cause_code": "CERTIFICATE_EXPIRED",
+  "root_cause": "The partner-gateway TLS certificate expired at 2026-09-14T02:16:00Z and renewal is in an invalid state, leading clients\u2019 TLS handshakes on :8443 to be rejected with 'bad certificate'.",
+  "confidence": 0.92,
+  "evidence": [
+   {
+    "source": "kubernetes",
+    "fact": "the event says: the certificate partner-gateway-tls served on :8443 expired at 2026-09-14T02:16:00Z; cert-manager renewal order partner-gateway-tls-4 is in state invalid and the expired secret is still in place",
+    "supports": "for"
+   },
+   {
+    "source": "logs",
+    "fact": "tls: handshake error from 10.2.9.31:51044: remote error: tls: bad certificate",
+    "supports": "for"
+   },
+   {
+    "source": "logs",
+    "fact": "tls: handshake error from 10.2.9.44:38210: remote error: tls: bad certificate",
+    "supports": "for"
+   },
+   {
+    "source": "logs",
+    "fact": "0 successful sessions in the last 5 minutes, 412 handshake failures",
+    "supports": "for"
+   },
+   {
+    "source": "metrics",
+    "fact": "certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached 0 seconds at 2026-09-14T02:16:00Z.",
+    "supports": "for"
+   },
+   {
+    "source": "metrics",
+    "fact": "certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached -180 seconds at 2026-09-14T02:19:00Z.",
+    "supports": "for"
+   },
+   {
+    "source": "metrics",
+    "fact": "tls_handshake_failures_total reached 412 count at 2026-09-14T02:19:00Z.",
+    "supports": "for"
+   }
+  ],
+  "incident": {
+   "incident_id": "INC-2026-1501",
+   "status": "diagnosed",
+   "service": "partner-gateway",
+   "namespace": "production",
+   "cluster": "prod-eu",
+   "started_at": "2026-09-14T02:18:00Z",
+   "scenario": "certificate-expired",
+   "source": {
+    "provider": "fake-datadog",
+    "alert": {
+     "id": "alert-1e88",
+     "title": "partner-gateway: all partner sessions failing",
+     "triggered_at": "2026-09-14T02:18:00Z",
+     "severity": "critical",
+     "monitor_id": "mon-9914",
+     "tags": [
+      "service:partner-gateway",
+      "env:production",
+      "cluster:prod-eu"
+     ]
+    }
+   },
+   "observations": {
+    "kubernetes": {
+     "collected_at": "2026-09-14T02:19:06Z",
+     "pods": [
+      {
+       "name": "partner-gateway-7c4d9f8b65-j5vwc",
+       "namespace": "production",
+       "phase": "Running",
+       "restart_count": 0,
+       "containers": [
+        {
+         "name": "partner-gateway",
+         "ready": true,
+         "restart_count": 0,
+         "limits": {
+          "memory": "1Gi",
+          "cpu": "1000m"
+         },
+         "requests": {
+          "memory": "512Mi",
+          "cpu": "500m"
+         }
+        }
+       ]
+      },
+      {
+       "name": "partner-gateway-7c4d9f8b65-r2ptq",
+       "namespace": "production",
+       "phase": "Running",
+       "restart_count": 0,
+       "containers": [
+        {
+         "name": "partner-gateway",
+         "ready": true,
+         "restart_count": 0,
+         "limits": {
+          "memory": "1Gi",
+          "cpu": "1000m"
+         },
+         "requests": {
+          "memory": "512Mi",
+          "cpu": "500m"
+         }
+        }
+       ]
+      },
+      {
+       "name": "partner-gateway-7c4d9f8b65-w8xqz",
+       "namespace": "production",
+       "phase": "Running",
+       "restart_count": 0,
+       "containers": [
+        {
+         "name": "partner-gateway",
+         "ready": true,
+         "restart_count": 0,
+         "limits": {
+          "memory": "1Gi",
+          "cpu": "1000m"
+         },
+         "requests": {
+          "memory": "512Mi",
+          "cpu": "500m"
+         }
+        }
+       ]
+      }
+     ],
+     "events": [
+      {
+       "type": "Warning",
+       "reason": "TLSHandshakeErrors",
+       "count": 1,
+       "last_seen": "2026-09-14T02:17:10Z",
+       "involved_object": "certificate/partner-gateway-tls",
+       "message": "the certificate partner-gateway-tls served on :8443 expired at 2026-09-14T02:16:00Z; cert-manager renewal order partner-gateway-tls-4 is in state invalid and the expired secret is still in place"
+      },
+      {
+       "type": "Normal",
+       "reason": "ScalingReplicaSet",
+       "count": 1,
+       "last_seen": "2026-09-06T10:41:07Z",
+       "involved_object": "deployment/partner-gateway",
+       "message": "Scaled up replica set partner-gateway-7c4d9f8b65 to 3 for image registry.internal/partner-gateway:5.0.4"
+      }
+     ],
+     "deployment": {
+      "name": "partner-gateway",
+      "namespace": "production",
+      "replicas": {
+       "desired": 3,
+       "ready": 3,
+       "available": 3
+      },
+      "image": "registry.internal/partner-gateway:5.0.4"
+     },
+     "provenance": {
+      "collection_id": "3d261946-9c9b-4308-84cb-40b730cd5983",
+      "requested_for": "INC-2026-1501",
+      "cluster": "prod-eu",
+      "namespace": "production",
+      "provider": "fake-kubernetes"
+     }
+    },
+    "logs": {
+     "collected_at": "2026-09-14T02:19:08Z",
+     "window": {
+      "from": "2026-09-14T02:10:00Z",
+      "to": "2026-09-14T02:19:00Z"
+     },
+     "truncated": false,
+     "lines": [
+      {
+       "ts": "2026-09-14T02:11:03Z",
+       "level": "info",
+       "container": "partner-gateway",
+       "message": "session summary: 1187 partner sessions established in the last 5 minutes"
+      },
+      {
+       "ts": "2026-09-14T02:16:20Z",
+       "level": "warn",
+       "container": "partner-gateway",
+       "message": "tls: handshake error from 10.2.9.31:51044: remote error: tls: bad certificate"
+      },
+      {
+       "ts": "2026-09-14T02:17:02Z",
+       "level": "warn",
+       "container": "partner-gateway",
+       "message": "tls: handshake error from 10.2.9.44:38210: remote error: tls: bad certificate"
+      },
+      {
+       "ts": "2026-09-14T02:17:38Z",
+       "level": "error",
+       "container": "partner-gateway",
+       "message": "0 successful sessions in the last 5 minutes, 412 handshake failures"
+      }
+     ],
+     "provenance": {
+      "collection_id": "3d261946-9c9b-4308-84cb-40b730cd5983",
+      "requested_for": "INC-2026-1501",
+      "cluster": "prod-eu",
+      "namespace": "production",
+      "provider": "fake-logs"
+     }
+    },
+    "metrics": {
+     "collected_at": "2026-09-14T02:19:10Z",
+     "window": {
+      "from": "2026-09-14T02:10:00Z",
+      "to": "2026-09-14T02:19:00Z"
+     },
+     "series": [
+      {
+       "name": "certmanager_certificate_seconds_until_expiry:partner-gateway-tls",
+       "unit": "seconds",
+       "container": "partner-gateway",
+       "points": [
+        {
+         "ts": "2026-09-14T02:10:00Z",
+         "value": 360
+        },
+        {
+         "ts": "2026-09-14T02:13:00Z",
+         "value": 180
+        },
+        {
+         "ts": "2026-09-14T02:16:00Z",
+         "value": 0
+        },
+        {
+         "ts": "2026-09-14T02:19:00Z",
+         "value": -180
+        }
+       ]
+      },
+      {
+       "name": "tls_handshake_failures_total",
+       "unit": "count",
+       "container": "partner-gateway",
+       "points": [
+        {
+         "ts": "2026-09-14T02:10:00Z",
+         "value": 3
+        },
+        {
+         "ts": "2026-09-14T02:13:00Z",
+         "value": 5
+        },
+        {
+         "ts": "2026-09-14T02:16:00Z",
+         "value": 149
+        },
+        {
+         "ts": "2026-09-14T02:19:00Z",
+         "value": 412
+        }
+       ]
+      },
+      {
+       "name": "container_cpu_cfs_throttled_seconds_total",
+       "unit": "seconds",
+       "container": "partner-gateway",
+       "points": [
+        {
+         "ts": "2026-09-14T02:10:00Z",
+         "value": 0
+        },
+        {
+         "ts": "2026-09-14T02:16:00Z",
+         "value": 0
+        },
+        {
+         "ts": "2026-09-14T02:19:00Z",
+         "value": 0
+        }
+       ]
+      }
+     ],
+     "provenance": {
+      "collection_id": "3d261946-9c9b-4308-84cb-40b730cd5983",
+      "requested_for": "INC-2026-1501",
+      "cluster": "prod-eu",
+      "namespace": "production",
+      "provider": "fake-metrics"
+     }
+    }
+   },
+   "collection": {
+    "kubernetes": {
+     "state": "collected"
+    },
+    "logs": {
+     "state": "collected"
+    },
+    "metrics": {
+     "state": "collected"
+    }
+   },
+   "analysis": {
+    "agents": [
+     {
+      "agent": "kubernetes",
+      "status": "ok",
+      "findings": [
+       {
+        "fact": "the event says: the certificate partner-gateway-tls served on :8443 expired at 2026-09-14T02:16:00Z; cert-manager renewal order partner-gateway-tls-4 is in state invalid and the expired secret is still in place",
+        "source_ref": "events[0].message"
+       },
+       {
+        "fact": "the event last_seen is 2026-09-14T02:17:10Z",
+        "source_ref": "events[0].last_seen"
+       },
+       {
+        "fact": "the event says: Scaled up replica set partner-gateway-7c4d9f8b65 to 3 for image registry.internal/partner-gateway:5.0.4",
+        "source_ref": "events[1].message"
+       },
+       {
+        "fact": "the event last_seen is 2026-09-06T10:41:07Z",
+        "source_ref": "events[1].last_seen"
+       },
+       {
+        "fact": "pod partner-gateway-7c4d9f8b65-j5vwc phase is Running",
+        "source_ref": "pods[0].phase"
+       },
+       {
+        "fact": "container partner-gateway ready is true",
+        "source_ref": "pods[0].containers[0].ready"
+       },
+       {
+        "fact": "container partner-gateway restart_count is 0",
+        "source_ref": "pods[0].containers[0].restart_count"
+       },
+       {
+        "fact": "the deployment image is registry.internal/partner-gateway:5.0.4",
+        "source_ref": "deployment.image"
+       },
+       {
+        "fact": "the container's cpu limit is 1000m",
+        "source_ref": "pods[0].containers[0].limits.cpu"
+       },
+       {
+        "fact": "the container's memory limit is 1Gi",
+        "source_ref": "pods[0].containers[0].limits.memory"
+       }
+      ],
+      "hypotheses": [
+       {
+        "code": "CERTIFICATE_EXPIRED",
+        "statement": "The certificate partner-gateway-tls expired and cert-manager renewal is in an invalid state, causing TLS handshake errors for the service.",
+        "supported_by": [
+         "events[0].message"
+        ]
+       }
+      ],
+      "confidence": 0.9
+     },
+     {
+      "agent": "logs",
+      "status": "ok",
+      "findings": [
+       {
+        "fact": "session summary: 1187 partner sessions established in the last 5 minutes",
+        "source_ref": "lines[0].message"
+       },
+       {
+        "fact": "tls: handshake error from 10.2.9.31:51044: remote error: tls: bad certificate",
+        "source_ref": "lines[1].message"
+       },
+       {
+        "fact": "tls: handshake error from 10.2.9.44:38210: remote error: tls: bad certificate",
+        "source_ref": "lines[2].message"
+       },
+       {
+        "fact": "0 successful sessions in the last 5 minutes, 412 handshake failures",
+        "source_ref": "lines[3].message"
+       }
+      ],
+      "hypotheses": [],
+      "confidence": 0
+     },
+     {
+      "agent": "metrics",
+      "status": "ok",
+      "findings": [
+       {
+        "fact": "certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached 0 seconds at 2026-09-14T02:16:00Z.",
+        "source_ref": "series[0].points[2].value"
+       },
+       {
+        "fact": "certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached -180 seconds at 2026-09-14T02:19:00Z.",
+        "source_ref": "series[0].points[3].value"
+       },
+       {
+        "fact": "tls_handshake_failures_total reached 149 count at 2026-09-14T02:16:00Z.",
+        "source_ref": "series[1].points[2].value"
+       },
+       {
+        "fact": "tls_handshake_failures_total reached 412 count at 2026-09-14T02:19:00Z.",
+        "source_ref": "series[1].points[3].value"
+       },
+       {
+        "fact": "container_cpu_cfs_throttled_seconds_total was 0 seconds at 2026-09-14T02:19:00Z.",
+        "source_ref": "series[2].points[2].value"
+       }
+      ],
+      "hypotheses": [],
+      "confidence": 0.9
+     },
+     {
+      "agent": "root_cause",
+      "status": "ok",
+      "findings": [
+       {
+        "fact": "the event says: the certificate partner-gateway-tls served on :8443 expired at 2026-09-14T02:16:00Z; cert-manager renewal order partner-gateway-tls-4 is in state invalid and the expired secret is still in place",
+        "source_ref": "events[0].message"
+       },
+       {
+        "fact": "the event last_seen is 2026-09-14T02:17:10Z",
+        "source_ref": "events[0].last_seen"
+       },
+       {
+        "fact": "tls: handshake error from 10.2.9.31:51044: remote error: tls: bad certificate",
+        "source_ref": "lines[1].message"
+       },
+       {
+        "fact": "tls: handshake error from 10.2.9.44:38210: remote error: tls: bad certificate",
+        "source_ref": "lines[2].message"
+       },
+       {
+        "fact": "0 successful sessions in the last 5 minutes, 412 handshake failures",
+        "source_ref": "lines[3].message"
+       },
+       {
+        "fact": "certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached 0 seconds at 2026-09-14T02:16:00Z.",
+        "source_ref": "series[0].points[2].value"
+       },
+       {
+        "fact": "certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached -180 seconds at 2026-09-14T02:19:00Z.",
+        "source_ref": "series[0].points[3].value"
+       },
+       {
+        "fact": "tls_handshake_failures_total reached 412 count at 2026-09-14T02:19:00Z.",
+        "source_ref": "series[1].points[3].value"
+       }
+      ],
+      "hypotheses": [
+       {
+        "code": "CERTIFICATE_EXPIRED",
+        "statement": "The partner-gateway TLS certificate expired at 2026-09-14T02:16:00Z and renewal is in an invalid state, leading clients\u2019 TLS handshakes on :8443 to be rejected with 'bad certificate'.",
+        "supported_by": [
+         "events[0].message",
+         "series[0].points[2].value",
+         "series[0].points[3].value",
+         "lines[1].message",
+         "lines[2].message",
+         "lines[3].message",
+         "series[1].points[3].value"
+        ]
+       }
+      ],
+      "confidence": 0.92
+     }
+    ],
+    "root_cause_code": "CERTIFICATE_EXPIRED",
+    "root_cause": "The partner-gateway TLS certificate expired at 2026-09-14T02:16:00Z and renewal is in an invalid state, leading clients\u2019 TLS handshakes on :8443 to be rejected with 'bad certificate'.",
+    "confidence": 0.92,
+    "evidence": [
+     {
+      "source": "kubernetes",
+      "fact": "the event says: the certificate partner-gateway-tls served on :8443 expired at 2026-09-14T02:16:00Z; cert-manager renewal order partner-gateway-tls-4 is in state invalid and the expired secret is still in place",
+      "supports": "for"
+     },
+     {
+      "source": "logs",
+      "fact": "tls: handshake error from 10.2.9.31:51044: remote error: tls: bad certificate",
+      "supports": "for"
+     },
+     {
+      "source": "logs",
+      "fact": "tls: handshake error from 10.2.9.44:38210: remote error: tls: bad certificate",
+      "supports": "for"
+     },
+     {
+      "source": "logs",
+      "fact": "0 successful sessions in the last 5 minutes, 412 handshake failures",
+      "supports": "for"
+     },
+     {
+      "source": "metrics",
+      "fact": "certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached 0 seconds at 2026-09-14T02:16:00Z.",
+      "supports": "for"
+     },
+     {
+      "source": "metrics",
+      "fact": "certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached -180 seconds at 2026-09-14T02:19:00Z.",
+      "supports": "for"
+     },
+     {
+      "source": "metrics",
+      "fact": "tls_handshake_failures_total reached 412 count at 2026-09-14T02:19:00Z.",
+      "supports": "for"
+     }
+    ]
+   },
+   "remediation": {
+    "recommended_actions": []
+   },
+   "conversation": {
+    "provider": "fake-slack",
+    "channel_id": "fake-prod-incidents",
+    "thread_id": "thread-INC-2026-1501",
+    "incident_id": "INC-2026-1501",
+    "messages": [
+     {
+      "role": "system",
+      "text": "INC-2026-1501: partner-gateway in production \u2014 investigating.",
+      "ts": "2026-09-14T02:18:00Z",
+      "incident_id": "INC-2026-1501"
+     },
+     {
+      "role": "agent",
+      "incident_id": "INC-2026-1501",
+      "ts": "2026-09-14T02:18:00Z",
+      "cited_evidence": [
+       {
+        "source": "kubernetes",
+        "fact": "the event says: the certificate partner-gateway-tls served on :8443 expired at 2026-09-14T02:16:00Z; cert-manager renewal order partner-gateway-tls-4 is in state invalid and the expired secret is still in place"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "the event last_seen is 2026-09-14T02:17:10Z"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "the event says: Scaled up replica set partner-gateway-7c4d9f8b65 to 3 for image registry.internal/partner-gateway:5.0.4"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "the event last_seen is 2026-09-06T10:41:07Z"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "pod partner-gateway-7c4d9f8b65-j5vwc phase is Running"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "container partner-gateway ready is true"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "container partner-gateway restart_count is 0"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "the deployment image is registry.internal/partner-gateway:5.0.4"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "the container's cpu limit is 1000m"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "the container's memory limit is 1Gi"
+       }
+      ],
+      "text": "kubernetes: the event says: the certificate partner-gateway-tls served on :8443 expired at 2026-09-14T02:16:00Z; cert-manager renewal order partner-gateway-tls-4 is in state invalid and the expired secret is still in place; the event last_seen is 2026-09-14T02:17:10Z; the event says: Scaled up replica set partner-gateway-7c4d9f8b65 to 3 for image registry.internal/partner-gateway:5.0.4; the event last_seen is 2026-09-06T10:41:07Z; pod partner-gateway-7c4d9f8b65-j5vwc phase is Running; container partner-gateway ready is true; container partner-gateway restart_count is 0; the deployment image is registry.internal/partner-gateway:5.0.4; the container's cpu limit is 1000m; the container's memory limit is 1Gi."
+     },
+     {
+      "role": "agent",
+      "incident_id": "INC-2026-1501",
+      "ts": "2026-09-14T02:18:00Z",
+      "cited_evidence": [
+       {
+        "source": "logs",
+        "fact": "session summary: 1187 partner sessions established in the last 5 minutes"
+       },
+       {
+        "source": "logs",
+        "fact": "tls: handshake error from 10.2.9.31:51044: remote error: tls: bad certificate"
+       },
+       {
+        "source": "logs",
+        "fact": "tls: handshake error from 10.2.9.44:38210: remote error: tls: bad certificate"
+       },
+       {
+        "source": "logs",
+        "fact": "0 successful sessions in the last 5 minutes, 412 handshake failures"
+       }
+      ],
+      "text": "logs: session summary: 1187 partner sessions established in the last 5 minutes; tls: handshake error from 10.2.9.31:51044: remote error: tls: bad certificate; tls: handshake error from 10.2.9.44:38210: remote error: tls: bad certificate; 0 successful sessions in the last 5 minutes, 412 handshake failures."
+     },
+     {
+      "role": "agent",
+      "incident_id": "INC-2026-1501",
+      "ts": "2026-09-14T02:18:00Z",
+      "cited_evidence": [
+       {
+        "source": "metrics",
+        "fact": "certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached 0 seconds at 2026-09-14T02:16:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached -180 seconds at 2026-09-14T02:19:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "tls_handshake_failures_total reached 149 count at 2026-09-14T02:16:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "tls_handshake_failures_total reached 412 count at 2026-09-14T02:19:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "container_cpu_cfs_throttled_seconds_total was 0 seconds at 2026-09-14T02:19:00Z."
+       }
+      ],
+      "text": "metrics: certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached 0 seconds at 2026-09-14T02:16:00Z.; certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached -180 seconds at 2026-09-14T02:19:00Z.; tls_handshake_failures_total reached 149 count at 2026-09-14T02:16:00Z.; tls_handshake_failures_total reached 412 count at 2026-09-14T02:19:00Z.; container_cpu_cfs_throttled_seconds_total was 0 seconds at 2026-09-14T02:19:00Z.."
+     },
+     {
+      "role": "agent",
+      "incident_id": "INC-2026-1501",
+      "ts": "2026-09-14T02:18:00Z",
+      "cited_evidence": [
+       {
+        "source": "kubernetes",
+        "fact": "the event says: the certificate partner-gateway-tls served on :8443 expired at 2026-09-14T02:16:00Z; cert-manager renewal order partner-gateway-tls-4 is in state invalid and the expired secret is still in place"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "the event last_seen is 2026-09-14T02:17:10Z"
+       },
+       {
+        "source": "logs",
+        "fact": "tls: handshake error from 10.2.9.31:51044: remote error: tls: bad certificate"
+       },
+       {
+        "source": "logs",
+        "fact": "tls: handshake error from 10.2.9.44:38210: remote error: tls: bad certificate"
+       },
+       {
+        "source": "logs",
+        "fact": "0 successful sessions in the last 5 minutes, 412 handshake failures"
+       },
+       {
+        "source": "metrics",
+        "fact": "certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached 0 seconds at 2026-09-14T02:16:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached -180 seconds at 2026-09-14T02:19:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "tls_handshake_failures_total reached 412 count at 2026-09-14T02:19:00Z."
+       }
+      ],
+      "text": "root_cause: the event says: the certificate partner-gateway-tls served on :8443 expired at 2026-09-14T02:16:00Z; cert-manager renewal order partner-gateway-tls-4 is in state invalid and the expired secret is still in place; the event last_seen is 2026-09-14T02:17:10Z; tls: handshake error from 10.2.9.31:51044: remote error: tls: bad certificate; tls: handshake error from 10.2.9.44:38210: remote error: tls: bad certificate; 0 successful sessions in the last 5 minutes, 412 handshake failures; certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached 0 seconds at 2026-09-14T02:16:00Z.; certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached -180 seconds at 2026-09-14T02:19:00Z.; tls_handshake_failures_total reached 412 count at 2026-09-14T02:19:00Z.."
+     },
+     {
+      "role": "agent",
+      "incident_id": "INC-2026-1501",
+      "ts": "2026-09-14T02:18:00Z",
+      "text": "Root cause: CERTIFICATE_EXPIRED. The partner-gateway TLS certificate expired at 2026-09-14T02:16:00Z and renewal is in an invalid state, leading clients\u2019 TLS handshakes on :8443 to be rejected with 'bad certificate'. The agent puts its confidence at 92%, which is its own estimate and nothing here checks it.",
+      "cited_evidence": [
+       {
+        "source": "kubernetes",
+        "fact": "the event says: the certificate partner-gateway-tls served on :8443 expired at 2026-09-14T02:16:00Z; cert-manager renewal order partner-gateway-tls-4 is in state invalid and the expired secret is still in place"
+       },
+       {
+        "source": "logs",
+        "fact": "tls: handshake error from 10.2.9.31:51044: remote error: tls: bad certificate"
+       },
+       {
+        "source": "logs",
+        "fact": "tls: handshake error from 10.2.9.44:38210: remote error: tls: bad certificate"
+       },
+       {
+        "source": "logs",
+        "fact": "0 successful sessions in the last 5 minutes, 412 handshake failures"
+       },
+       {
+        "source": "metrics",
+        "fact": "certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached 0 seconds at 2026-09-14T02:16:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached -180 seconds at 2026-09-14T02:19:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "tls_handshake_failures_total reached 412 count at 2026-09-14T02:19:00Z."
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "thread": [
+   "INC-2026-1501: partner-gateway in production \u2014 investigating.",
+   "kubernetes: the event says: the certificate partner-gateway-tls served on :8443 expired at 2026-09-14T02:16:00Z; cert-manager renewal order partner-gateway-tls-4 is in state invalid and the expired secret is still in place; the event last_seen is 2026-09-14T02:17:10Z; the event says: Scaled up replica set partner-gateway-7c4d9f8b65 to 3 for image registry.internal/partner-gateway:5.0.4; the event last_seen is 2026-09-06T10:41:07Z; pod partner-gateway-7c4d9f8b65-j5vwc phase is Running; container partner-gateway ready is true; container partner-gateway restart_count is 0; the deployment image is registry.internal/partner-gateway:5.0.4; the container's cpu limit is 1000m; the container's memory limit is 1Gi.",
+   "logs: session summary: 1187 partner sessions established in the last 5 minutes; tls: handshake error from 10.2.9.31:51044: remote error: tls: bad certificate; tls: handshake error from 10.2.9.44:38210: remote error: tls: bad certificate; 0 successful sessions in the last 5 minutes, 412 handshake failures.",
+   "metrics: certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached 0 seconds at 2026-09-14T02:16:00Z.; certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached -180 seconds at 2026-09-14T02:19:00Z.; tls_handshake_failures_total reached 149 count at 2026-09-14T02:16:00Z.; tls_handshake_failures_total reached 412 count at 2026-09-14T02:19:00Z.; container_cpu_cfs_throttled_seconds_total was 0 seconds at 2026-09-14T02:19:00Z..",
+   "root_cause: the event says: the certificate partner-gateway-tls served on :8443 expired at 2026-09-14T02:16:00Z; cert-manager renewal order partner-gateway-tls-4 is in state invalid and the expired secret is still in place; the event last_seen is 2026-09-14T02:17:10Z; tls: handshake error from 10.2.9.31:51044: remote error: tls: bad certificate; tls: handshake error from 10.2.9.44:38210: remote error: tls: bad certificate; 0 successful sessions in the last 5 minutes, 412 handshake failures; certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached 0 seconds at 2026-09-14T02:16:00Z.; certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached -180 seconds at 2026-09-14T02:19:00Z.; tls_handshake_failures_total reached 412 count at 2026-09-14T02:19:00Z..",
+   "Root cause: CERTIFICATE_EXPIRED. The partner-gateway TLS certificate expired at 2026-09-14T02:16:00Z and renewal is in an invalid state, leading clients\u2019 TLS handshakes on :8443 to be rejected with 'bad certificate'. The agent puts its confidence at 92%, which is its own estimate and nothing here checks it."
+  ],
+  "slack_blocks": [
+   {
+    "type": "header",
+    "text": {
+     "type": "plain_text",
+     "text": ":rotating_light: INC-2026-1501 \u2014 partner-gateway",
+     "emoji": true
+    }
+   },
+   {
+    "type": "context",
+    "elements": [
+     {
+      "type": "mrkdwn",
+      "text": ":wheel_of_dharma: cluster `prod-eu`  \u00b7  :globe_with_meridians: namespace `production`  \u00b7  :test_tube: pod `partner-gateway-7c4d9f8b65-j5vwc`"
+     }
+    ]
+   },
+   {
+    "type": "divider"
+   },
+   {
+    "type": "section",
+    "text": {
+     "type": "mrkdwn",
+     "text": ":ice_cube: *kubernetes* the event says: the certificate partner-gateway-tls served on :8443 expired at 2026-09-14T02:16:00Z; cert-manager renewal order partner-gateway-tls-4 is in state invalid and the expired secret is still in place; the event last_seen is 2026-09-14T02:17:10Z; the event says: Scaled up replica set partner-gateway-7c4d9f8b65 to 3 for image registry.internal/partner-gateway:5.0.4; the event last_seen is 2026-09-06T10:41:07Z; pod partner-gateway-7c4d9f8b65-j5vwc phase is Running; container partner-gateway ready is true; container partner-gateway restart_count is 0; the deployment image is registry.internal/partner-gateway:5.0.4; the container's cpu limit is 1000m; the container's memory limit is 1Gi."
+    }
+   },
+   {
+    "type": "section",
+    "text": {
+     "type": "mrkdwn",
+     "text": ":page_facing_up: *logs* session summary: 1187 partner sessions established in the last 5 minutes; tls: handshake error from 10.2.9.31:51044: remote error: tls: bad certificate; tls: handshake error from 10.2.9.44:38210: remote error: tls: bad certificate; 0 successful sessions in the last 5 minutes, 412 handshake failures."
+    }
+   },
+   {
+    "type": "section",
+    "text": {
+     "type": "mrkdwn",
+     "text": ":bar_chart: *metrics* certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached 0 seconds at 2026-09-14T02:16:00Z.; certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached -180 seconds at 2026-09-14T02:19:00Z.; tls_handshake_failures_total reached 149 count at 2026-09-14T02:16:00Z.; tls_handshake_failures_total reached 412 count at 2026-09-14T02:19:00Z.; container_cpu_cfs_throttled_seconds_total was 0 seconds at 2026-09-14T02:19:00Z.."
+    }
+   },
+   {
+    "type": "divider"
+   },
+   {
+    "type": "section",
+    "text": {
+     "type": "mrkdwn",
+     "text": ":dart: *Root cause:*  `CERTIFICATE_EXPIRED`\nCERTIFICATE_EXPIRED. The partner-gateway TLS certificate expired at 2026-09-14T02:16:00Z and renewal is in an invalid state, leading clients\u2019 TLS handshakes on :8443 to be rejected with 'bad certificate'. The agent puts its confidence at 92%, which is its own estimate and nothing here checks it."
+    }
+   },
+   {
+    "type": "context",
+    "elements": [
+     {
+      "type": "mrkdwn",
+      "text": ":bar_chart: confidence *92%* \u2014 the model's own estimate, nothing here checks it"
+     }
+    ]
+   },
+   {
+    "type": "context",
+    "elements": [
+     {
+      "type": "mrkdwn",
+      "text": ":test_tube: Datadog (simulated): `dd-mock-INC-2026-1501` \u2014 not sent to Datadog"
+     }
+    ]
+   }
+  ],
+  "slack_text": "INC-2026-1501: partner-gateway in production \u2014 investigating.\n\nkubernetes: the event says: the certificate partner-gateway-tls served on :8443 expired at 2026-09-14T02:16:00Z; cert-manager renewal order partner-gateway-tls-4 is in state invalid and the expired secret is still in place; the event last_seen is 2026-09-14T02:17:10Z; the event says: Scaled up replica set partner-gateway-7c4d9f8b65 to 3 for image registry.internal/partner-gateway:5.0.4; the event last_seen is 2026-09-06T10:41:07Z; pod partner-gateway-7c4d9f8b65-j5vwc phase is Running; container partner-gateway ready is true; container partner-gateway restart_count is 0; the deployment image is registry.internal/partner-gateway:5.0.4; the container's cpu limit is 1000m; the container's memory limit is 1Gi.\n\nlogs: session summary: 1187 partner sessions established in the last 5 minutes; tls: handshake error from 10.2.9.31:51044: remote error: tls: bad certificate; tls: handshake error from 10.2.9.44:38210: remote error: tls: bad certificate; 0 successful sessions in the last 5 minutes, 412 handshake failures.\n\nmetrics: certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached 0 seconds at 2026-09-14T02:16:00Z.; certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached -180 seconds at 2026-09-14T02:19:00Z.; tls_handshake_failures_total reached 149 count at 2026-09-14T02:16:00Z.; tls_handshake_failures_total reached 412 count at 2026-09-14T02:19:00Z.; container_cpu_cfs_throttled_seconds_total was 0 seconds at 2026-09-14T02:19:00Z..\n\nroot_cause: the event says: the certificate partner-gateway-tls served on :8443 expired at 2026-09-14T02:16:00Z; cert-manager renewal order partner-gateway-tls-4 is in state invalid and the expired secret is still in place; the event last_seen is 2026-09-14T02:17:10Z; tls: handshake error from 10.2.9.31:51044: remote error: tls: bad certificate; tls: handshake error from 10.2.9.44:38210: remote error: tls: bad certificate; 0 successful sessions in the last 5 minutes, 412 handshake failures; certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached 0 seconds at 2026-09-14T02:16:00Z.; certmanager_certificate_seconds_until_expiry:partner-gateway-tls reached -180 seconds at 2026-09-14T02:19:00Z.; tls_handshake_failures_total reached 412 count at 2026-09-14T02:19:00Z..\n\nRoot cause: CERTIFICATE_EXPIRED. The partner-gateway TLS certificate expired at 2026-09-14T02:16:00Z and renewal is in an invalid state, leading clients\u2019 TLS handshakes on :8443 to be rejected with 'bad certificate'. The agent puts its confidence at 92%, which is its own estimate and nothing here checks it.",
+  "datadog_record": {
+   "provider": "mock-datadog",
+   "simulated": true,
+   "sent": false,
+   "note": "SIMULATED \u2014 no Datadog call was made. A real integration needs its own adapter validated against the Datadog API.",
+   "datadog_incident_id": "dd-mock-INC-2026-1501",
+   "incident_id": "INC-2026-1501",
+   "title": "INC-2026-1501: partner-gateway \u2014 CERTIFICATE_EXPIRED",
+   "severity": "SEV-1",
+   "severity_from_signal": true,
+   "service": "partner-gateway",
+   "root_cause": "CERTIFICATE_EXPIRED",
+   "confidence_pct": 92,
+   "cluster": "prod-eu",
+   "namespace": "production",
+   "pod": "partner-gateway-7c4d9f8b65-j5vwc"
+  },
+  "prompt_versions": {
+   "kubernetes": "392d396b104c",
+   "logs": "3d518a92d4eb",
+   "metrics": "97038bf71973",
+   "root-cause": "b417c9346204"
+  }
+ },
+ "connection-pool-exhausted#23": {
+  "index": 0,
+  "state": "concluded",
+  "scenario": "connection-pool-exhausted",
+  "normalised": 0,
+  "raw_answers": {
+   "kubernetes": "{\n  \"agent\": \"kubernetes\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"the event says: db pool billing-primary at its configured maximum of 20 in-use with 63 waiters; acquire timeouts returned to callers\",\n      \"source_ref\": \"events[0].message\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"the event last_seen is 2026-09-12T16:48:12Z\",\n      \"source_ref\": \"events[0].last_seen\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"the event says: New size: 2; reason: All metrics below target\",\n      \"source_ref\": \"events[1].message\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"the event last_seen is 2026-09-12T16:41:19Z\",\n      \"source_ref\": \"events[1].last_seen\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"the deployment image is registry.internal/billing-api:6.1.0\",\n      \"source_ref\": \"deployment.image\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"deployment replicas desired is 2\",\n      \"source_ref\": \"deployment.replicas.desired\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"deployment replicas ready is 2\",\n      \"source_ref\": \"deployment.replicas.ready\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"deployment replicas available is 2\",\n      \"source_ref\": \"deployment.replicas.available\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"pod billing-api-7f6c4b8d95-r9jkt container billing-api cpu limit is 2000m\",\n      \"source_ref\": \"pods[0].containers[0].limits.cpu\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"pod billing-api-7f6c4b8d95-r9jkt container billing-api memory limit is 2Gi\",\n      \"source_ref\": \"pods[0].containers[0].limits.memory\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"pod billing-api-7f6c4b8d95-wq3bs container billing-api cpu limit is 2000m\",\n      \"source_ref\": \"pods[1].containers[0].limits.cpu\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"pod billing-api-7f6c4b8d95-wq3bs container billing-api memory limit is 2Gi\",\n      \"source_ref\": \"pods[1].containers[0].limits.memory\",\n      \"severity\": \"warning\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.8\n}",
+   "logs": "{\n  \"agent\": \"logs\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"pool: 20 of 20 connections in use, 0 idle\",\n      \"source_ref\": \"lines[0].message\"\n    },\n    {\n      \"fact\": \"acquire from pool waited 4812ms (limit 20, in use 20, waiters 63)\",\n      \"source_ref\": \"lines[1].message\"\n    },\n    {\n      \"fact\": \"POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms\",\n      \"source_ref\": \"lines[2].message\"\n    },\n    {\n      \"fact\": \"POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms\",\n      \"source_ref\": \"lines[3].message\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+   "metrics": "{\n  \"agent\": \"metrics\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"db_connection_pool_in_use_of_20_max:billing-primary was 14 count at 2026-09-12T16:41:00Z.\",\n      \"source_ref\": \"series[0].points[0].value\"\n    },\n    {\n      \"fact\": \"db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:43:00Z.\",\n      \"source_ref\": \"series[0].points[1].value\"\n    },\n    {\n      \"fact\": \"db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:45:00Z.\",\n      \"source_ref\": \"series[0].points[2].value\"\n    },\n    {\n      \"fact\": \"db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:49:00Z.\",\n      \"source_ref\": \"series[0].points[3].value\"\n    },\n    {\n      \"fact\": \"db_query_duration_seconds_p99:billing-primary was 0.011 seconds at 2026-09-12T16:41:00Z.\",\n      \"source_ref\": \"series[1].points[0].value\"\n    },\n    {\n      \"fact\": \"db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:45:00Z.\",\n      \"source_ref\": \"series[1].points[1].value\"\n    },\n    {\n      \"fact\": \"db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:49:00Z.\",\n      \"source_ref\": \"series[1].points[2].value\"\n    },\n    {\n      \"fact\": \"container_cpu_cfs_throttled_seconds_total for billing-api was 0 seconds at 2026-09-12T16:41:00Z.\",\n      \"source_ref\": \"series[2].points[0].value\"\n    },\n    {\n      \"fact\": \"container_cpu_cfs_throttled_seconds_total for billing-api was 0 seconds at 2026-09-12T16:45:00Z.\",\n      \"source_ref\": \"series[2].points[1].value\"\n    },\n    {\n      \"fact\": \"container_cpu_cfs_throttled_seconds_total for billing-api was 0 seconds at 2026-09-12T16:49:00Z.\",\n      \"source_ref\": \"series[2].points[2].value\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.9\n}",
+   "root-cause": "{\n  \"agent\": \"root_cause\",\n  \"status\": \"ok\",\n  \"findings\": [\n    { \"fact\": \"the event says: db pool billing-primary at its configured maximum of 20 in-use with 63 waiters; acquire timeouts returned to callers\", \"source_ref\": \"events[0].message\" },\n    { \"fact\": \"pool: 20 of 20 connections in use, 0 idle\", \"source_ref\": \"lines[0].message\" },\n    { \"fact\": \"acquire from pool waited 4812ms (limit 20, in use 20, waiters 63)\", \"source_ref\": \"lines[1].message\" },\n    { \"fact\": \"POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms\", \"source_ref\": \"lines[2].message\" },\n    { \"fact\": \"POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms\", \"source_ref\": \"lines[3].message\" },\n    { \"fact\": \"db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:43:00Z.\", \"source_ref\": \"series[0].points[1].value\" },\n    { \"fact\": \"db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:45:00Z.\", \"source_ref\": \"series[0].points[2].value\" },\n    { \"fact\": \"db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:49:00Z.\", \"source_ref\": \"series[0].points[3].value\" },\n    { \"fact\": \"db_query_duration_seconds_p99:billing-primary was 0.011 seconds at 2026-09-12T16:41:00Z.\", \"source_ref\": \"series[1].points[0].value\" },\n    { \"fact\": \"db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:45:00Z.\", \"source_ref\": \"series[1].points[1].value\" },\n    { \"fact\": \"db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:49:00Z.\", \"source_ref\": \"series[1].points[2].value\" }\n  ],\n  \"hypotheses\": [\n    {\n      \"code\": \"CONNECTION_POOL_EXHAUSTED\",\n      \"statement\": \"The billing-api exhausted its database connection pool (max 20), with many waiters and 5s acquire timeouts, while the database itself was responding quickly.\",\n      \"supported_by\": [\n        \"events[0].message\",\n        \"lines[0].message\",\n        \"lines[1].message\",\n        \"lines[2].message\",\n        \"lines[3].message\",\n        \"series[0].points[1].value\",\n        \"series[0].points[2].value\",\n        \"series[0].points[3].value\",\n        \"series[1].points[0].value\",\n        \"series[1].points[1].value\",\n        \"series[1].points[2].value\"\n      ]\n    }\n  ],\n  \"confidence\": 0.9\n}"
+  },
+  "usage_by_agent": {
+   "kubernetes": {
+    "prompt_tokens": 4094,
+    "completion_tokens": 3328,
+    "cached_tokens": 3968
+   },
+   "logs": {
+    "prompt_tokens": 1961,
+    "completion_tokens": 596,
+    "cached_tokens": 1792
+   },
+   "metrics": {
+    "prompt_tokens": 2088,
+    "completion_tokens": 1576,
+    "cached_tokens": 1920
+   },
+   "root-cause": {
+    "prompt_tokens": 6030,
+    "completion_tokens": 2924,
+    "cached_tokens": 3968
+   }
+  },
+  "model_by_agent": {
+   "kubernetes": "gpt-5-mini-2025-08-07",
+   "logs": "gpt-5-mini-2025-08-07",
+   "metrics": "gpt-5-mini-2025-08-07",
+   "root-cause": "gpt-5-2025-08-07"
+  },
+  "payloads_sent": {
+   "root-cause": {
+    "incident_id": "INC-2026-1201",
+    "agent_results": [
+     {
+      "agent": "kubernetes",
+      "status": "ok",
+      "findings": [
+       {
+        "fact": "the event says: db pool billing-primary at its configured maximum of 20 in-use with 63 waiters; acquire timeouts returned to callers",
+        "source_ref": "events[0].message",
+        "severity": "warning"
+       },
+       {
+        "fact": "the event last_seen is 2026-09-12T16:48:12Z",
+        "source_ref": "events[0].last_seen",
+        "severity": "warning"
+       },
+       {
+        "fact": "the event says: New size: 2; reason: All metrics below target",
+        "source_ref": "events[1].message",
+        "severity": "warning"
+       },
+       {
+        "fact": "the event last_seen is 2026-09-12T16:41:19Z",
+        "source_ref": "events[1].last_seen",
+        "severity": "warning"
+       },
+       {
+        "fact": "the deployment image is registry.internal/billing-api:6.1.0",
+        "source_ref": "deployment.image",
+        "severity": "warning"
+       },
+       {
+        "fact": "deployment replicas desired is 2",
+        "source_ref": "deployment.replicas.desired",
+        "severity": "warning"
+       },
+       {
+        "fact": "deployment replicas ready is 2",
+        "source_ref": "deployment.replicas.ready",
+        "severity": "warning"
+       },
+       {
+        "fact": "deployment replicas available is 2",
+        "source_ref": "deployment.replicas.available",
+        "severity": "warning"
+       },
+       {
+        "fact": "pod billing-api-7f6c4b8d95-r9jkt container billing-api cpu limit is 2000m",
+        "source_ref": "pods[0].containers[0].limits.cpu",
+        "severity": "warning"
+       },
+       {
+        "fact": "pod billing-api-7f6c4b8d95-r9jkt container billing-api memory limit is 2Gi",
+        "source_ref": "pods[0].containers[0].limits.memory",
+        "severity": "warning"
+       },
+       {
+        "fact": "pod billing-api-7f6c4b8d95-wq3bs container billing-api cpu limit is 2000m",
+        "source_ref": "pods[1].containers[0].limits.cpu",
+        "severity": "warning"
+       },
+       {
+        "fact": "pod billing-api-7f6c4b8d95-wq3bs container billing-api memory limit is 2Gi",
+        "source_ref": "pods[1].containers[0].limits.memory",
+        "severity": "warning"
+       }
+      ],
+      "hypotheses": [],
+      "confidence": 0.8
+     },
+     {
+      "agent": "logs",
+      "status": "ok",
+      "findings": [
+       {
+        "fact": "pool: 20 of 20 connections in use, 0 idle",
+        "source_ref": "lines[0].message"
+       },
+       {
+        "fact": "acquire from pool waited 4812ms (limit 20, in use 20, waiters 63)",
+        "source_ref": "lines[1].message"
+       },
+       {
+        "fact": "POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms",
+        "source_ref": "lines[2].message"
+       },
+       {
+        "fact": "POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms",
+        "source_ref": "lines[3].message"
+       }
+      ],
+      "hypotheses": [],
+      "confidence": 0
+     },
+     {
+      "agent": "metrics",
+      "status": "ok",
+      "findings": [
+       {
+        "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 14 count at 2026-09-12T16:41:00Z.",
+        "source_ref": "series[0].points[0].value"
+       },
+       {
+        "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:43:00Z.",
+        "source_ref": "series[0].points[1].value"
+       },
+       {
+        "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:45:00Z.",
+        "source_ref": "series[0].points[2].value"
+       },
+       {
+        "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:49:00Z.",
+        "source_ref": "series[0].points[3].value"
+       },
+       {
+        "fact": "db_query_duration_seconds_p99:billing-primary was 0.011 seconds at 2026-09-12T16:41:00Z.",
+        "source_ref": "series[1].points[0].value"
+       },
+       {
+        "fact": "db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:45:00Z.",
+        "source_ref": "series[1].points[1].value"
+       },
+       {
+        "fact": "db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:49:00Z.",
+        "source_ref": "series[1].points[2].value"
+       },
+       {
+        "fact": "container_cpu_cfs_throttled_seconds_total for billing-api was 0 seconds at 2026-09-12T16:41:00Z.",
+        "source_ref": "series[2].points[0].value"
+       },
+       {
+        "fact": "container_cpu_cfs_throttled_seconds_total for billing-api was 0 seconds at 2026-09-12T16:45:00Z.",
+        "source_ref": "series[2].points[1].value"
+       },
+       {
+        "fact": "container_cpu_cfs_throttled_seconds_total for billing-api was 0 seconds at 2026-09-12T16:49:00Z.",
+        "source_ref": "series[2].points[2].value"
+       }
+      ],
+      "hypotheses": [],
+      "confidence": 0.9
+     }
+    ],
+    "configuration_read_by_code": [
+     {
+      "slot": "kubernetes",
+      "ref": "pods[0].containers[0].limits.memory",
+      "value": "2Gi",
+      "kind": "resource-limit"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[0].containers[0].limits.cpu",
+      "value": "2000m",
+      "kind": "resource-limit"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[0].containers[0].requests.memory",
+      "value": "1Gi",
+      "kind": "resource-request"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[0].containers[0].requests.cpu",
+      "value": "1000m",
+      "kind": "resource-request"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[0].containers[0].ready",
+      "value": "true",
+      "kind": "container-readiness"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[1].containers[0].limits.memory",
+      "value": "2Gi",
+      "kind": "resource-limit"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[1].containers[0].limits.cpu",
+      "value": "2000m",
+      "kind": "resource-limit"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[1].containers[0].requests.memory",
+      "value": "1Gi",
+      "kind": "resource-request"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[1].containers[0].requests.cpu",
+      "value": "1000m",
+      "kind": "resource-request"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[1].containers[0].ready",
+      "value": "true",
+      "kind": "container-readiness"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "deployment.image",
+      "value": "registry.internal/billing-api:6.1.0",
+      "kind": "deployment-image"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "events[0].last_seen",
+      "value": "2026-09-12T16:48:12Z",
+      "kind": "observed-at"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "events[1].last_seen",
+      "value": "2026-09-12T16:41:19Z",
+      "kind": "observed-at"
+     },
+     {
+      "slot": "logs",
+      "ref": "lines[0].ts",
+      "value": "2026-09-12T16:42:07Z",
+      "kind": "observed-at"
+     },
+     {
+      "slot": "logs",
+      "ref": "lines[1].ts",
+      "value": "2026-09-12T16:44:33Z",
+      "kind": "observed-at"
+     },
+     {
+      "slot": "logs",
+      "ref": "lines[2].ts",
+      "value": "2026-09-12T16:46:12Z",
+      "kind": "observed-at"
+     },
+     {
+      "slot": "logs",
+      "ref": "lines[3].ts",
+      "value": "2026-09-12T16:48:26Z",
+      "kind": "observed-at"
+     },
+     {
+      "slot": "metrics",
+      "ref": "series[0].points[0].value",
+      "value": "14",
+      "kind": "series-endpoint",
+      "ts": "2026-09-12T16:41:00Z",
+      "series": "db_connection_pool_in_use_of_20_max:billing-primary",
+      "unit": "count"
+     },
+     {
+      "slot": "metrics",
+      "ref": "series[0].points[3].value",
+      "value": "20",
+      "kind": "series-endpoint",
+      "ts": "2026-09-12T16:49:00Z",
+      "series": "db_connection_pool_in_use_of_20_max:billing-primary",
+      "unit": "count"
+     },
+     {
+      "slot": "metrics",
+      "ref": "series[1].points[0].value",
+      "value": "0.011",
+      "kind": "series-endpoint",
+      "ts": "2026-09-12T16:41:00Z",
+      "series": "db_query_duration_seconds_p99:billing-primary",
+      "unit": "seconds"
+     },
+     {
+      "slot": "metrics",
+      "ref": "series[1].points[2].value",
+      "value": "0.012",
+      "kind": "series-endpoint",
+      "ts": "2026-09-12T16:49:00Z",
+      "series": "db_query_duration_seconds_p99:billing-primary",
+      "unit": "seconds"
+     },
+     {
+      "slot": "metrics",
+      "ref": "series[2].points[0].value",
+      "value": "0",
+      "kind": "series-endpoint",
+      "ts": "2026-09-12T16:41:00Z",
+      "series": "container_cpu_cfs_throttled_seconds_total",
+      "unit": "seconds"
+     },
+     {
+      "slot": "metrics",
+      "ref": "series[2].points[2].value",
+      "value": "0",
+      "kind": "series-endpoint",
+      "ts": "2026-09-12T16:49:00Z",
+      "series": "container_cpu_cfs_throttled_seconds_total",
+      "unit": "seconds"
+     }
+    ]
+   }
+  },
+  "root_cause_code": "CONNECTION_POOL_EXHAUSTED",
+  "root_cause": "The billing-api exhausted its database connection pool (max 20), with many waiters and 5s acquire timeouts, while the database itself was responding quickly.",
+  "confidence": 0.9,
+  "evidence": [
+   {
+    "source": "kubernetes",
+    "fact": "the event says: db pool billing-primary at its configured maximum of 20 in-use with 63 waiters; acquire timeouts returned to callers",
+    "supports": "for"
+   },
+   {
+    "source": "logs",
+    "fact": "pool: 20 of 20 connections in use, 0 idle",
+    "supports": "for"
+   },
+   {
+    "source": "logs",
+    "fact": "acquire from pool waited 4812ms (limit 20, in use 20, waiters 63)",
+    "supports": "for"
+   },
+   {
+    "source": "logs",
+    "fact": "POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms",
+    "supports": "for"
+   },
+   {
+    "source": "logs",
+    "fact": "POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms",
+    "supports": "for"
+   },
+   {
+    "source": "metrics",
+    "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:43:00Z.",
+    "supports": "for"
+   },
+   {
+    "source": "metrics",
+    "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:45:00Z.",
+    "supports": "for"
+   },
+   {
+    "source": "metrics",
+    "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:49:00Z.",
+    "supports": "for"
+   },
+   {
+    "source": "metrics",
+    "fact": "db_query_duration_seconds_p99:billing-primary was 0.011 seconds at 2026-09-12T16:41:00Z.",
+    "supports": "for"
+   },
+   {
+    "source": "metrics",
+    "fact": "db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:45:00Z.",
+    "supports": "for"
+   },
+   {
+    "source": "metrics",
+    "fact": "db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:49:00Z.",
+    "supports": "for"
+   }
+  ],
+  "incident": {
+   "incident_id": "INC-2026-1201",
+   "status": "diagnosed",
+   "service": "billing-api",
+   "namespace": "production",
+   "cluster": "prod-eu",
+   "started_at": "2026-09-12T16:48:00Z",
+   "scenario": "connection-pool-exhausted",
+   "source": {
+    "provider": "fake-datadog",
+    "alert": {
+     "id": "alert-2f66",
+     "title": "billing-api p99 latency above 5s",
+     "triggered_at": "2026-09-12T16:48:00Z",
+     "severity": "warning",
+     "monitor_id": "mon-3390",
+     "tags": [
+      "service:billing-api",
+      "env:production",
+      "cluster:prod-eu"
+     ]
+    }
+   },
+   "observations": {
+    "kubernetes": {
+     "collected_at": "2026-09-12T16:49:03Z",
+     "pods": [
+      {
+       "name": "billing-api-7f6c4b8d95-r9jkt",
+       "namespace": "production",
+       "phase": "Running",
+       "restart_count": 0,
+       "containers": [
+        {
+         "name": "billing-api",
+         "ready": true,
+         "restart_count": 0,
+         "limits": {
+          "memory": "2Gi",
+          "cpu": "2000m"
+         },
+         "requests": {
+          "memory": "1Gi",
+          "cpu": "1000m"
+         }
+        }
+       ]
+      },
+      {
+       "name": "billing-api-7f6c4b8d95-wq3bs",
+       "namespace": "production",
+       "phase": "Running",
+       "restart_count": 0,
+       "containers": [
+        {
+         "name": "billing-api",
+         "ready": true,
+         "restart_count": 0,
+         "limits": {
+          "memory": "2Gi",
+          "cpu": "2000m"
+         },
+         "requests": {
+          "memory": "1Gi",
+          "cpu": "1000m"
+         }
+        }
+       ]
+      }
+     ],
+     "events": [
+      {
+       "type": "Warning",
+       "reason": "BackendLatency",
+       "count": 74,
+       "last_seen": "2026-09-12T16:48:12Z",
+       "involved_object": "pod/billing-api-7f6c4b8d95-r9jkt",
+       "message": "db pool billing-primary at its configured maximum of 20 in-use with 63 waiters; acquire timeouts returned to callers"
+      },
+      {
+       "type": "Normal",
+       "reason": "SuccessfulRescale",
+       "count": 1,
+       "last_seen": "2026-09-12T16:41:19Z",
+       "involved_object": "horizontalpodautoscaler/billing-api",
+       "message": "New size: 2; reason: All metrics below target"
+      }
+     ],
+     "deployment": {
+      "name": "billing-api",
+      "namespace": "production",
+      "replicas": {
+       "desired": 2,
+       "ready": 2,
+       "available": 2
+      },
+      "image": "registry.internal/billing-api:6.1.0"
+     },
+     "provenance": {
+      "collection_id": "c878dc23-84d9-4609-865c-6cc552d84aa7",
+      "requested_for": "INC-2026-1201",
+      "cluster": "prod-eu",
+      "namespace": "production",
+      "provider": "fake-kubernetes"
+     }
+    },
+    "logs": {
+     "collected_at": "2026-09-12T16:49:05Z",
+     "window": {
+      "from": "2026-09-12T16:40:00Z",
+      "to": "2026-09-12T16:49:00Z"
+     },
+     "truncated": false,
+     "lines": [
+      {
+       "ts": "2026-09-12T16:42:07Z",
+       "level": "info",
+       "container": "billing-api",
+       "message": "pool: 20 of 20 connections in use, 0 idle"
+      },
+      {
+       "ts": "2026-09-12T16:44:33Z",
+       "level": "warn",
+       "container": "billing-api",
+       "message": "acquire from pool waited 4812ms (limit 20, in use 20, waiters 63)"
+      },
+      {
+       "ts": "2026-09-12T16:46:12Z",
+       "level": "error",
+       "container": "billing-api",
+       "message": "POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms"
+      },
+      {
+       "ts": "2026-09-12T16:48:26Z",
+       "level": "error",
+       "container": "billing-api",
+       "message": "POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms"
+      }
+     ],
+     "provenance": {
+      "collection_id": "c878dc23-84d9-4609-865c-6cc552d84aa7",
+      "requested_for": "INC-2026-1201",
+      "cluster": "prod-eu",
+      "namespace": "production",
+      "provider": "fake-logs"
+     }
+    },
+    "metrics": {
+     "collected_at": "2026-09-12T16:49:07Z",
+     "window": {
+      "from": "2026-09-12T16:40:00Z",
+      "to": "2026-09-12T16:49:00Z"
+     },
+     "series": [
+      {
+       "name": "db_connection_pool_in_use_of_20_max:billing-primary",
+       "unit": "count",
+       "container": "billing-api",
+       "points": [
+        {
+         "ts": "2026-09-12T16:41:00Z",
+         "value": 14
+        },
+        {
+         "ts": "2026-09-12T16:43:00Z",
+         "value": 20
+        },
+        {
+         "ts": "2026-09-12T16:45:00Z",
+         "value": 20
+        },
+        {
+         "ts": "2026-09-12T16:49:00Z",
+         "value": 20
+        }
+       ]
+      },
+      {
+       "name": "db_query_duration_seconds_p99:billing-primary",
+       "unit": "seconds",
+       "container": "billing-api",
+       "points": [
+        {
+         "ts": "2026-09-12T16:41:00Z",
+         "value": 0.011
+        },
+        {
+         "ts": "2026-09-12T16:45:00Z",
+         "value": 0.012
+        },
+        {
+         "ts": "2026-09-12T16:49:00Z",
+         "value": 0.012
+        }
+       ]
+      },
+      {
+       "name": "container_cpu_cfs_throttled_seconds_total",
+       "unit": "seconds",
+       "container": "billing-api",
+       "points": [
+        {
+         "ts": "2026-09-12T16:41:00Z",
+         "value": 0
+        },
+        {
+         "ts": "2026-09-12T16:45:00Z",
+         "value": 0
+        },
+        {
+         "ts": "2026-09-12T16:49:00Z",
+         "value": 0
+        }
+       ]
+      }
+     ],
+     "provenance": {
+      "collection_id": "c878dc23-84d9-4609-865c-6cc552d84aa7",
+      "requested_for": "INC-2026-1201",
+      "cluster": "prod-eu",
+      "namespace": "production",
+      "provider": "fake-metrics"
+     }
+    }
+   },
+   "collection": {
+    "kubernetes": {
+     "state": "collected"
+    },
+    "logs": {
+     "state": "collected"
+    },
+    "metrics": {
+     "state": "collected"
+    }
+   },
+   "analysis": {
+    "agents": [
+     {
+      "agent": "kubernetes",
+      "status": "ok",
+      "findings": [
+       {
+        "fact": "the event says: db pool billing-primary at its configured maximum of 20 in-use with 63 waiters; acquire timeouts returned to callers",
+        "source_ref": "events[0].message",
+        "severity": "warning"
+       },
+       {
+        "fact": "the event last_seen is 2026-09-12T16:48:12Z",
+        "source_ref": "events[0].last_seen",
+        "severity": "warning"
+       },
+       {
+        "fact": "the event says: New size: 2; reason: All metrics below target",
+        "source_ref": "events[1].message",
+        "severity": "warning"
+       },
+       {
+        "fact": "the event last_seen is 2026-09-12T16:41:19Z",
+        "source_ref": "events[1].last_seen",
+        "severity": "warning"
+       },
+       {
+        "fact": "the deployment image is registry.internal/billing-api:6.1.0",
+        "source_ref": "deployment.image",
+        "severity": "warning"
+       },
+       {
+        "fact": "deployment replicas desired is 2",
+        "source_ref": "deployment.replicas.desired",
+        "severity": "warning"
+       },
+       {
+        "fact": "deployment replicas ready is 2",
+        "source_ref": "deployment.replicas.ready",
+        "severity": "warning"
+       },
+       {
+        "fact": "deployment replicas available is 2",
+        "source_ref": "deployment.replicas.available",
+        "severity": "warning"
+       },
+       {
+        "fact": "pod billing-api-7f6c4b8d95-r9jkt container billing-api cpu limit is 2000m",
+        "source_ref": "pods[0].containers[0].limits.cpu",
+        "severity": "warning"
+       },
+       {
+        "fact": "pod billing-api-7f6c4b8d95-r9jkt container billing-api memory limit is 2Gi",
+        "source_ref": "pods[0].containers[0].limits.memory",
+        "severity": "warning"
+       },
+       {
+        "fact": "pod billing-api-7f6c4b8d95-wq3bs container billing-api cpu limit is 2000m",
+        "source_ref": "pods[1].containers[0].limits.cpu",
+        "severity": "warning"
+       },
+       {
+        "fact": "pod billing-api-7f6c4b8d95-wq3bs container billing-api memory limit is 2Gi",
+        "source_ref": "pods[1].containers[0].limits.memory",
+        "severity": "warning"
+       }
+      ],
+      "hypotheses": [],
+      "confidence": 0.8
+     },
+     {
+      "agent": "logs",
+      "status": "ok",
+      "findings": [
+       {
+        "fact": "pool: 20 of 20 connections in use, 0 idle",
+        "source_ref": "lines[0].message"
+       },
+       {
+        "fact": "acquire from pool waited 4812ms (limit 20, in use 20, waiters 63)",
+        "source_ref": "lines[1].message"
+       },
+       {
+        "fact": "POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms",
+        "source_ref": "lines[2].message"
+       },
+       {
+        "fact": "POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms",
+        "source_ref": "lines[3].message"
+       }
+      ],
+      "hypotheses": [],
+      "confidence": 0
+     },
+     {
+      "agent": "metrics",
+      "status": "ok",
+      "findings": [
+       {
+        "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 14 count at 2026-09-12T16:41:00Z.",
+        "source_ref": "series[0].points[0].value"
+       },
+       {
+        "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:43:00Z.",
+        "source_ref": "series[0].points[1].value"
+       },
+       {
+        "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:45:00Z.",
+        "source_ref": "series[0].points[2].value"
+       },
+       {
+        "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:49:00Z.",
+        "source_ref": "series[0].points[3].value"
+       },
+       {
+        "fact": "db_query_duration_seconds_p99:billing-primary was 0.011 seconds at 2026-09-12T16:41:00Z.",
+        "source_ref": "series[1].points[0].value"
+       },
+       {
+        "fact": "db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:45:00Z.",
+        "source_ref": "series[1].points[1].value"
+       },
+       {
+        "fact": "db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:49:00Z.",
+        "source_ref": "series[1].points[2].value"
+       },
+       {
+        "fact": "container_cpu_cfs_throttled_seconds_total for billing-api was 0 seconds at 2026-09-12T16:41:00Z.",
+        "source_ref": "series[2].points[0].value"
+       },
+       {
+        "fact": "container_cpu_cfs_throttled_seconds_total for billing-api was 0 seconds at 2026-09-12T16:45:00Z.",
+        "source_ref": "series[2].points[1].value"
+       },
+       {
+        "fact": "container_cpu_cfs_throttled_seconds_total for billing-api was 0 seconds at 2026-09-12T16:49:00Z.",
+        "source_ref": "series[2].points[2].value"
+       }
+      ],
+      "hypotheses": [],
+      "confidence": 0.9
+     },
+     {
+      "agent": "root_cause",
+      "status": "ok",
+      "findings": [
+       {
+        "fact": "the event says: db pool billing-primary at its configured maximum of 20 in-use with 63 waiters; acquire timeouts returned to callers",
+        "source_ref": "events[0].message"
+       },
+       {
+        "fact": "pool: 20 of 20 connections in use, 0 idle",
+        "source_ref": "lines[0].message"
+       },
+       {
+        "fact": "acquire from pool waited 4812ms (limit 20, in use 20, waiters 63)",
+        "source_ref": "lines[1].message"
+       },
+       {
+        "fact": "POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms",
+        "source_ref": "lines[2].message"
+       },
+       {
+        "fact": "POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms",
+        "source_ref": "lines[3].message"
+       },
+       {
+        "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:43:00Z.",
+        "source_ref": "series[0].points[1].value"
+       },
+       {
+        "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:45:00Z.",
+        "source_ref": "series[0].points[2].value"
+       },
+       {
+        "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:49:00Z.",
+        "source_ref": "series[0].points[3].value"
+       },
+       {
+        "fact": "db_query_duration_seconds_p99:billing-primary was 0.011 seconds at 2026-09-12T16:41:00Z.",
+        "source_ref": "series[1].points[0].value"
+       },
+       {
+        "fact": "db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:45:00Z.",
+        "source_ref": "series[1].points[1].value"
+       },
+       {
+        "fact": "db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:49:00Z.",
+        "source_ref": "series[1].points[2].value"
+       }
+      ],
+      "hypotheses": [
+       {
+        "code": "CONNECTION_POOL_EXHAUSTED",
+        "statement": "The billing-api exhausted its database connection pool (max 20), with many waiters and 5s acquire timeouts, while the database itself was responding quickly.",
+        "supported_by": [
+         "events[0].message",
+         "lines[0].message",
+         "lines[1].message",
+         "lines[2].message",
+         "lines[3].message",
+         "series[0].points[1].value",
+         "series[0].points[2].value",
+         "series[0].points[3].value",
+         "series[1].points[0].value",
+         "series[1].points[1].value",
+         "series[1].points[2].value"
+        ]
+       }
+      ],
+      "confidence": 0.9
+     }
+    ],
+    "root_cause_code": "CONNECTION_POOL_EXHAUSTED",
+    "root_cause": "The billing-api exhausted its database connection pool (max 20), with many waiters and 5s acquire timeouts, while the database itself was responding quickly.",
+    "confidence": 0.9,
+    "evidence": [
+     {
+      "source": "kubernetes",
+      "fact": "the event says: db pool billing-primary at its configured maximum of 20 in-use with 63 waiters; acquire timeouts returned to callers",
+      "supports": "for"
+     },
+     {
+      "source": "logs",
+      "fact": "pool: 20 of 20 connections in use, 0 idle",
+      "supports": "for"
+     },
+     {
+      "source": "logs",
+      "fact": "acquire from pool waited 4812ms (limit 20, in use 20, waiters 63)",
+      "supports": "for"
+     },
+     {
+      "source": "logs",
+      "fact": "POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms",
+      "supports": "for"
+     },
+     {
+      "source": "logs",
+      "fact": "POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms",
+      "supports": "for"
+     },
+     {
+      "source": "metrics",
+      "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:43:00Z.",
+      "supports": "for"
+     },
+     {
+      "source": "metrics",
+      "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:45:00Z.",
+      "supports": "for"
+     },
+     {
+      "source": "metrics",
+      "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:49:00Z.",
+      "supports": "for"
+     },
+     {
+      "source": "metrics",
+      "fact": "db_query_duration_seconds_p99:billing-primary was 0.011 seconds at 2026-09-12T16:41:00Z.",
+      "supports": "for"
+     },
+     {
+      "source": "metrics",
+      "fact": "db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:45:00Z.",
+      "supports": "for"
+     },
+     {
+      "source": "metrics",
+      "fact": "db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:49:00Z.",
+      "supports": "for"
+     }
+    ]
+   },
+   "remediation": {
+    "recommended_actions": []
+   },
+   "conversation": {
+    "provider": "fake-slack",
+    "channel_id": "fake-prod-incidents",
+    "thread_id": "thread-INC-2026-1201",
+    "incident_id": "INC-2026-1201",
+    "messages": [
+     {
+      "role": "system",
+      "text": "INC-2026-1201: billing-api in production \u2014 investigating.",
+      "ts": "2026-09-12T16:48:00Z",
+      "incident_id": "INC-2026-1201"
+     },
+     {
+      "role": "agent",
+      "incident_id": "INC-2026-1201",
+      "ts": "2026-09-12T16:48:00Z",
+      "cited_evidence": [
+       {
+        "source": "kubernetes",
+        "fact": "the event says: db pool billing-primary at its configured maximum of 20 in-use with 63 waiters; acquire timeouts returned to callers"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "the event last_seen is 2026-09-12T16:48:12Z"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "the event says: New size: 2; reason: All metrics below target"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "the event last_seen is 2026-09-12T16:41:19Z"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "the deployment image is registry.internal/billing-api:6.1.0"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "deployment replicas desired is 2"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "deployment replicas ready is 2"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "deployment replicas available is 2"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "pod billing-api-7f6c4b8d95-r9jkt container billing-api cpu limit is 2000m"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "pod billing-api-7f6c4b8d95-r9jkt container billing-api memory limit is 2Gi"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "pod billing-api-7f6c4b8d95-wq3bs container billing-api cpu limit is 2000m"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "pod billing-api-7f6c4b8d95-wq3bs container billing-api memory limit is 2Gi"
+       }
+      ],
+      "text": "kubernetes: the event says: db pool billing-primary at its configured maximum of 20 in-use with 63 waiters; acquire timeouts returned to callers; the event last_seen is 2026-09-12T16:48:12Z; the event says: New size: 2; reason: All metrics below target; the event last_seen is 2026-09-12T16:41:19Z; the deployment image is registry.internal/billing-api:6.1.0; deployment replicas desired is 2; deployment replicas ready is 2; deployment replicas available is 2; pod billing-api-7f6c4b8d95-r9jkt container billing-api cpu limit is 2000m; pod billing-api-7f6c4b8d95-r9jkt container billing-api memory limit is 2Gi; pod billing-api-7f6c4b8d95-wq3bs container billing-api cpu limit is 2000m; pod billing-api-7f6c4b8d95-wq3bs container billing-api memory limit is 2Gi."
+     },
+     {
+      "role": "agent",
+      "incident_id": "INC-2026-1201",
+      "ts": "2026-09-12T16:48:00Z",
+      "cited_evidence": [
+       {
+        "source": "logs",
+        "fact": "pool: 20 of 20 connections in use, 0 idle"
+       },
+       {
+        "source": "logs",
+        "fact": "acquire from pool waited 4812ms (limit 20, in use 20, waiters 63)"
+       },
+       {
+        "source": "logs",
+        "fact": "POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms"
+       },
+       {
+        "source": "logs",
+        "fact": "POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms"
+       }
+      ],
+      "text": "logs: pool: 20 of 20 connections in use, 0 idle; acquire from pool waited 4812ms (limit 20, in use 20, waiters 63); POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms; POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms."
+     },
+     {
+      "role": "agent",
+      "incident_id": "INC-2026-1201",
+      "ts": "2026-09-12T16:48:00Z",
+      "cited_evidence": [
+       {
+        "source": "metrics",
+        "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 14 count at 2026-09-12T16:41:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:43:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:45:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:49:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "db_query_duration_seconds_p99:billing-primary was 0.011 seconds at 2026-09-12T16:41:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:45:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:49:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "container_cpu_cfs_throttled_seconds_total for billing-api was 0 seconds at 2026-09-12T16:41:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "container_cpu_cfs_throttled_seconds_total for billing-api was 0 seconds at 2026-09-12T16:45:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "container_cpu_cfs_throttled_seconds_total for billing-api was 0 seconds at 2026-09-12T16:49:00Z."
+       }
+      ],
+      "text": "metrics: db_connection_pool_in_use_of_20_max:billing-primary was 14 count at 2026-09-12T16:41:00Z.; db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:43:00Z.; db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:45:00Z.; db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:49:00Z.; db_query_duration_seconds_p99:billing-primary was 0.011 seconds at 2026-09-12T16:41:00Z.; db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:45:00Z.; db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:49:00Z.; container_cpu_cfs_throttled_seconds_total for billing-api was 0 seconds at 2026-09-12T16:41:00Z.; container_cpu_cfs_throttled_seconds_total for billing-api was 0 seconds at 2026-09-12T16:45:00Z.; container_cpu_cfs_throttled_seconds_total for billing-api was 0 seconds at 2026-09-12T16:49:00Z.."
+     },
+     {
+      "role": "agent",
+      "incident_id": "INC-2026-1201",
+      "ts": "2026-09-12T16:48:00Z",
+      "cited_evidence": [
+       {
+        "source": "kubernetes",
+        "fact": "the event says: db pool billing-primary at its configured maximum of 20 in-use with 63 waiters; acquire timeouts returned to callers"
+       },
+       {
+        "source": "logs",
+        "fact": "pool: 20 of 20 connections in use, 0 idle"
+       },
+       {
+        "source": "logs",
+        "fact": "acquire from pool waited 4812ms (limit 20, in use 20, waiters 63)"
+       },
+       {
+        "source": "logs",
+        "fact": "POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms"
+       },
+       {
+        "source": "logs",
+        "fact": "POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms"
+       },
+       {
+        "source": "metrics",
+        "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:43:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:45:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:49:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "db_query_duration_seconds_p99:billing-primary was 0.011 seconds at 2026-09-12T16:41:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:45:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:49:00Z."
+       }
+      ],
+      "text": "root_cause: the event says: db pool billing-primary at its configured maximum of 20 in-use with 63 waiters; acquire timeouts returned to callers; pool: 20 of 20 connections in use, 0 idle; acquire from pool waited 4812ms (limit 20, in use 20, waiters 63); POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms; POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms; db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:43:00Z.; db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:45:00Z.; db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:49:00Z.; db_query_duration_seconds_p99:billing-primary was 0.011 seconds at 2026-09-12T16:41:00Z.; db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:45:00Z.; db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:49:00Z.."
+     },
+     {
+      "role": "agent",
+      "incident_id": "INC-2026-1201",
+      "ts": "2026-09-12T16:48:00Z",
+      "text": "Root cause: CONNECTION_POOL_EXHAUSTED. The billing-api exhausted its database connection pool (max 20), with many waiters and 5s acquire timeouts, while the database itself was responding quickly. The agent puts its confidence at 90%, which is its own estimate and nothing here checks it.",
+      "cited_evidence": [
+       {
+        "source": "kubernetes",
+        "fact": "the event says: db pool billing-primary at its configured maximum of 20 in-use with 63 waiters; acquire timeouts returned to callers"
+       },
+       {
+        "source": "logs",
+        "fact": "pool: 20 of 20 connections in use, 0 idle"
+       },
+       {
+        "source": "logs",
+        "fact": "acquire from pool waited 4812ms (limit 20, in use 20, waiters 63)"
+       },
+       {
+        "source": "logs",
+        "fact": "POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms"
+       },
+       {
+        "source": "logs",
+        "fact": "POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms"
+       },
+       {
+        "source": "metrics",
+        "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:43:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:45:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:49:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "db_query_duration_seconds_p99:billing-primary was 0.011 seconds at 2026-09-12T16:41:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:45:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:49:00Z."
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "thread": [
+   "INC-2026-1201: billing-api in production \u2014 investigating.",
+   "kubernetes: the event says: db pool billing-primary at its configured maximum of 20 in-use with 63 waiters; acquire timeouts returned to callers; the event last_seen is 2026-09-12T16:48:12Z; the event says: New size: 2; reason: All metrics below target; the event last_seen is 2026-09-12T16:41:19Z; the deployment image is registry.internal/billing-api:6.1.0; deployment replicas desired is 2; deployment replicas ready is 2; deployment replicas available is 2; pod billing-api-7f6c4b8d95-r9jkt container billing-api cpu limit is 2000m; pod billing-api-7f6c4b8d95-r9jkt container billing-api memory limit is 2Gi; pod billing-api-7f6c4b8d95-wq3bs container billing-api cpu limit is 2000m; pod billing-api-7f6c4b8d95-wq3bs container billing-api memory limit is 2Gi.",
+   "logs: pool: 20 of 20 connections in use, 0 idle; acquire from pool waited 4812ms (limit 20, in use 20, waiters 63); POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms; POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms.",
+   "metrics: db_connection_pool_in_use_of_20_max:billing-primary was 14 count at 2026-09-12T16:41:00Z.; db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:43:00Z.; db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:45:00Z.; db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:49:00Z.; db_query_duration_seconds_p99:billing-primary was 0.011 seconds at 2026-09-12T16:41:00Z.; db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:45:00Z.; db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:49:00Z.; container_cpu_cfs_throttled_seconds_total for billing-api was 0 seconds at 2026-09-12T16:41:00Z.; container_cpu_cfs_throttled_seconds_total for billing-api was 0 seconds at 2026-09-12T16:45:00Z.; container_cpu_cfs_throttled_seconds_total for billing-api was 0 seconds at 2026-09-12T16:49:00Z..",
+   "root_cause: the event says: db pool billing-primary at its configured maximum of 20 in-use with 63 waiters; acquire timeouts returned to callers; pool: 20 of 20 connections in use, 0 idle; acquire from pool waited 4812ms (limit 20, in use 20, waiters 63); POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms; POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms; db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:43:00Z.; db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:45:00Z.; db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:49:00Z.; db_query_duration_seconds_p99:billing-primary was 0.011 seconds at 2026-09-12T16:41:00Z.; db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:45:00Z.; db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:49:00Z..",
+   "Root cause: CONNECTION_POOL_EXHAUSTED. The billing-api exhausted its database connection pool (max 20), with many waiters and 5s acquire timeouts, while the database itself was responding quickly. The agent puts its confidence at 90%, which is its own estimate and nothing here checks it."
+  ],
+  "slack_blocks": [
+   {
+    "type": "header",
+    "text": {
+     "type": "plain_text",
+     "text": ":rotating_light: INC-2026-1201 \u2014 billing-api",
+     "emoji": true
+    }
+   },
+   {
+    "type": "context",
+    "elements": [
+     {
+      "type": "mrkdwn",
+      "text": ":wheel_of_dharma: cluster `prod-eu`  \u00b7  :globe_with_meridians: namespace `production`  \u00b7  :test_tube: pod `billing-api-7f6c4b8d95-r9jkt`"
+     }
+    ]
+   },
+   {
+    "type": "divider"
+   },
+   {
+    "type": "section",
+    "text": {
+     "type": "mrkdwn",
+     "text": ":ice_cube: *kubernetes* the event says: db pool billing-primary at its configured maximum of 20 in-use with 63 waiters; acquire timeouts returned to callers; the event last_seen is 2026-09-12T16:48:12Z; the event says: New size: 2; reason: All metrics below target; the event last_seen is 2026-09-12T16:41:19Z; the deployment image is registry.internal/billing-api:6.1.0; deployment replicas desired is 2; deployment replicas ready is 2; deployment replicas available is 2; pod billing-api-7f6c4b8d95-r9jkt container billing-api cpu limit is 2000m; pod billing-api-7f6c4b8d95-r9jkt container billing-api memory limit is 2Gi; pod billing-api-7f6c4b8d95-wq3bs container billing-api cpu limit is 2000m; pod billing-api-7f6c4b8d95-wq3bs container billing-api memory limit is 2Gi."
+    }
+   },
+   {
+    "type": "section",
+    "text": {
+     "type": "mrkdwn",
+     "text": ":page_facing_up: *logs* pool: 20 of 20 connections in use, 0 idle; acquire from pool waited 4812ms (limit 20, in use 20, waiters 63); POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms; POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms."
+    }
+   },
+   {
+    "type": "section",
+    "text": {
+     "type": "mrkdwn",
+     "text": ":bar_chart: *metrics* db_connection_pool_in_use_of_20_max:billing-primary was 14 count at 2026-09-12T16:41:00Z.; db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:43:00Z.; db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:45:00Z.; db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:49:00Z.; db_query_duration_seconds_p99:billing-primary was 0.011 seconds at 2026-09-12T16:41:00Z.; db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:45:00Z.; db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:49:00Z.; container_cpu_cfs_throttled_seconds_total for billing-api was 0 seconds at 2026-09-12T16:41:00Z.; container_cpu_cfs_throttled_seconds_total for billing-api was 0 seconds at 2026-09-12T16:45:00Z.; container_cpu_cfs_throttled_seconds_total for billing-api was 0 seconds at 2026-09-12T16:49:00Z.."
+    }
+   },
+   {
+    "type": "divider"
+   },
+   {
+    "type": "section",
+    "text": {
+     "type": "mrkdwn",
+     "text": ":dart: *Root cause:*  `CONNECTION_POOL_EXHAUSTED`\nCONNECTION_POOL_EXHAUSTED. The billing-api exhausted its database connection pool (max 20), with many waiters and 5s acquire timeouts, while the database itself was responding quickly. The agent puts its confidence at 90%, which is its own estimate and nothing here checks it."
+    }
+   },
+   {
+    "type": "context",
+    "elements": [
+     {
+      "type": "mrkdwn",
+      "text": ":bar_chart: confidence *90%* \u2014 the model's own estimate, nothing here checks it"
+     }
+    ]
+   },
+   {
+    "type": "context",
+    "elements": [
+     {
+      "type": "mrkdwn",
+      "text": ":test_tube: Datadog (simulated): `dd-mock-INC-2026-1201` \u2014 not sent to Datadog"
+     }
+    ]
+   }
+  ],
+  "slack_text": "INC-2026-1201: billing-api in production \u2014 investigating.\n\nkubernetes: the event says: db pool billing-primary at its configured maximum of 20 in-use with 63 waiters; acquire timeouts returned to callers; the event last_seen is 2026-09-12T16:48:12Z; the event says: New size: 2; reason: All metrics below target; the event last_seen is 2026-09-12T16:41:19Z; the deployment image is registry.internal/billing-api:6.1.0; deployment replicas desired is 2; deployment replicas ready is 2; deployment replicas available is 2; pod billing-api-7f6c4b8d95-r9jkt container billing-api cpu limit is 2000m; pod billing-api-7f6c4b8d95-r9jkt container billing-api memory limit is 2Gi; pod billing-api-7f6c4b8d95-wq3bs container billing-api cpu limit is 2000m; pod billing-api-7f6c4b8d95-wq3bs container billing-api memory limit is 2Gi.\n\nlogs: pool: 20 of 20 connections in use, 0 idle; acquire from pool waited 4812ms (limit 20, in use 20, waiters 63); POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms; POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms.\n\nmetrics: db_connection_pool_in_use_of_20_max:billing-primary was 14 count at 2026-09-12T16:41:00Z.; db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:43:00Z.; db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:45:00Z.; db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:49:00Z.; db_query_duration_seconds_p99:billing-primary was 0.011 seconds at 2026-09-12T16:41:00Z.; db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:45:00Z.; db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:49:00Z.; container_cpu_cfs_throttled_seconds_total for billing-api was 0 seconds at 2026-09-12T16:41:00Z.; container_cpu_cfs_throttled_seconds_total for billing-api was 0 seconds at 2026-09-12T16:45:00Z.; container_cpu_cfs_throttled_seconds_total for billing-api was 0 seconds at 2026-09-12T16:49:00Z..\n\nroot_cause: the event says: db pool billing-primary at its configured maximum of 20 in-use with 63 waiters; acquire timeouts returned to callers; pool: 20 of 20 connections in use, 0 idle; acquire from pool waited 4812ms (limit 20, in use 20, waiters 63); POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms; POST /v1/invoices 503: timeout acquiring connection from pool after 5000ms; db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:43:00Z.; db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:45:00Z.; db_connection_pool_in_use_of_20_max:billing-primary was 20 count at 2026-09-12T16:49:00Z.; db_query_duration_seconds_p99:billing-primary was 0.011 seconds at 2026-09-12T16:41:00Z.; db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:45:00Z.; db_query_duration_seconds_p99:billing-primary was 0.012 seconds at 2026-09-12T16:49:00Z..\n\nRoot cause: CONNECTION_POOL_EXHAUSTED. The billing-api exhausted its database connection pool (max 20), with many waiters and 5s acquire timeouts, while the database itself was responding quickly. The agent puts its confidence at 90%, which is its own estimate and nothing here checks it.",
+  "datadog_record": {
+   "provider": "mock-datadog",
+   "simulated": true,
+   "sent": false,
+   "note": "SIMULATED \u2014 no Datadog call was made. A real integration needs its own adapter validated against the Datadog API.",
+   "datadog_incident_id": "dd-mock-INC-2026-1201",
+   "incident_id": "INC-2026-1201",
+   "title": "INC-2026-1201: billing-api \u2014 CONNECTION_POOL_EXHAUSTED",
+   "severity": "SEV-3",
+   "severity_from_signal": true,
+   "service": "billing-api",
+   "root_cause": "CONNECTION_POOL_EXHAUSTED",
+   "confidence_pct": 90,
+   "cluster": "prod-eu",
+   "namespace": "production",
+   "pod": "billing-api-7f6c4b8d95-r9jkt"
+  },
+  "prompt_versions": {
+   "kubernetes": "392d396b104c",
+   "logs": "3d518a92d4eb",
+   "metrics": "97038bf71973",
+   "root-cause": "b417c9346204"
+  }
+ },
+ "network-policy-blocked#23": {
+  "index": 0,
+  "state": "concluded",
+  "scenario": "network-policy-blocked",
+  "normalised": 3,
+  "raw_answers": {
+   "kubernetes": "{\n  \"agent\": \"kubernetes\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"the event says: cni-agent dropped 1284 egress packets from this pod in the last 10 minutes\",\n      \"source_ref\": \"events[0].message\",\n      \"severity\": \"warning\"\n    },\n    {\n      \"fact\": \"pod report-exporter-6c8d5f9b47-k4wzn container report-exporter memory limit is 1Gi\",\n      \"source_ref\": \"pods[0].containers[0].limits.memory\",\n      \"severity\": \"info\"\n    },\n    {\n      \"fact\": \"pod report-exporter-6c8d5f9b47-k4wzn container report-exporter cpu limit is 1000m\",\n      \"source_ref\": \"pods[0].containers[0].limits.cpu\",\n      \"severity\": \"info\"\n    },\n    {\n      \"fact\": \"pod warehouse-api-7d9f6c5b83-m2rvq container warehouse-api memory limit is 2Gi\",\n      \"source_ref\": \"pods[1].containers[0].limits.memory\",\n      \"severity\": \"info\"\n    },\n    {\n      \"fact\": \"pod warehouse-api-7d9f6c5b83-m2rvq container warehouse-api cpu limit is 2000m\",\n      \"source_ref\": \"pods[1].containers[0].limits.cpu\",\n      \"severity\": \"info\"\n    },\n    {\n      \"fact\": \"pod warehouse-api-7d9f6c5b83-p8kdt container warehouse-api memory limit is 2Gi\",\n      \"source_ref\": \"pods[2].containers[0].limits.memory\",\n      \"severity\": \"info\"\n    },\n    {\n      \"fact\": \"pod warehouse-api-7d9f6c5b83-p8kdt container warehouse-api cpu limit is 2000m\",\n      \"source_ref\": \"pods[2].containers[0].limits.cpu\",\n      \"severity\": \"info\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.6\n}",
+   "logs": "{\n  \"agent\": \"logs\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"2026-09-13T15:14:24Z\",\n      \"source_ref\": \"collected_at\"\n    },\n    {\n      \"fact\": \"extract job 2026-09-13 started, 41 partitions\",\n      \"source_ref\": \"lines[0].message\"\n    },\n    {\n      \"fact\": \"GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout\",\n      \"source_ref\": \"lines[1].message\"\n    },\n    {\n      \"fact\": \"GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout\",\n      \"source_ref\": \"lines[2].message\"\n    },\n    {\n      \"fact\": \"extract job aborted: 0 of 41 partitions read, last error dial tcp 10.96.71.4:8443: i/o timeout\",\n      \"source_ref\": \"lines[3].message\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.0\n}",
+   "metrics": "{\n  \"agent\": \"metrics\",\n  \"status\": \"ok\",\n  \"findings\": [\n    {\n      \"fact\": \"cilium_drop_count_total:report-exporter-egress-policy-denied increased from 0 count at 2026-09-13T15:04:00Z to 1284 count at 2026-09-13T15:14:00Z, showing an upward trend.\",\n      \"source_ref\": \"observation.series[0].points[3].value\"\n    },\n    {\n      \"fact\": \"cilium_forward_count_total:report-exporter-egress rose from 90412 count at 2026-09-13T15:04:00Z to 91694 count at 2026-09-13T15:14:00Z.\",\n      \"source_ref\": \"observation.series[1].points[3].value\"\n    },\n    {\n      \"fact\": \"http_requests_failed_ratio for container warehouse-api remained constant at 0.001 (ratio) across 2026-09-13T15:04:00Z, 2026-09-13T15:09:00Z and 2026-09-13T15:14:00Z.\",\n      \"source_ref\": \"observation.series[2].points[2].value\"\n    }\n  ],\n  \"hypotheses\": [],\n  \"confidence\": 0.8\n}",
+   "root-cause": "{\n  \"agent\": \"root_cause\",\n  \"status\": \"ok\",\n  \"findings\": [\n    { \"fact\": \"the event says: cni-agent dropped 1284 egress packets from this pod in the last 10 minutes\", \"source_ref\": \"events[0].message\" },\n    { \"fact\": \"cilium_drop_count_total:report-exporter-egress-policy-denied increased from 0 count at 2026-09-13T15:04:00Z to 1284 count at 2026-09-13T15:14:00Z, showing an upward trend.\", \"source_ref\": \"series[0].points[3].value\" },\n    { \"fact\": \"GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout\", \"source_ref\": \"lines[1].message\" },\n    { \"fact\": \"http_requests_failed_ratio for container warehouse-api remained constant at 0.001 (ratio) across 2026-09-13T15:04:00Z, 2026-09-13T15:09:00Z and 2026-09-13T15:14:00Z.\", \"source_ref\": \"series[2].points[2].value\" }\n  ],\n  \"hypotheses\": [\n    {\n      \"code\": \"NETWORK_POLICY_BLOCKED\",\n      \"statement\": \"Egress from report-exporter to warehouse-api was blocked by network policy/CNI (egress packet drops and Cilium policy-denied counters rose), causing i/o timeouts from the caller while warehouse-api itself remained healthy.\",\n      \"supported_by\": [\n        \"events[0].message\",\n        \"series[0].points[3].value\",\n        \"lines[1].message\",\n        \"series[2].points[2].value\"\n      ]\n    }\n  ],\n  \"confidence\": 0.9\n}"
+  },
+  "usage_by_agent": {
+   "kubernetes": {
+    "prompt_tokens": 4197,
+    "completion_tokens": 2645,
+    "cached_tokens": 4096
+   },
+   "logs": {
+    "prompt_tokens": 2018,
+    "completion_tokens": 811,
+    "cached_tokens": 1920
+   },
+   "metrics": {
+    "prompt_tokens": 2114,
+    "completion_tokens": 1588,
+    "cached_tokens": 2048
+   },
+   "root-cause": {
+    "prompt_tokens": 5896,
+    "completion_tokens": 3252,
+    "cached_tokens": 3968
+   }
+  },
+  "model_by_agent": {
+   "kubernetes": "gpt-5-mini-2025-08-07",
+   "logs": "gpt-5-mini-2025-08-07",
+   "metrics": "gpt-5-mini-2025-08-07",
+   "root-cause": "gpt-5-2025-08-07"
+  },
+  "payloads_sent": {
+   "root-cause": {
+    "incident_id": "INC-2026-1401",
+    "agent_results": [
+     {
+      "agent": "kubernetes",
+      "status": "ok",
+      "findings": [
+       {
+        "fact": "the event says: cni-agent dropped 1284 egress packets from this pod in the last 10 minutes",
+        "source_ref": "events[0].message",
+        "severity": "warning"
+       },
+       {
+        "fact": "pod report-exporter-6c8d5f9b47-k4wzn container report-exporter memory limit is 1Gi",
+        "source_ref": "pods[0].containers[0].limits.memory",
+        "severity": "info"
+       },
+       {
+        "fact": "pod report-exporter-6c8d5f9b47-k4wzn container report-exporter cpu limit is 1000m",
+        "source_ref": "pods[0].containers[0].limits.cpu",
+        "severity": "info"
+       },
+       {
+        "fact": "pod warehouse-api-7d9f6c5b83-m2rvq container warehouse-api memory limit is 2Gi",
+        "source_ref": "pods[1].containers[0].limits.memory",
+        "severity": "info"
+       },
+       {
+        "fact": "pod warehouse-api-7d9f6c5b83-m2rvq container warehouse-api cpu limit is 2000m",
+        "source_ref": "pods[1].containers[0].limits.cpu",
+        "severity": "info"
+       },
+       {
+        "fact": "pod warehouse-api-7d9f6c5b83-p8kdt container warehouse-api memory limit is 2Gi",
+        "source_ref": "pods[2].containers[0].limits.memory",
+        "severity": "info"
+       },
+       {
+        "fact": "pod warehouse-api-7d9f6c5b83-p8kdt container warehouse-api cpu limit is 2000m",
+        "source_ref": "pods[2].containers[0].limits.cpu",
+        "severity": "info"
+       }
+      ],
+      "hypotheses": [],
+      "confidence": 0.6
+     },
+     {
+      "agent": "logs",
+      "status": "ok",
+      "findings": [
+       {
+        "fact": "2026-09-13T15:14:24Z",
+        "source_ref": "collected_at"
+       },
+       {
+        "fact": "extract job 2026-09-13 started, 41 partitions",
+        "source_ref": "lines[0].message"
+       },
+       {
+        "fact": "GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout",
+        "source_ref": "lines[1].message"
+       },
+       {
+        "fact": "GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout",
+        "source_ref": "lines[2].message"
+       },
+       {
+        "fact": "extract job aborted: 0 of 41 partitions read, last error dial tcp 10.96.71.4:8443: i/o timeout",
+        "source_ref": "lines[3].message"
+       }
+      ],
+      "hypotheses": [],
+      "confidence": 0
+     },
+     {
+      "agent": "metrics",
+      "status": "ok",
+      "findings": [
+       {
+        "fact": "cilium_drop_count_total:report-exporter-egress-policy-denied increased from 0 count at 2026-09-13T15:04:00Z to 1284 count at 2026-09-13T15:14:00Z, showing an upward trend.",
+        "source_ref": "series[0].points[3].value"
+       },
+       {
+        "fact": "cilium_forward_count_total:report-exporter-egress rose from 90412 count at 2026-09-13T15:04:00Z to 91694 count at 2026-09-13T15:14:00Z.",
+        "source_ref": "series[1].points[3].value"
+       },
+       {
+        "fact": "http_requests_failed_ratio for container warehouse-api remained constant at 0.001 (ratio) across 2026-09-13T15:04:00Z, 2026-09-13T15:09:00Z and 2026-09-13T15:14:00Z.",
+        "source_ref": "series[2].points[2].value"
+       }
+      ],
+      "hypotheses": [],
+      "confidence": 0.8
+     }
+    ],
+    "configuration_read_by_code": [
+     {
+      "slot": "kubernetes",
+      "ref": "pods[0].containers[0].limits.memory",
+      "value": "1Gi",
+      "kind": "resource-limit"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[0].containers[0].limits.cpu",
+      "value": "1000m",
+      "kind": "resource-limit"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[0].containers[0].requests.memory",
+      "value": "512Mi",
+      "kind": "resource-request"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[0].containers[0].requests.cpu",
+      "value": "500m",
+      "kind": "resource-request"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[0].containers[0].ready",
+      "value": "true",
+      "kind": "container-readiness"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[1].containers[0].limits.memory",
+      "value": "2Gi",
+      "kind": "resource-limit"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[1].containers[0].limits.cpu",
+      "value": "2000m",
+      "kind": "resource-limit"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[1].containers[0].requests.memory",
+      "value": "1Gi",
+      "kind": "resource-request"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[1].containers[0].requests.cpu",
+      "value": "1000m",
+      "kind": "resource-request"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[1].containers[0].ready",
+      "value": "true",
+      "kind": "container-readiness"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[2].containers[0].limits.memory",
+      "value": "2Gi",
+      "kind": "resource-limit"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[2].containers[0].limits.cpu",
+      "value": "2000m",
+      "kind": "resource-limit"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[2].containers[0].requests.memory",
+      "value": "1Gi",
+      "kind": "resource-request"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[2].containers[0].requests.cpu",
+      "value": "1000m",
+      "kind": "resource-request"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "pods[2].containers[0].ready",
+      "value": "true",
+      "kind": "container-readiness"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "deployment.image",
+      "value": "registry.internal/report-exporter:3.2.0",
+      "kind": "deployment-image"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "events[0].last_seen",
+      "value": "2026-09-13T15:12:44Z",
+      "kind": "observed-at"
+     },
+     {
+      "slot": "kubernetes",
+      "ref": "events[1].last_seen",
+      "value": "2026-09-13T06:02:18Z",
+      "kind": "observed-at"
+     },
+     {
+      "slot": "logs",
+      "ref": "lines[0].ts",
+      "value": "2026-09-13T15:04:22Z",
+      "kind": "observed-at"
+     },
+     {
+      "slot": "logs",
+      "ref": "lines[1].ts",
+      "value": "2026-09-13T15:06:51Z",
+      "kind": "observed-at"
+     },
+     {
+      "slot": "logs",
+      "ref": "lines[2].ts",
+      "value": "2026-09-13T15:09:33Z",
+      "kind": "observed-at"
+     },
+     {
+      "slot": "logs",
+      "ref": "lines[3].ts",
+      "value": "2026-09-13T15:12:19Z",
+      "kind": "observed-at"
+     },
+     {
+      "slot": "metrics",
+      "ref": "series[0].points[0].value",
+      "value": "0",
+      "kind": "series-endpoint",
+      "ts": "2026-09-13T15:04:00Z",
+      "series": "cilium_drop_count_total:report-exporter-egress-policy-denied",
+      "unit": "count"
+     },
+     {
+      "slot": "metrics",
+      "ref": "series[0].points[3].value",
+      "value": "1284",
+      "kind": "series-endpoint",
+      "ts": "2026-09-13T15:14:00Z",
+      "series": "cilium_drop_count_total:report-exporter-egress-policy-denied",
+      "unit": "count"
+     },
+     {
+      "slot": "metrics",
+      "ref": "series[1].points[0].value",
+      "value": "90412",
+      "kind": "series-endpoint",
+      "ts": "2026-09-13T15:04:00Z",
+      "series": "cilium_forward_count_total:report-exporter-egress",
+      "unit": "count"
+     },
+     {
+      "slot": "metrics",
+      "ref": "series[1].points[3].value",
+      "value": "91694",
+      "kind": "series-endpoint",
+      "ts": "2026-09-13T15:14:00Z",
+      "series": "cilium_forward_count_total:report-exporter-egress",
+      "unit": "count"
+     },
+     {
+      "slot": "metrics",
+      "ref": "series[2].points[0].value",
+      "value": "0.001",
+      "kind": "series-endpoint",
+      "ts": "2026-09-13T15:04:00Z",
+      "series": "http_requests_failed_ratio",
+      "unit": "ratio"
+     },
+     {
+      "slot": "metrics",
+      "ref": "series[2].points[2].value",
+      "value": "0.001",
+      "kind": "series-endpoint",
+      "ts": "2026-09-13T15:14:00Z",
+      "series": "http_requests_failed_ratio",
+      "unit": "ratio"
+     }
+    ]
+   }
+  },
+  "root_cause_code": "NETWORK_POLICY_BLOCKED",
+  "root_cause": "Egress from report-exporter to warehouse-api was blocked by network policy/CNI (egress packet drops and Cilium policy-denied counters rose), causing i/o timeouts from the caller while warehouse-api itself remained healthy.",
+  "confidence": 0.9,
+  "evidence": [
+   {
+    "source": "kubernetes",
+    "fact": "the event says: cni-agent dropped 1284 egress packets from this pod in the last 10 minutes",
+    "supports": "for"
+   },
+   {
+    "source": "metrics",
+    "fact": "cilium_drop_count_total:report-exporter-egress-policy-denied increased from 0 count at 2026-09-13T15:04:00Z to 1284 count at 2026-09-13T15:14:00Z, showing an upward trend.",
+    "supports": "for"
+   },
+   {
+    "source": "logs",
+    "fact": "GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout",
+    "supports": "for"
+   },
+   {
+    "source": "metrics",
+    "fact": "http_requests_failed_ratio for container warehouse-api remained constant at 0.001 (ratio) across 2026-09-13T15:04:00Z, 2026-09-13T15:09:00Z and 2026-09-13T15:14:00Z.",
+    "supports": "for"
+   }
+  ],
+  "incident": {
+   "incident_id": "INC-2026-1401",
+   "status": "diagnosed",
+   "service": "report-exporter",
+   "namespace": "production",
+   "cluster": "prod-eu",
+   "started_at": "2026-09-13T15:13:00Z",
+   "scenario": "network-policy-blocked",
+   "source": {
+    "provider": "fake-datadog",
+    "alert": {
+     "id": "alert-9e57",
+     "title": "report-exporter nightly extract stalled",
+     "triggered_at": "2026-09-13T15:13:00Z",
+     "severity": "critical",
+     "monitor_id": "mon-5521",
+     "tags": [
+      "service:report-exporter",
+      "env:production",
+      "cluster:prod-eu"
+     ]
+    }
+   },
+   "observations": {
+    "kubernetes": {
+     "collected_at": "2026-09-13T15:14:22Z",
+     "pods": [
+      {
+       "name": "report-exporter-6c8d5f9b47-k4wzn",
+       "namespace": "production",
+       "phase": "Running",
+       "restart_count": 0,
+       "containers": [
+        {
+         "name": "report-exporter",
+         "ready": true,
+         "restart_count": 0,
+         "limits": {
+          "memory": "1Gi",
+          "cpu": "1000m"
+         },
+         "requests": {
+          "memory": "512Mi",
+          "cpu": "500m"
+         }
+        }
+       ]
+      },
+      {
+       "name": "warehouse-api-7d9f6c5b83-m2rvq",
+       "namespace": "production",
+       "phase": "Running",
+       "restart_count": 0,
+       "containers": [
+        {
+         "name": "warehouse-api",
+         "ready": true,
+         "restart_count": 0,
+         "limits": {
+          "memory": "2Gi",
+          "cpu": "2000m"
+         },
+         "requests": {
+          "memory": "1Gi",
+          "cpu": "1000m"
+         }
+        }
+       ]
+      },
+      {
+       "name": "warehouse-api-7d9f6c5b83-p8kdt",
+       "namespace": "production",
+       "phase": "Running",
+       "restart_count": 0,
+       "containers": [
+        {
+         "name": "warehouse-api",
+         "ready": true,
+         "restart_count": 0,
+         "limits": {
+          "memory": "2Gi",
+          "cpu": "2000m"
+         },
+         "requests": {
+          "memory": "1Gi",
+          "cpu": "1000m"
+         }
+        }
+       ]
+      }
+     ],
+     "events": [
+      {
+       "type": "Warning",
+       "reason": "EgressDrop",
+       "count": 1284,
+       "last_seen": "2026-09-13T15:12:44Z",
+       "involved_object": "pod/report-exporter-6c8d5f9b47-k4wzn",
+       "message": "cni-agent dropped 1284 egress packets from this pod in the last 10 minutes"
+      },
+      {
+       "type": "Normal",
+       "reason": "Scheduled",
+       "count": 1,
+       "last_seen": "2026-09-13T06:02:18Z",
+       "involved_object": "pod/report-exporter-6c8d5f9b47-k4wzn",
+       "message": "Successfully assigned production/report-exporter-6c8d5f9b47-k4wzn to ip-10-2-41-77"
+      }
+     ],
+     "deployment": {
+      "name": "report-exporter",
+      "namespace": "production",
+      "replicas": {
+       "desired": 1,
+       "ready": 1,
+       "available": 1
+      },
+      "image": "registry.internal/report-exporter:3.2.0"
+     },
+     "provenance": {
+      "collection_id": "0ba7b656-1291-44aa-8fd3-9dbbabe13453",
+      "requested_for": "INC-2026-1401",
+      "cluster": "prod-eu",
+      "namespace": "production",
+      "provider": "fake-kubernetes"
+     }
+    },
+    "logs": {
+     "collected_at": "2026-09-13T15:14:24Z",
+     "window": {
+      "from": "2026-09-13T15:03:00Z",
+      "to": "2026-09-13T15:14:00Z"
+     },
+     "truncated": false,
+     "lines": [
+      {
+       "ts": "2026-09-13T15:04:22Z",
+       "level": "info",
+       "container": "report-exporter",
+       "message": "extract job 2026-09-13 started, 41 partitions"
+      },
+      {
+       "ts": "2026-09-13T15:06:51Z",
+       "level": "warn",
+       "container": "report-exporter",
+       "message": "GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout"
+      },
+      {
+       "ts": "2026-09-13T15:09:33Z",
+       "level": "warn",
+       "container": "report-exporter",
+       "message": "GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout"
+      },
+      {
+       "ts": "2026-09-13T15:12:19Z",
+       "level": "error",
+       "container": "report-exporter",
+       "message": "extract job aborted: 0 of 41 partitions read, last error dial tcp 10.96.71.4:8443: i/o timeout"
+      }
+     ],
+     "provenance": {
+      "collection_id": "0ba7b656-1291-44aa-8fd3-9dbbabe13453",
+      "requested_for": "INC-2026-1401",
+      "cluster": "prod-eu",
+      "namespace": "production",
+      "provider": "fake-logs"
+     }
+    },
+    "metrics": {
+     "collected_at": "2026-09-13T15:14:26Z",
+     "window": {
+      "from": "2026-09-13T15:03:00Z",
+      "to": "2026-09-13T15:14:00Z"
+     },
+     "series": [
+      {
+       "name": "cilium_drop_count_total:report-exporter-egress-policy-denied",
+       "unit": "count",
+       "container": "report-exporter",
+       "points": [
+        {
+         "ts": "2026-09-13T15:04:00Z",
+         "value": 0
+        },
+        {
+         "ts": "2026-09-13T15:06:00Z",
+         "value": 218
+        },
+        {
+         "ts": "2026-09-13T15:09:00Z",
+         "value": 741
+        },
+        {
+         "ts": "2026-09-13T15:14:00Z",
+         "value": 1284
+        }
+       ]
+      },
+      {
+       "name": "cilium_forward_count_total:report-exporter-egress",
+       "unit": "count",
+       "container": "report-exporter",
+       "points": [
+        {
+         "ts": "2026-09-13T15:04:00Z",
+         "value": 90412
+        },
+        {
+         "ts": "2026-09-13T15:06:00Z",
+         "value": 90788
+        },
+        {
+         "ts": "2026-09-13T15:09:00Z",
+         "value": 91240
+        },
+        {
+         "ts": "2026-09-13T15:14:00Z",
+         "value": 91694
+        }
+       ]
+      },
+      {
+       "name": "http_requests_failed_ratio",
+       "unit": "ratio",
+       "container": "warehouse-api",
+       "points": [
+        {
+         "ts": "2026-09-13T15:04:00Z",
+         "value": 0.001
+        },
+        {
+         "ts": "2026-09-13T15:09:00Z",
+         "value": 0.001
+        },
+        {
+         "ts": "2026-09-13T15:14:00Z",
+         "value": 0.001
+        }
+       ]
+      }
+     ],
+     "provenance": {
+      "collection_id": "0ba7b656-1291-44aa-8fd3-9dbbabe13453",
+      "requested_for": "INC-2026-1401",
+      "cluster": "prod-eu",
+      "namespace": "production",
+      "provider": "fake-metrics"
+     }
+    }
+   },
+   "collection": {
+    "kubernetes": {
+     "state": "collected"
+    },
+    "logs": {
+     "state": "collected"
+    },
+    "metrics": {
+     "state": "collected"
+    }
+   },
+   "analysis": {
+    "agents": [
+     {
+      "agent": "kubernetes",
+      "status": "ok",
+      "findings": [
+       {
+        "fact": "the event says: cni-agent dropped 1284 egress packets from this pod in the last 10 minutes",
+        "source_ref": "events[0].message",
+        "severity": "warning"
+       },
+       {
+        "fact": "pod report-exporter-6c8d5f9b47-k4wzn container report-exporter memory limit is 1Gi",
+        "source_ref": "pods[0].containers[0].limits.memory",
+        "severity": "info"
+       },
+       {
+        "fact": "pod report-exporter-6c8d5f9b47-k4wzn container report-exporter cpu limit is 1000m",
+        "source_ref": "pods[0].containers[0].limits.cpu",
+        "severity": "info"
+       },
+       {
+        "fact": "pod warehouse-api-7d9f6c5b83-m2rvq container warehouse-api memory limit is 2Gi",
+        "source_ref": "pods[1].containers[0].limits.memory",
+        "severity": "info"
+       },
+       {
+        "fact": "pod warehouse-api-7d9f6c5b83-m2rvq container warehouse-api cpu limit is 2000m",
+        "source_ref": "pods[1].containers[0].limits.cpu",
+        "severity": "info"
+       },
+       {
+        "fact": "pod warehouse-api-7d9f6c5b83-p8kdt container warehouse-api memory limit is 2Gi",
+        "source_ref": "pods[2].containers[0].limits.memory",
+        "severity": "info"
+       },
+       {
+        "fact": "pod warehouse-api-7d9f6c5b83-p8kdt container warehouse-api cpu limit is 2000m",
+        "source_ref": "pods[2].containers[0].limits.cpu",
+        "severity": "info"
+       }
+      ],
+      "hypotheses": [],
+      "confidence": 0.6
+     },
+     {
+      "agent": "logs",
+      "status": "ok",
+      "findings": [
+       {
+        "fact": "2026-09-13T15:14:24Z",
+        "source_ref": "collected_at"
+       },
+       {
+        "fact": "extract job 2026-09-13 started, 41 partitions",
+        "source_ref": "lines[0].message"
+       },
+       {
+        "fact": "GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout",
+        "source_ref": "lines[1].message"
+       },
+       {
+        "fact": "GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout",
+        "source_ref": "lines[2].message"
+       },
+       {
+        "fact": "extract job aborted: 0 of 41 partitions read, last error dial tcp 10.96.71.4:8443: i/o timeout",
+        "source_ref": "lines[3].message"
+       }
+      ],
+      "hypotheses": [],
+      "confidence": 0
+     },
+     {
+      "agent": "metrics",
+      "status": "ok",
+      "findings": [
+       {
+        "fact": "cilium_drop_count_total:report-exporter-egress-policy-denied increased from 0 count at 2026-09-13T15:04:00Z to 1284 count at 2026-09-13T15:14:00Z, showing an upward trend.",
+        "source_ref": "series[0].points[3].value"
+       },
+       {
+        "fact": "cilium_forward_count_total:report-exporter-egress rose from 90412 count at 2026-09-13T15:04:00Z to 91694 count at 2026-09-13T15:14:00Z.",
+        "source_ref": "series[1].points[3].value"
+       },
+       {
+        "fact": "http_requests_failed_ratio for container warehouse-api remained constant at 0.001 (ratio) across 2026-09-13T15:04:00Z, 2026-09-13T15:09:00Z and 2026-09-13T15:14:00Z.",
+        "source_ref": "series[2].points[2].value"
+       }
+      ],
+      "hypotheses": [],
+      "confidence": 0.8
+     },
+     {
+      "agent": "root_cause",
+      "status": "ok",
+      "findings": [
+       {
+        "fact": "the event says: cni-agent dropped 1284 egress packets from this pod in the last 10 minutes",
+        "source_ref": "events[0].message"
+       },
+       {
+        "fact": "cilium_drop_count_total:report-exporter-egress-policy-denied increased from 0 count at 2026-09-13T15:04:00Z to 1284 count at 2026-09-13T15:14:00Z, showing an upward trend.",
+        "source_ref": "series[0].points[3].value"
+       },
+       {
+        "fact": "GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout",
+        "source_ref": "lines[1].message"
+       },
+       {
+        "fact": "http_requests_failed_ratio for container warehouse-api remained constant at 0.001 (ratio) across 2026-09-13T15:04:00Z, 2026-09-13T15:09:00Z and 2026-09-13T15:14:00Z.",
+        "source_ref": "series[2].points[2].value"
+       }
+      ],
+      "hypotheses": [
+       {
+        "code": "NETWORK_POLICY_BLOCKED",
+        "statement": "Egress from report-exporter to warehouse-api was blocked by network policy/CNI (egress packet drops and Cilium policy-denied counters rose), causing i/o timeouts from the caller while warehouse-api itself remained healthy.",
+        "supported_by": [
+         "events[0].message",
+         "series[0].points[3].value",
+         "lines[1].message",
+         "series[2].points[2].value"
+        ]
+       }
+      ],
+      "confidence": 0.9
+     }
+    ],
+    "root_cause_code": "NETWORK_POLICY_BLOCKED",
+    "root_cause": "Egress from report-exporter to warehouse-api was blocked by network policy/CNI (egress packet drops and Cilium policy-denied counters rose), causing i/o timeouts from the caller while warehouse-api itself remained healthy.",
+    "confidence": 0.9,
+    "evidence": [
+     {
+      "source": "kubernetes",
+      "fact": "the event says: cni-agent dropped 1284 egress packets from this pod in the last 10 minutes",
+      "supports": "for"
+     },
+     {
+      "source": "metrics",
+      "fact": "cilium_drop_count_total:report-exporter-egress-policy-denied increased from 0 count at 2026-09-13T15:04:00Z to 1284 count at 2026-09-13T15:14:00Z, showing an upward trend.",
+      "supports": "for"
+     },
+     {
+      "source": "logs",
+      "fact": "GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout",
+      "supports": "for"
+     },
+     {
+      "source": "metrics",
+      "fact": "http_requests_failed_ratio for container warehouse-api remained constant at 0.001 (ratio) across 2026-09-13T15:04:00Z, 2026-09-13T15:09:00Z and 2026-09-13T15:14:00Z.",
+      "supports": "for"
+     }
+    ]
+   },
+   "remediation": {
+    "recommended_actions": []
+   },
+   "conversation": {
+    "provider": "fake-slack",
+    "channel_id": "fake-prod-incidents",
+    "thread_id": "thread-INC-2026-1401",
+    "incident_id": "INC-2026-1401",
+    "messages": [
+     {
+      "role": "system",
+      "text": "INC-2026-1401: report-exporter in production \u2014 investigating.",
+      "ts": "2026-09-13T15:13:00Z",
+      "incident_id": "INC-2026-1401"
+     },
+     {
+      "role": "agent",
+      "incident_id": "INC-2026-1401",
+      "ts": "2026-09-13T15:13:00Z",
+      "cited_evidence": [
+       {
+        "source": "kubernetes",
+        "fact": "the event says: cni-agent dropped 1284 egress packets from this pod in the last 10 minutes"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "pod report-exporter-6c8d5f9b47-k4wzn container report-exporter memory limit is 1Gi"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "pod report-exporter-6c8d5f9b47-k4wzn container report-exporter cpu limit is 1000m"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "pod warehouse-api-7d9f6c5b83-m2rvq container warehouse-api memory limit is 2Gi"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "pod warehouse-api-7d9f6c5b83-m2rvq container warehouse-api cpu limit is 2000m"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "pod warehouse-api-7d9f6c5b83-p8kdt container warehouse-api memory limit is 2Gi"
+       },
+       {
+        "source": "kubernetes",
+        "fact": "pod warehouse-api-7d9f6c5b83-p8kdt container warehouse-api cpu limit is 2000m"
+       }
+      ],
+      "text": "kubernetes: the event says: cni-agent dropped 1284 egress packets from this pod in the last 10 minutes; pod report-exporter-6c8d5f9b47-k4wzn container report-exporter memory limit is 1Gi; pod report-exporter-6c8d5f9b47-k4wzn container report-exporter cpu limit is 1000m; pod warehouse-api-7d9f6c5b83-m2rvq container warehouse-api memory limit is 2Gi; pod warehouse-api-7d9f6c5b83-m2rvq container warehouse-api cpu limit is 2000m; pod warehouse-api-7d9f6c5b83-p8kdt container warehouse-api memory limit is 2Gi; pod warehouse-api-7d9f6c5b83-p8kdt container warehouse-api cpu limit is 2000m."
+     },
+     {
+      "role": "agent",
+      "incident_id": "INC-2026-1401",
+      "ts": "2026-09-13T15:13:00Z",
+      "cited_evidence": [
+       {
+        "source": "logs",
+        "fact": "2026-09-13T15:14:24Z"
+       },
+       {
+        "source": "logs",
+        "fact": "extract job 2026-09-13 started, 41 partitions"
+       },
+       {
+        "source": "logs",
+        "fact": "GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout"
+       },
+       {
+        "source": "logs",
+        "fact": "GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout"
+       },
+       {
+        "source": "logs",
+        "fact": "extract job aborted: 0 of 41 partitions read, last error dial tcp 10.96.71.4:8443: i/o timeout"
+       }
+      ],
+      "text": "logs: 2026-09-13T15:14:24Z; extract job 2026-09-13 started, 41 partitions; GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout; GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout; extract job aborted: 0 of 41 partitions read, last error dial tcp 10.96.71.4:8443: i/o timeout."
+     },
+     {
+      "role": "agent",
+      "incident_id": "INC-2026-1401",
+      "ts": "2026-09-13T15:13:00Z",
+      "cited_evidence": [
+       {
+        "source": "metrics",
+        "fact": "cilium_drop_count_total:report-exporter-egress-policy-denied increased from 0 count at 2026-09-13T15:04:00Z to 1284 count at 2026-09-13T15:14:00Z, showing an upward trend."
+       },
+       {
+        "source": "metrics",
+        "fact": "cilium_forward_count_total:report-exporter-egress rose from 90412 count at 2026-09-13T15:04:00Z to 91694 count at 2026-09-13T15:14:00Z."
+       },
+       {
+        "source": "metrics",
+        "fact": "http_requests_failed_ratio for container warehouse-api remained constant at 0.001 (ratio) across 2026-09-13T15:04:00Z, 2026-09-13T15:09:00Z and 2026-09-13T15:14:00Z."
+       }
+      ],
+      "text": "metrics: cilium_drop_count_total:report-exporter-egress-policy-denied increased from 0 count at 2026-09-13T15:04:00Z to 1284 count at 2026-09-13T15:14:00Z, showing an upward trend.; cilium_forward_count_total:report-exporter-egress rose from 90412 count at 2026-09-13T15:04:00Z to 91694 count at 2026-09-13T15:14:00Z.; http_requests_failed_ratio for container warehouse-api remained constant at 0.001 (ratio) across 2026-09-13T15:04:00Z, 2026-09-13T15:09:00Z and 2026-09-13T15:14:00Z.."
+     },
+     {
+      "role": "agent",
+      "incident_id": "INC-2026-1401",
+      "ts": "2026-09-13T15:13:00Z",
+      "cited_evidence": [
+       {
+        "source": "kubernetes",
+        "fact": "the event says: cni-agent dropped 1284 egress packets from this pod in the last 10 minutes"
+       },
+       {
+        "source": "metrics",
+        "fact": "cilium_drop_count_total:report-exporter-egress-policy-denied increased from 0 count at 2026-09-13T15:04:00Z to 1284 count at 2026-09-13T15:14:00Z, showing an upward trend."
+       },
+       {
+        "source": "logs",
+        "fact": "GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout"
+       },
+       {
+        "source": "metrics",
+        "fact": "http_requests_failed_ratio for container warehouse-api remained constant at 0.001 (ratio) across 2026-09-13T15:04:00Z, 2026-09-13T15:09:00Z and 2026-09-13T15:14:00Z."
+       }
+      ],
+      "text": "root_cause: the event says: cni-agent dropped 1284 egress packets from this pod in the last 10 minutes; cilium_drop_count_total:report-exporter-egress-policy-denied increased from 0 count at 2026-09-13T15:04:00Z to 1284 count at 2026-09-13T15:14:00Z, showing an upward trend.; GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout; http_requests_failed_ratio for container warehouse-api remained constant at 0.001 (ratio) across 2026-09-13T15:04:00Z, 2026-09-13T15:09:00Z and 2026-09-13T15:14:00Z.."
+     },
+     {
+      "role": "agent",
+      "incident_id": "INC-2026-1401",
+      "ts": "2026-09-13T15:13:00Z",
+      "text": "Root cause: NETWORK_POLICY_BLOCKED. Egress from report-exporter to warehouse-api was blocked by network policy/CNI (egress packet drops and Cilium policy-denied counters rose), causing i/o timeouts from the caller while warehouse-api itself remained healthy. The agent puts its confidence at 90%, which is its own estimate and nothing here checks it.",
+      "cited_evidence": [
+       {
+        "source": "kubernetes",
+        "fact": "the event says: cni-agent dropped 1284 egress packets from this pod in the last 10 minutes"
+       },
+       {
+        "source": "metrics",
+        "fact": "cilium_drop_count_total:report-exporter-egress-policy-denied increased from 0 count at 2026-09-13T15:04:00Z to 1284 count at 2026-09-13T15:14:00Z, showing an upward trend."
+       },
+       {
+        "source": "logs",
+        "fact": "GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout"
+       },
+       {
+        "source": "metrics",
+        "fact": "http_requests_failed_ratio for container warehouse-api remained constant at 0.001 (ratio) across 2026-09-13T15:04:00Z, 2026-09-13T15:09:00Z and 2026-09-13T15:14:00Z."
+       }
+      ]
+     }
+    ]
+   }
+  },
+  "thread": [
+   "INC-2026-1401: report-exporter in production \u2014 investigating.",
+   "kubernetes: the event says: cni-agent dropped 1284 egress packets from this pod in the last 10 minutes; pod report-exporter-6c8d5f9b47-k4wzn container report-exporter memory limit is 1Gi; pod report-exporter-6c8d5f9b47-k4wzn container report-exporter cpu limit is 1000m; pod warehouse-api-7d9f6c5b83-m2rvq container warehouse-api memory limit is 2Gi; pod warehouse-api-7d9f6c5b83-m2rvq container warehouse-api cpu limit is 2000m; pod warehouse-api-7d9f6c5b83-p8kdt container warehouse-api memory limit is 2Gi; pod warehouse-api-7d9f6c5b83-p8kdt container warehouse-api cpu limit is 2000m.",
+   "logs: 2026-09-13T15:14:24Z; extract job 2026-09-13 started, 41 partitions; GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout; GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout; extract job aborted: 0 of 41 partitions read, last error dial tcp 10.96.71.4:8443: i/o timeout.",
+   "metrics: cilium_drop_count_total:report-exporter-egress-policy-denied increased from 0 count at 2026-09-13T15:04:00Z to 1284 count at 2026-09-13T15:14:00Z, showing an upward trend.; cilium_forward_count_total:report-exporter-egress rose from 90412 count at 2026-09-13T15:04:00Z to 91694 count at 2026-09-13T15:14:00Z.; http_requests_failed_ratio for container warehouse-api remained constant at 0.001 (ratio) across 2026-09-13T15:04:00Z, 2026-09-13T15:09:00Z and 2026-09-13T15:14:00Z..",
+   "root_cause: the event says: cni-agent dropped 1284 egress packets from this pod in the last 10 minutes; cilium_drop_count_total:report-exporter-egress-policy-denied increased from 0 count at 2026-09-13T15:04:00Z to 1284 count at 2026-09-13T15:14:00Z, showing an upward trend.; GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout; http_requests_failed_ratio for container warehouse-api remained constant at 0.001 (ratio) across 2026-09-13T15:04:00Z, 2026-09-13T15:09:00Z and 2026-09-13T15:14:00Z..",
+   "Root cause: NETWORK_POLICY_BLOCKED. Egress from report-exporter to warehouse-api was blocked by network policy/CNI (egress packet drops and Cilium policy-denied counters rose), causing i/o timeouts from the caller while warehouse-api itself remained healthy. The agent puts its confidence at 90%, which is its own estimate and nothing here checks it."
+  ],
+  "slack_blocks": [
+   {
+    "type": "header",
+    "text": {
+     "type": "plain_text",
+     "text": ":rotating_light: INC-2026-1401 \u2014 report-exporter",
+     "emoji": true
+    }
+   },
+   {
+    "type": "context",
+    "elements": [
+     {
+      "type": "mrkdwn",
+      "text": ":wheel_of_dharma: cluster `prod-eu`  \u00b7  :globe_with_meridians: namespace `production`  \u00b7  :test_tube: pod `report-exporter-6c8d5f9b47-k4wzn`"
+     }
+    ]
+   },
+   {
+    "type": "divider"
+   },
+   {
+    "type": "section",
+    "text": {
+     "type": "mrkdwn",
+     "text": ":ice_cube: *kubernetes* the event says: cni-agent dropped 1284 egress packets from this pod in the last 10 minutes; pod report-exporter-6c8d5f9b47-k4wzn container report-exporter memory limit is 1Gi; pod report-exporter-6c8d5f9b47-k4wzn container report-exporter cpu limit is 1000m; pod warehouse-api-7d9f6c5b83-m2rvq container warehouse-api memory limit is 2Gi; pod warehouse-api-7d9f6c5b83-m2rvq container warehouse-api cpu limit is 2000m; pod warehouse-api-7d9f6c5b83-p8kdt container warehouse-api memory limit is 2Gi; pod warehouse-api-7d9f6c5b83-p8kdt container warehouse-api cpu limit is 2000m."
+    }
+   },
+   {
+    "type": "section",
+    "text": {
+     "type": "mrkdwn",
+     "text": ":page_facing_up: *logs* 2026-09-13T15:14:24Z; extract job 2026-09-13 started, 41 partitions; GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout; GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout; extract job aborted: 0 of 41 partitions read, last error dial tcp 10.96.71.4:8443: i/o timeout."
+    }
+   },
+   {
+    "type": "section",
+    "text": {
+     "type": "mrkdwn",
+     "text": ":bar_chart: *metrics* cilium_drop_count_total:report-exporter-egress-policy-denied increased from 0 count at 2026-09-13T15:04:00Z to 1284 count at 2026-09-13T15:14:00Z, showing an upward trend.; cilium_forward_count_total:report-exporter-egress rose from 90412 count at 2026-09-13T15:04:00Z to 91694 count at 2026-09-13T15:14:00Z.; http_requests_failed_ratio for container warehouse-api remained constant at 0.001 (ratio) across 2026-09-13T15:04:00Z, 2026-09-13T15:09:00Z and 2026-09-13T15:14:00Z.."
+    }
+   },
+   {
+    "type": "divider"
+   },
+   {
+    "type": "section",
+    "text": {
+     "type": "mrkdwn",
+     "text": ":dart: *Root cause:*  `NETWORK_POLICY_BLOCKED`\nNETWORK_POLICY_BLOCKED. Egress from report-exporter to warehouse-api was blocked by network policy/CNI (egress packet drops and Cilium policy-denied counters rose), causing i/o timeouts from the caller while warehouse-api itself remained healthy. The agent puts its confidence at 90%, which is its own estimate and nothing here checks it."
+    }
+   },
+   {
+    "type": "context",
+    "elements": [
+     {
+      "type": "mrkdwn",
+      "text": ":bar_chart: confidence *90%* \u2014 the model's own estimate, nothing here checks it"
+     }
+    ]
+   },
+   {
+    "type": "context",
+    "elements": [
+     {
+      "type": "mrkdwn",
+      "text": ":test_tube: Datadog (simulated): `dd-mock-INC-2026-1401` \u2014 not sent to Datadog"
+     }
+    ]
+   }
+  ],
+  "slack_text": "INC-2026-1401: report-exporter in production \u2014 investigating.\n\nkubernetes: the event says: cni-agent dropped 1284 egress packets from this pod in the last 10 minutes; pod report-exporter-6c8d5f9b47-k4wzn container report-exporter memory limit is 1Gi; pod report-exporter-6c8d5f9b47-k4wzn container report-exporter cpu limit is 1000m; pod warehouse-api-7d9f6c5b83-m2rvq container warehouse-api memory limit is 2Gi; pod warehouse-api-7d9f6c5b83-m2rvq container warehouse-api cpu limit is 2000m; pod warehouse-api-7d9f6c5b83-p8kdt container warehouse-api memory limit is 2Gi; pod warehouse-api-7d9f6c5b83-p8kdt container warehouse-api cpu limit is 2000m.\n\nlogs: 2026-09-13T15:14:24Z; extract job 2026-09-13 started, 41 partitions; GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout; GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout; extract job aborted: 0 of 41 partitions read, last error dial tcp 10.96.71.4:8443: i/o timeout.\n\nmetrics: cilium_drop_count_total:report-exporter-egress-policy-denied increased from 0 count at 2026-09-13T15:04:00Z to 1284 count at 2026-09-13T15:14:00Z, showing an upward trend.; cilium_forward_count_total:report-exporter-egress rose from 90412 count at 2026-09-13T15:04:00Z to 91694 count at 2026-09-13T15:14:00Z.; http_requests_failed_ratio for container warehouse-api remained constant at 0.001 (ratio) across 2026-09-13T15:04:00Z, 2026-09-13T15:09:00Z and 2026-09-13T15:14:00Z..\n\nroot_cause: the event says: cni-agent dropped 1284 egress packets from this pod in the last 10 minutes; cilium_drop_count_total:report-exporter-egress-policy-denied increased from 0 count at 2026-09-13T15:04:00Z to 1284 count at 2026-09-13T15:14:00Z, showing an upward trend.; GET https://warehouse-api.production.svc.cluster.local:8443/v1/partitions timed out after 30s: dial tcp 10.96.71.4:8443: i/o timeout; http_requests_failed_ratio for container warehouse-api remained constant at 0.001 (ratio) across 2026-09-13T15:04:00Z, 2026-09-13T15:09:00Z and 2026-09-13T15:14:00Z..\n\nRoot cause: NETWORK_POLICY_BLOCKED. Egress from report-exporter to warehouse-api was blocked by network policy/CNI (egress packet drops and Cilium policy-denied counters rose), causing i/o timeouts from the caller while warehouse-api itself remained healthy. The agent puts its confidence at 90%, which is its own estimate and nothing here checks it.",
+  "datadog_record": {
+   "provider": "mock-datadog",
+   "simulated": true,
+   "sent": false,
+   "note": "SIMULATED \u2014 no Datadog call was made. A real integration needs its own adapter validated against the Datadog API.",
+   "datadog_incident_id": "dd-mock-INC-2026-1401",
+   "incident_id": "INC-2026-1401",
+   "title": "INC-2026-1401: report-exporter \u2014 NETWORK_POLICY_BLOCKED",
+   "severity": "SEV-1",
+   "severity_from_signal": true,
+   "service": "report-exporter",
+   "root_cause": "NETWORK_POLICY_BLOCKED",
+   "confidence_pct": 90,
+   "cluster": "prod-eu",
+   "namespace": "production",
+   "pod": "report-exporter-6c8d5f9b47-k4wzn"
+  },
+  "prompt_versions": {
+   "kubernetes": "392d396b104c",
+   "logs": "3d518a92d4eb",
+   "metrics": "97038bf71973",
+   "root-cause": "b417c9346204"
+  }
  }
 }
