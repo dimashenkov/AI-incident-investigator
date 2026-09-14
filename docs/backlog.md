@@ -185,7 +185,9 @@ pattern already exists in `src/core/review.ts` (`versionStamp` folds the model i
 
 ## Brick · the four-agent split leaks the cause into the extractors · needs a paid run
 
-**State:** RESOLVED IN CODE, awaits a paid re-measurement (2026-09-14). Grok
+**State:** ✅ RESOLVED AND VERIFIED LIVE (2026-09-14). The paid re-measurement ran: all 15 scenarios at `#40`, k=1, on the deployed (b) workflow, scored **15 correct, 0 wrong** — no regression. Every answer was `gpt-5`/`gpt-5-mini` (serial submission, no 429/grok contamination); `conflicting-evidence#40` concluded CONTAINER_OOM at 0.55 (below `container-oom#40`'s 0.9 and the 0.6 ceiling); `insufficient-evidence#40` refused. Evidence: `docs/answers/2026-09-14-option-b-verify.json`. A k=3 reliability baseline under the (b) prompt set is future work (this run establishes coverage, not reliability). The rest of this brick is the history of how it was decided.
+
+**State (history):** RESOLVED IN CODE, awaited a paid re-measurement (2026-09-14). Grok
 adjudicated the fork to **(b)** with evidence: the extractors named a cause 28 times
 across the green baseline (kubernetes `CONTAINER_OOM` 4×, the extend 24×), so (a) —
 forbidding them — would break exactly what 15/15 already does. (b) fixes only
