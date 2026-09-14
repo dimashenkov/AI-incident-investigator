@@ -17,7 +17,7 @@ prompt is kept only if the measurement justifies it.
 The numbers in this file come from measurement, not judgment. The live readiness is read with
 `node scripts/readiness.mjs --short`, the spend with `node scripts/spend.mjs --short`.
 The full, evidence-grounded specification is in `SPEC.md` — every claim points to the file
-it comes from. (Updated 2026-09-14: real Slack, all 15 scenarios measured, fallback provider proven live, both Slack posts redacted.)
+it comes from. (Updated 2026-09-14: real Slack, all 15 scenarios measured at k=3 (0 sticky) under the option-(b) prompt set, fallback provider proven live, both Slack posts redacted.)
 
 ---
 
@@ -32,7 +32,7 @@ At the time of writing (2026-09-14):
 
 ```
 readiness 92% — 24 of 26 checks green, 0 red, 2 unestablished — 2 on work not yet done
-spend $0.0455 — floor, 82 run(s) could not be priced
+spend $0.0455 — floor, 127 run(s) could not be priced
 ```
 
 Readiness has **three states**, not two — green, red, and **unestablished** —
@@ -40,7 +40,7 @@ because counting the unestablished as a failure makes a project that has not bee
 look broken, while throwing it out makes a project that cannot answer look
 finished. The two unestablished today are `dod-6` (no cross-incident data in the
 prompts — awaiting a way to say whose data is unlabeled) and `gate` (the recorded
-result of the gate predates `tests/eval.test.ts`, so it is not for this tree).
+result of the gate predates this session's new tests, so it is not for this tree).
 
 The spend is a **floor**: the `gpt-5` runs carry no usage in the webhook response, so
 they cannot be priced and count as `unknown` with **no number**, not as zero.
@@ -154,13 +154,15 @@ proven**.
 | **Simulated cluster, real Slack** (2026-09-12) | every provider is a fixture; only Slack is live externally — app, channel, token, two-way bot. A public cloud so it is mutually reachable (n8n Cloud does not read `localhost`) |
 | **Read-only MVP** | the agents recommend actions, do not execute them; the schema refuses `executed: true`, so it fails loudly the day something acts |
 | **No Redis / no atomic lock** (2026-09-12) | one Slack thread per incident is guaranteed only under `MemoryStore`; the live path has no compare-and-swap, while n8n Cloud runs the webhooks in parallel. Two **concurrent** signals for one incident can open two threads. The demo fires one incident at a time; `DurableThreadIndex`/`AtomicStore` are the seam for a real CAS store |
-| **The bot answers from the report** | the reply is assembled from the prepared report, not from the raw observations — "I couldn't" is not glued to "here is the answer" |
+| **The bot answers from the report** | the reply is assembled from the prepared report, not from the raw observations, so raw secrets are never in the model's context. A prompt-level refusal instruction (2026-09-14) also tells it not to reveal a credential verbatim — best-effort, not an enforced control |
 | **Confidence is the model's claim** | there is no calibrated scale behind the number; the two ceilings (0.5 refusal, 0.6 on conflict) are **chosen**, not measured |
 | **`gpt-5` refuses `temperature: 0`** | default 1 applies, so **two runs are not strictly comparable** — a difference could be the sampling itself |
 | **One incident per execution** | the whole isolation compares against one request; several incidents in one execution — deliberately not |
 
-The measured scenarios are **single runs** per scenario: they establish
-**coverage, not reliability**. No claim about variance is made from them.
+The **eval baseline** is now **k=3** (three runs per scenario), 0 sticky, under the
+current (b) prompt set — that is **reliability**, not just coverage. The live-demo runs in
+the "What is proven" table above (volume-full, the Slack reply) are single runs, so those
+establish coverage; the k=3 baseline is what a future prompt edit is kept or rejected against.
 
 ---
 
@@ -171,7 +173,7 @@ The measured scenarios are **single runs** per scenario: they establish
 | `SPEC.md` | the full specification — every claim points to the file it comes from (updated 2026-09-14: real Slack, 15/15 measured) |
 | `PROGRESS.md` | the chronological log; the round number is read from there |
 | `CLAUDE.md` | the project rules, decisions, commands, machine traps |
-| `docs/backlog.md` | the bricks and their state — all closed as of 2026-09-14 (specialist scoring, report-path redaction, fallback provider all done; more scenarios rejected) |
+| `docs/backlog.md` | the bricks and their state — the eval-loop bricks, report-path redaction, fallback provider, and the four-agent contradiction (option (b)) are done; open/limitation items remain: the readiness model-marker, the Slack-bot real-deploy hardening, and the #3 stickiness debate |
 | `docs/slack-setup.md`, `docs/trace-viewer.md` | the real Slack and the trace viewer |
 | `docs/spend-counter.md`, `docs/readiness-counter.md` | how spend and readiness are counted |
 | `docs/measurement-contract.md`, `docs/async-shape.md` | how it is measured and why the answer is read from the execution record |
