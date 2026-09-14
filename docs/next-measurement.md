@@ -251,7 +251,7 @@ agent, so a run is 3 or 4 calls, not always 4 — between 30 and 40 calls.
 | 3 | 4 | 12–16 | $0.0049 – $0.0065 |
 | **all three** | **10** | **30–40** | **$0.012 – $0.016** |
 
-Each part is asked for on its own, with its own word. One `харчи` is one part.
+Each part is asked for on its own, with its own word. One `harchi` is one part.
 
 ## The result, and the decision it forced · 2026-09-09
 

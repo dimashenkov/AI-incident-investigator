@@ -1,229 +1,231 @@
-# n8n spike — какво Code node наистина може
+# n8n spike — what the Code node can really do
 
-Измерено на **2026-09-04** върху `dimitarshenkov.app.n8n.cloud`, с **две**
-изпълнения на един временен workflow, който е изтрит веднага след това.
+Measured on **2026-09-04** on `dimitarshenkov.app.n8n.cloud`, with **two**
+executions of one temporary workflow that was deleted immediately afterwards.
 
-Codex поиска този spike още в първия кръг по плана, с основание, което си струва
-да се повтори: *„Credentials should validate—not first reveal—the architecture."*
-Оказа се право — три от нещата долу опровергават допускания, по които chunk 1
-щеше да бъде написан.
+Codex asked for this spike in the very first round of the plan, with a rationale
+worth repeating: *"Credentials should validate—not first reveal—the architecture."*
+It turned out right — three of the things below disprove assumptions that chunk 1
+would have been written on.
 
-Числата тук са от **пускане**, не от документация. Където документацията казва
-друго, това е отбелязано.
+The numbers here are from a **run**, not from documentation. Where the
+documentation says otherwise, that is noted.
 
 ---
 
-## 1. Модулите минават през allowlist, не blocklist
+## 1. Modules go through an allowlist, not a blocklist
 
-Съобщението при отказ е `Module 'X' is disallowed` — формулировка на позволен
-списък, не на забранен.
+The message on refusal is `Module 'X' is disallowed` — the phrasing of a permitted
+list, not a forbidden one.
 
-**Пробвани са деветнайсет имена; минаха две.** Това не установява целия
-allowlist: не е известно колко модула са позволени, само че от тези деветнайсет
-два се зареждат. Друг модул може да мине; проверява се с пробване, не с
-предположение.
+**Nineteen names were tried; two passed.** This does not establish the whole
+allowlist: it is not known how many modules are permitted, only that of these
+nineteen, two load. Another module might pass; it is checked by trying, not by
+assuming.
 
-| Модул | Резултат |
+| Module | Result |
 |---|---|
-| `crypto` | **работи** — `createHash('sha256')` върна хеш |
-| `moment` | **работи** |
-| `node:crypto` | disallowed — префиксът `node:` **не** минава, макар `crypto` да минава |
+| `crypto` | **works** — `createHash('sha256')` returned a hash |
+| `moment` | **works** |
+| `node:crypto` | disallowed — the `node:` prefix does **not** pass, even though `crypto` passes |
 | `util` `path` `buffer` `fs` `child_process` `http` `url` `zlib` `events` `assert` | disallowed |
 | `luxon` `axios` `lodash` `ajv` `cheerio` `uuid` | disallowed |
 
-**Най-важният ред е `ajv`.** Validator-ът на проекта стъпва на него, и той **не
-може да бъде внесен** в Code node. Виж §5 за какво следва от това.
+**The most important row is `ajv`.** The project's validator rests on it, and it
+**cannot be imported** into the Code node. See §5 for what follows from this.
 
-## 2. Какво липсва от глобалния обхват
+## 2. What is missing from the global scope
 
-| Глобал | Има ли |
+| Global | Present? |
 |---|---|
-| `require` | **да**, `typeof === "function"`; от 19 пробвани имена зареди две |
-| `module` | да, само с `exports` |
-| `Buffer` `setTimeout` `TextEncoder` | да |
-| `process` | **не** — няма версия на node, няма `process.env` |
-| `fetch` | **не** |
-| `crypto` (глобал) | **не** — само през `require('crypto')` |
-| `structuredClone` | **не** |
-| `require.resolve` | **не** |
+| `require` | **yes**, `typeof === "function"`; of 19 names tried it loaded two |
+| `module` | yes, only with `exports` |
+| `Buffer` `setTimeout` `TextEncoder` | yes |
+| `process` | **no** — no node version, no `process.env` |
+| `fetch` | **no** |
+| `crypto` (global) | **no** — only through `require('crypto')` |
+| `structuredClone` | **no** |
+| `require.resolve` | **no** |
 
-`process` липсва изцяло, тоест **версията на runtime-а не е установима отвътре**.
-Езиковите възможности обаче работят: optional chaining, nullish coalescing,
-`async`, `Map`, `TextEncoder` — всички минаха.
+`process` is missing entirely, that is, **the runtime version is not
+establishable from inside**. The language features do work, though: optional
+chaining, nullish coalescing, `async`, `Map`, `TextEncoder` — all passed.
 
-## 3. Какво n8n дава вместо тях
+## 3. What n8n gives instead of them
 
-| Име | Какво е |
+| Name | What it is |
 |---|---|
-| `DateTime` | luxon, като **глобал** — макар `require('luxon')` да е забранен |
-| `$jmespath` | функция, глобална |
-| `this.helpers` | `httpRequest`, `request`, `httpRequestWithAuthentication`, и четири за binary data |
+| `DateTime` | luxon, as a **global** — even though `require('luxon')` is forbidden |
+| `$jmespath` | a function, global |
+| `this.helpers` | `httpRequest`, `request`, `httpRequestWithAuthentication`, and four for binary data |
 
-**HTTP заявки са възможни** — през `this.helpers.httpRequest`, не през `fetch`.
+**HTTP requests are possible** — through `this.helpers.httpRequest`, not through
+`fetch`.
 
-## 4. Дребни неща, които струват време, ако не се знаят
+## 4. Small things that cost time if you do not know them
 
-* Часовата зона на изпълнение е **UTC**.
-* `$node.name` дава `ERR:Referenced node doesn't exist` вътре в собствения си нод.
-* `$workflow.id`, `$execution.id` и `$execution.mode` работят.
-* Webhook-ът получава цял обект с `headers`, `params`, `query`, `body` — тялото
-  е в `body`, не в корена.
-* Workflow **трябва да е активен**, за да се извика webhook-ът през API.
-  Без `N8N_MCP_ACCESS_TOKEN` workflow без trigger изобщо не може да се пусне.
-* LangChain Code node **не съществува** на Cloud, само на self-hosted.
-* Code node v2 предлага и `pythonNative`, но Python няма `$` синтаксиса и
-  помощниците — само `_items` и `_item`. **Дали Python може да внася пакети не е
-  пробвано** — всички проби бяха на JavaScript.
+* The execution time zone is **UTC**.
+* `$node.name` gives `ERR:Referenced node doesn't exist` inside its own node.
+* `$workflow.id`, `$execution.id` and `$execution.mode` work.
+* The webhook receives a whole object with `headers`, `params`, `query`, `body` — the body
+  is in `body`, not at the root.
+* A workflow **must be active** for the webhook to be called through the API.
+  Without `N8N_MCP_ACCESS_TOKEN` a workflow without a trigger cannot be run at all.
+* The LangChain Code node **does not exist** on Cloud, only on self-hosted.
+* Code node v2 also offers `pythonNative`, but Python has no `$` syntax and no
+  helpers — only `_items` and `_item`. **Whether Python can import packages was not
+  tried** — all trials were on JavaScript.
 
-## 5. Какво следва за chunk 1
+## 5. What follows for chunk 1
 
-**Кодът се вгражда, не се внася.** Общото ядро **не беше внесено през нито един
-от пробваните механизми** — име на пакет през `require`. Не са пробвани
-относителен и абсолютен път. `require('fs')` е disallowed, което е причина да се
-очаква, че няма да работят — но очакване не е измерване, и това тук не се твърди
-като установено.
+**The code is embedded, not imported.** The shared core **was not imported through
+any of the tried mechanisms** — a package name through `require`. Relative and
+absolute paths were not tried. `require('fs')` is disallowed, which is a reason to
+expect that they will not work — but expectation is not measurement, and that is
+not asserted here as established.
 
-Workflow-ът получава **генериран, самодостатъчен JavaScript**; източникът на
-истината остава един, но артефактът е inline.
+The workflow receives **generated, self-contained JavaScript**; the source of
+truth stays one, but the artifact is inline.
 
-**Валидацията не може да ползва ajv по обичайния начин.** `require('ajv')` е
-disallowed. **Проверено е, че ajv standalone работи — вж. §6.**
+**Validation cannot use ajv in the usual way.** `require('ajv')` is disallowed.
+**It has been verified that ajv standalone works — see §6.**
 
-Изходът е **един**, а не два. Ръчно писан validator означава едно и също правило
-на две места, а това е забранено от записано решение — „един validator, не два",
-2026-09-04. Следващият spike проверява **ajv standalone**: ajv компилира схемата
-предварително до чист JavaScript без зависимости, който се вгражда.
+The output is **one**, not two. A hand-written validator means the same rule in
+two places, and that is forbidden by a recorded decision — "one validator, not
+two", 2026-09-04. The next spike checks **ajv standalone**: ajv compiles the schema
+ahead of time into pure JavaScript with no dependencies, which is embedded.
 
-Ако този spike се провали, това **не** прави ръчния validator равностоен
-автоматично — принуждава преразглеждане на записаното решение, което е отделна
-работа с отделна отсъда.
+If this spike fails, that does **not** make the hand-written validator equivalent
+automatically — it forces a reconsideration of the recorded decision, which is
+separate work with a separate judgement.
 
-**Какво остана неустановено, нарочно:** максимална памет, максимален размер на
-payload, timeout на изпълнение. Codex беше изричен: едно успешно изпълнение не
-може да ги установи, а нарочен провал би изхабил единственото измерване.
-Записани са като `could-not-establish`, не като предположени числа.
+**What stayed unestablished, on purpose:** maximum memory, maximum payload size,
+execution timeout. Codex was explicit: one successful execution cannot establish
+them, and a deliberate failure would waste the single measurement. They are
+recorded as `could-not-establish`, not as assumed numbers.
 
 ---
 
-# Spike 2 — ajv standalone в Code node
+# Spike 2 — ajv standalone in the Code node
 
-Измерено на **2026-09-04**, едно изпълнение, workflow изтрит; инстанцията е
-проверена и е празна.
+Measured on **2026-09-04**, one execution, workflow deleted; the instance was
+checked and is empty.
 
-## 6. Резултатът: работи
+## 6. The result: it works
 
-`ajv` компилира схемите предварително до самостоятелен JavaScript. Каква част от
-него наистина е самостоятелна:
+`ajv` compiles the schemas ahead of time into standalone JavaScript. How much of
+it is really standalone:
 
-| Стъпка | Останали `require` | Байтове |
+| Step | Remaining `require` | Bytes |
 |---|---|---|
-| `standaloneCode` с `addFormats` | 2 — `ajv/dist/runtime/ucs2length`, `ajv-formats/dist/formats` | 126 640 |
-| само `date-time` като regex, без `ajv-formats` | 1 — `ucs2length` | 126 612 |
-| `ucs2length` вграден на ръка (808 байта, 20 реда) | **0** | 126 809 |
+| `standaloneCode` with `addFormats` | 2 — `ajv/dist/runtime/ucs2length`, `ajv-formats/dist/formats` | 126 640 |
+| only `date-time` as a regex, without `ajv-formats` | 1 — `ucs2length` | 126 612 |
+| `ucs2length` embedded by hand (808 bytes, 20 lines) | **0** | 126 809 |
 
-Схемите ползват точно **един** формат — `date-time` — затова целият `ajv-formats`
-отпада срещу един regex. `ucs2length` е двайсет реда и се вгражда.
+The schemas use exactly **one** format — `date-time` — so the whole `ajv-formats`
+falls away against one regex. `ucs2length` is twenty lines and is embedded.
 
-## 7. Съвпадение с живия ajv върху избрана извадка
+## 7. Agreement with the live ajv over a chosen sample
 
-Преди да се пусне каквото и да е, генерираният артефакт беше сравнен с живия ajv
-върху шестнайсет обекта — валидни и невалидни, и по четирите схеми.
+Before anything at all was run, the generated artifact was compared with the live
+ajv over sixteen objects — valid and invalid, and across all four schemas.
 
-**Съвпадат по всичките 16.** И точно затова изречението трябва да се прочете
-внимателно: това е **проба за дим (smoke test), не доказателство за еднакво
-поведение.** Шестнайсет обекта установяват съгласие върху шестнайсет обекта.
-Каквото не е пробвано, не е установено.
+**They agree on all 16.** And that is exactly why the sentence must be read
+carefully: this is a **smoke test, not proof of identical behaviour.** Sixteen
+objects establish agreement over sixteen objects. What was not tried is not
+established.
 
-## 8. Какво показа изпълнението в Code node
+## 8. What the Code node execution showed
 
-| Проверка | Резултат |
+| Check | Result |
 |---|---|
-| 126 KB код в `jsCode` | **приема се**; payload на workflow-а е 134 KB |
-| и четирите validator-а са налични | `v_incident`, `v_agent_result`, `v_conversation`, `v_remediation` |
-| валиден инцидент минава | да |
-| празно наблюдение се отказва | да |
-| печатен ключ на горно ниво се отказва | да |
-| грешен формат на дата се отказва | да |
-| **cross-file `$ref` към `common.schema.json` действа** | да — цитиран източник извън списъка се отказва |
-| съобщенията за грешка | **за пробваните откази** съвпадат с ajv: `instancePath`, `schemaPath`, `keyword`, `params` |
+| 126 KB of code in `jsCode` | **accepted**; the workflow payload is 134 KB |
+| all four validators are present | `v_incident`, `v_agent_result`, `v_conversation`, `v_remediation` |
+| a valid incident passes | yes |
+| an empty observation is refused | yes |
+| a typo key at the top level is refused | yes |
+| a wrong date format is refused | yes |
+| **cross-file `$ref` to `common.schema.json` works** | yes — a cited source outside the list is refused |
+| the error messages | **for the tried refusals** they match ajv: `instancePath`, `schemaPath`, `keyword`, `params` |
 
-Предпоследният ред е важен: споделените дефиниции са в отделен файл, а в
-Code node няма файлова система. Standalone компилацията ги е вградила и
-препратката работи.
+The second-to-last row is important: the shared definitions are in a separate
+file, and the Code node has no filesystem. The standalone compilation embedded them
+and the reference works.
 
-## 9. Как се вгражда в нода
+## 9. How it is embedded in the node
 
-Code node няма модулна система: `exports` е `undefined`, а `module` носи само
-празен `exports`. Генерираният CommonJS затова се обвива:
+The Code node has no module system: `exports` is `undefined`, and `module` carries
+only an empty `exports`. The generated CommonJS is therefore wrapped:
 
 ```js
 const module = { exports: {} };
 const exports = module.exports;
 (function (module, exports) {
-  /* генерираният код */
+  /* the generated code */
 })(module, exports);
 const V = module.exports;
 ```
 
-## 10. Дефект, намерен при самата проверка: форматът стана втори носител
+## 10. A defect found during the check itself: the format became a second carrier
 
-За да отпадне `ajv-formats`, регистрирах `date-time` като **свой** regex. Изглеждаше
-безобидно, защото схемите ползват само този формат. Не е.
+To drop `ajv-formats`, I registered `date-time` as **my own** regex. It looked
+harmless, because the schemas use only this format. It is not.
 
-Сравнени двайсет низа срещу `ajv-formats`: **седем се разминават**, и то в двете
-посоки.
+Twenty strings compared against `ajv-formats`: **seven diverge**, and in both
+directions.
 
-| Вход | `ajv-formats` | моят regex |
+| Input | `ajv-formats` | my regex |
 |---|---|---|
-| `2026-13-04T10:30:00Z` (месец 13) | отказва | **приема** |
-| `2026-02-30T10:30:00Z` (30 февруари) | отказва | **приема** |
-| `2026-09-31T10:30:00Z` (31 септември) | отказва | **приема** |
-| `2026-09-04T25:30:00Z` (час 25) | отказва | **приема** |
-| `2026-09-04T10:60:00Z` (минута 60) | отказва | **приема** |
-| `2026-09-04 10:30:00Z` (интервал вместо `T`) | приема | отказва |
-| `2026-09-04T10:30:00+0200` (без двоеточие) | приема | отказва |
+| `2026-13-04T10:30:00Z` (month 13) | refuses | **accepts** |
+| `2026-02-30T10:30:00Z` (February 30) | refuses | **accepts** |
+| `2026-09-31T10:30:00Z` (September 31) | refuses | **accepts** |
+| `2026-09-04T25:30:00Z` (hour 25) | refuses | **accepts** |
+| `2026-09-04T10:60:00Z` (minute 60) | refuses | **accepts** |
+| `2026-09-04 10:30:00Z` (space instead of `T`) | accepts | refuses |
+| `2026-09-04T10:30:00+0200` (no colon) | accepts | refuses |
 
-Тоест deployed validator-ът щеше да приема дати, които локалният отказва — **едно
-правило с две поведения**, точно дефектът, който този проект лови навсякъде.
+That is, the deployed validator would accept dates the local one refuses — **one
+rule with two behaviours**, exactly the defect this project catches everywhere.
 
-`ajv-formats` има два режима, и това обяснява разликата:
+`ajv-formats` has two modes, and this explains the difference:
 
-| Режим | Какво прави |
+| Mode | What it does |
 |---|---|
-| `fast` | чист regex — вграждаем както е |
-| `full` (по подразбиране) | функция: дни в месеца, високосна година, `23:59:60` |
+| `fast` | pure regex — embeddable as is |
+| `full` (default) | a function: days in the month, leap year, `23:59:60` |
 
-**Изискване към chunk 1, а не предложение:** форматът се дефинира **на едно
-място** в repo-то и се ползва и от локалния validator, и от генератора. Свой
-regex не се пише. Ако се избере `fast`, това е решение с дата и основание, а не
-страничен ефект от желанието да отпадне един `require`.
+**A requirement for chunk 1, not a suggestion:** the format is defined in **one
+place** in the repo and is used by both the local validator and the generator. No
+own regex is written. If `fast` is chosen, that is a decision with a date and a
+rationale, not a side effect of the wish to drop one `require`.
 
-В repo-то днес дефект **няма** — `validate.ts` ползва `addFormats`, а моят regex
-живя само в spike скрипта, който е изтрит. Дефектът е в плана за генератора и е
-хванат преди да бъде написан.
+In the repo today there is **no** defect — `validate.ts` uses `addFormats`, and my
+regex lived only in the spike script, which is deleted. The defect is in the plan
+for the generator and is caught before it is written.
 
-## 11. Вграждането на `ucs2length` е незащитена трансформация
+## 11. Embedding `ucs2length` is an unprotected transformation
 
-Замяната е текстова: търси се `require("ajv/dist/runtime/ucs2length").default` и
-се слага функцията. Ако ajv се обнови, това може да се счупи **тихо**:
+The replacement is textual: `require("ajv/dist/runtime/ucs2length").default` is
+searched for and the function is put in. If ajv is updated, this can break
+**silently**:
 
-| Какво може да стане | Забелязва ли се |
+| What can happen | Is it noticed |
 |---|---|
-| замяната изобщо не се случи | **да** — ако генераторът настоява за нула останали `require` |
-| замяната хване друг фрагмент | **не задължително** |
-| ajv смени поведението на помощника, а вграденото копие остане замразено | **не** — освен ако точно този вход се тества |
+| the replacement does not happen at all | **yes** — if the generator insists on zero remaining `require` |
+| the replacement catches a different fragment | **not necessarily** |
+| ajv changes the helper's behaviour, while the embedded copy stays frozen | **no** — unless exactly this input is tested |
 
-**Изисквания към генератора в chunk 1**, всяко от които е проверка, а не бележка:
+**Requirements for the generator in chunk 1**, each of which is a check, not a note:
 
-* точно **една** замяна — нито нула, нито две;
-* **нула** останали `require` в артефакта, като условие за успех;
-* диференциални тестове върху дължини в Unicode (сурогатни двойки, емоджи) и
-  върху границите на `date-time`.
+* exactly **one** replacement — neither zero nor two;
+* **zero** remaining `require` in the artifact, as a success condition;
+* differential tests over lengths in Unicode (surrogate pairs, emoji) and over the
+  boundaries of `date-time`.
 
-Без тях „вградих го" е твърдение, което нищо не проверява.
+Without them, "I embedded it" is a claim that nothing checks.
 
-## 12. Какво остава неизмерено
+## 12. What remains unmeasured
 
-Горната граница за размер на `jsCode` — 126 KB минават, къде е таванът не е
-търсено. Времето за компилация при всяко изпълнение не е измерено отделно.
-Двете остават `could-not-establish`.
+The upper bound for the size of `jsCode` — 126 KB pass, where the ceiling is has
+not been searched for. The compilation time on each execution was not measured
+separately. Both stay `could-not-establish`.

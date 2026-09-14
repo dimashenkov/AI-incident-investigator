@@ -37,8 +37,8 @@ is to be created: the owner decided on 2026-08-30 that an API key is never used.
 
 ## Corrected on 2026-09-10 — `read` is ALLOWED, and paths are given
 
-The owner, seeing a review whose prompt carried pasted code: *„искаш да кажеш,
-че не подаваш на Grok files path — това не е ок."* He is right, and the reason
+The owner, seeing a review whose prompt carried pasted code: *„you mean to say
+you don't give Grok a files path — that's not ok."* He is right, and the reason
 is the same one §6 gives for a hostile mandate: **when I paste excerpts, I am
 choosing what the reviewer sees, and that is a map of what I already know.**
 
@@ -66,7 +66,7 @@ change anything. `read` is the only one that came back.
 Allowing `read` is **not enough**. The first attempt returned after one turn
 with `"stopReason": "cancelled"` and this as its entire answer:
 
-> Ще прочета самите файлове и diff-а, без да приемам резюмето за вярно.
+> I will read the files themselves and the diff, without taking the summary as true.
 
 Its `thought` field showed it had decided to read the files and had drafted a
 verdict; the tool call itself was never approved, because headless mode has

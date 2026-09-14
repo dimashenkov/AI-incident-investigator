@@ -1,160 +1,160 @@
-# Backlog — тухли, които чакат ред
+# Backlog — bricks awaiting their turn
 
-Всяка тухла тук е записана, за да не изчезне тихо. Редът не е обещание, а списък.
-Тухла напуска backlog-а само когато е свършена или изрично отменена — не когато е
-забравена. Цената до всяка казва дали иска думата `харчи`.
+Every brick here is recorded so it does not disappear quietly. The order is not a promise, but a list.
+A brick leaves the backlog only when it is done or explicitly cancelled — not when it is
+forgotten. The cost beside each says whether it requires the word `harchi` (spend).
 
 ---
 
-## Тухла · още полезни сценарии към 15-те · ОТКАЗАНА
+## Brick · more useful scenarios beyond the 15 · REJECTED
 
-**Състояние:** ❌ ОТКАЗАНА от собственика 2026-09-14: „не искам нови сценарии, 15 са достатъчни". Записана 2026-09-13; не се строи.
+**State:** ❌ REJECTED by the owner 2026-09-14: "I don't want new scenarios, 15 are enough". Recorded 2026-09-13; not built.
 
-**Какво е.** Сценарий = папка `scenarios/<име>/` с пет фикстури — `alert.json`,
-`kubernetes.json`, `logs.json`, `metrics.json`, `expected.json` — плюс ред в
-`scenarios/registry.json`. Никакъв код, никакъв модел. Добавянето е **безплатно**;
-плаща се само когато сценарият се пусне на живо срещу модела (това е eval-ът, и
-той иска `харчи`).
+**What it is.** A scenario = folder `scenarios/<name>/` with five fixtures — `alert.json`,
+`kubernetes.json`, `logs.json`, `metrics.json`, `expected.json` — plus a row in
+`scenarios/registry.json`. No code, no model. Adding is **free**; you pay
+only when the scenario is run live against the model (that is the eval, and
+it requires `harchi`).
 
-**Защо още.** 15-те покриват разпознаваеми k8s провали. Полезна нова е тази, която
-**стяга преценката**, не менюто. Един нов код в схемата без сценарий е по-дълго
-меню, не по-широк обхват — и тестът `gives every code in the schema a scenario
-that expects it` го отказва поименно.
+**Why more.** The 15 cover recognizable k8s failures. A useful new one is the one that
+**tightens the judgment**, not the menu. A new code in the schema without a scenario is a longer
+menu, not a broader scope — and the test `gives every code in the schema a scenario
+that expects it` refuses it by name.
 
-**Кои са кандидатите (стрес върху преценка, не разпознаване):**
+**Which are the candidates (stress on judgment, not recognition):**
 
-| Кандидат | Какво проверява, което 15-те не проверяват |
+| Candidate | What it checks that the 15 do not check |
 |---|---|
-| каскада: зависимост пада → пулът се изчерпва → 500-ици | кой е **коренът**, а не последното звено — примамва да спре на симптома |
-| причина извън k8s (приложен бъг, не инфра) | дали агентът признава „не е инфраструктурен", вместо да натисне случая в най-близкия код |
-| noisy neighbour / контеиниция за ресурс на node | OOM/throttle на **съседа**, не на алармираната услуга — problemPod трябва да не сочи грешния под |
-| eviction при disk pressure на node | различава се от `volume-full` (том), тук е node — лесно се слива |
-| 429 rate-limit от зависимост (не quota) | различава се от `dependency-unavailable` — услугата е жива, но дроселира |
+| cascade: a dependency falls → the pool is exhausted → 500s | which is the **root**, not the last link — it tempts you to stop at the symptom |
+| a cause outside k8s (application bug, not infra) | whether the agent admits "it is not infrastructural", instead of forcing the case into the nearest code |
+| noisy neighbour / contention for a node resource | OOM/throttle of the **neighbour**, not of the alerted service — problemPod must not point to the wrong pod |
+| eviction on node disk pressure | differs from `volume-full` (volume), here it is the node — easily conflated |
+| 429 rate-limit from a dependency (not quota) | differs from `dependency-unavailable` — the service is alive but throttling |
 
-**Двете правила, които всяка нова спазва (научени скъпо):**
+**The two rules that every new one follows (learned expensively):**
 
-1. **Никакъв етикет-пряк път.** `reason`-ът на събитие не бива да назовава кода
-   (`VolumeFull`, `PacketDropped` …) — реален контролер не емитва такова, и моделът
-   уцелва кода без да разсъждава. Диагнозата стои в **цитираното** `message`, не в
+1. **No label-shortcut.** An event's `reason` must not name the code
+   (`VolumeFull`, `PacketDropped` …) — a real controller does not emit such, and the model
+   hits the code without reasoning. The diagnosis lives in the **cited** `message`, not in
    `reason`. Grok, 2026-09-11.
-2. **Печелима, проверено локално end-to-end** преди да се брои за покритие — фикстура,
-   която никой модел не може да реши, мери подканата срещу невъзможен въпрос.
+2. **Winnable, verified locally end-to-end** before it counts as coverage — a fixture
+   that no model can solve measures the prompt against an impossible question.
 
-**Цена:** $0 да се добави. Eval-ът после иска `харчи` (k≥3 на нов сценарий).
+**Cost:** $0 to add. The eval then requires `harchi` (k≥3 on a new scenario).
 
 ---
 
-## Тухли от Grok · 2026-09-13 · функционалност, без нови providers
+## Bricks from Grok · 2026-09-13 · functionality, no new providers
 
-Собственикът поиска: какво още полезно може да влезе, **без нов cloud provider,
-само функционалност**. Grok ($0.18, абонамент) върна пет, подредени. Дупката, която
-посочи: eval „четенето" **маркира** (кой сценарий пада), но не **диагностицира**
-(защо и кой агент) — тоест следващата промяна в подканата още е гадаене, платено с
-12 пускания, за да разбереш, че си пипнал грешния агент. Първите три са безплатни.
+The owner asked: what else useful can go in, **without a new cloud provider,
+functionality only**. Grok ($0.18, subscription) returned five, ordered. The gap it
+pointed out: the eval "read" **marks** (which scenario fails), but does not **diagnose**
+(why and which agent) — that is, the next change to the prompt is still a guess, paid with
+12 runs, only to find out you touched the wrong agent. The first three are free.
 
-| # | Тухла | Какво дава | Честният лимит | Труд | Пари |
+| # | Brick | What it gives | The honest limit | Effort | Money |
 |---|---|---|---|---|---|
-| 1 ✅ | **eval диагноза, не само оценка** (ГОТОВО 2026-09-13, commit `d4aaa5c`) — `eval.mjs` да печата оста на провала (грешен код / нецитирано / неквалифицирано), пропуснатите `must_cite` пътища, объркването на кодове | следващата редакция има **цел**, не догадка. `node-not-ready` „верен код, друго основание" е точно този клас | ако разцепиш k=3 на четири оси, всичко става „insufficient" — дръж мнозинството, добави разбивката като **детайл** | S | **не** |
-| 2 ✅ | **оценка на специалистите** (ГОТОВО 2026-09-13, commit брик #2) — дали агентът (k8s/logs/metrics) е извадил фикстурния път, отделно от заключението | казва **коя подкана** да пипнеш. На 2026-09-10 4 от 5 провала бяха извличане, не сливане | `expected.json` става оракул за извличане — замрази собствеността на слота от `must_cite` префиксите, не добавяй второ expected | M | **не** |
-| 3 ✅ | **тест срещу етикета-пряк път** (ГОТОВО 2026-09-13, `tests/label-shortcut.test.ts`) — фикстурен `reason` да не е spelling на `causeCode` (`VolumeFull`, `PacketDropped`) | спира следващото платено пускане да е „четене на етикета" | реални kubelet reasons (`OOMKilled`) са легитимни — забрани spelling-ите на кодовете от схемата, не k8s reasons | S | **не** |
-| 4 ✅ | **k=3 под set `2c121d3550c3` за другите 11 сценария** (ГОТОВО 2026-09-14: 36 пускания, ВСИЧКИТЕ 15 сценария на k=3, 0 sticky) | без това keep-rule-ът пази само 4 имена; поправка за `node-not-ready` не може да се **задържи** | ~33 живи пускания; HTTP 524; gpt-5 temperature default 1 | S / L | **да · харчи** |
-| 5 ✅ | **`eval.mjs --plan`** (ГОТОВО 2026-09-13) — преди редакция печата „за да задържиш, купи k=3 на {тези зелени} + {тези sticky}" | собственикът вижда **цената** на промяната преди да я напише | „предложено подмножество" е измама — печатай реалното изискване на keep-rule, не отстъпка | S | **не** |
+| 1 ✅ | **eval diagnosis, not just scoring** (DONE 2026-09-13, commit `d4aaa5c`) — `eval.mjs` to print the axis of the failure (wrong code / uncited / unqualified), the missed `must_cite` paths, the confusion of codes | the next edit has a **target**, not a guess. `node-not-ready` "correct code, other basis" is exactly this class | if you split k=3 across four axes, everything becomes "insufficient" — keep the majority, add the breakdown as a **detail** | S | **no** |
+| 2 ✅ | **specialist scoring** (DONE 2026-09-13, commit brick #2) — whether the agent (k8s/logs/metrics) extracted the fixture path, separately from the conclusion | says **which prompt** to touch. On 2026-09-10 4 of 5 failures were extraction, not merging | `expected.json` becomes an oracle for extraction — freeze slot ownership from the `must_cite` prefixes, do not add a second expected | M | **no** |
+| 3 ✅ | **test against the label-shortcut** (DONE 2026-09-13, `tests/label-shortcut.test.ts`) — a fixture `reason` must not be a spelling of `causeCode` (`VolumeFull`, `PacketDropped`) | stops the next paid run from being "reading the label" | real kubelet reasons (`OOMKilled`) are legitimate — forbid the spellings of the codes from the schema, not k8s reasons | S | **no** |
+| 4 ✅ | **k=3 under set `2c121d3550c3` for the other 11 scenarios** (DONE 2026-09-14: 36 runs, ALL 15 scenarios at k=3, 0 sticky) | without it the keep-rule guards only 4 names; a fix for `node-not-ready` cannot be **kept** | ~33 live runs; HTTP 524; gpt-5 temperature default 1 | S / L | **yes · harchi** |
+| 5 ✅ | **`eval.mjs --plan`** (DONE 2026-09-13) — before an edit prints "to keep, buy k=3 on {these green} + {these sticky}" | the owner sees the **cost** of the change before writing it | "proposed subset" is a cheat — print the real keep-rule requirement, not a discount | S | **no** |
 
-**Отхвърлени от Grok като театър:** изведена увереност от брой находки (второ число, което никой не е калибрирал); закаляване на симулацията (retries, Redis lock, жив Datadog, много инциденти в едно изпълнение — преструва фикстурите на клъстер); налагане на `must_cite` в схемата (убива канарчето, че моделът е пренебрегнал инструкция); отворени cause кодове (скорерът умира).
+**Rejected by Grok as theater:** confidence derived from the number of findings (a second number no one has calibrated); hardening of the simulation (retries, Redis lock, live Datadog, many incidents in one execution — pretends the fixtures are a cluster); enforcing `must_cite` in the schema (kills the canary that the model ignored an instruction); open cause codes (the scorer dies).
 
-**Редът, който Grok препоръчва:** 1 → 2 върху съществуващия baseline (без модел), **преди** да се купи каквото и да е. Диагнозата прави платеното пускане прицелено.
-
----
-
-## Тухла · redaction и на report-пътя (първия Slack пост) · безплатна
-
-**Състояние:** ✅ ГОТОВО 2026-09-14 (Grok преглед clear). Споделен `src/core/redact.ts` guard-ва и двата Slack поста (доклад + reply) от един източник; Report node редактира slack_text + Block Kit блокове; listener Build reply редактира отговора. 1087 теста.
-
-**Какво е.** `redactSecrets` сега пази само reply-пътя (отговорите на бота). Първият
-Slack пост — самият incident доклад — се сглобява от `slackReport` (thread.ts) и
-цитира `finding.fact` и `message` редове. Той **не минава** през `redactSecrets`, тоест
-тайна, която агент цитира в доклада, стига до Slack преди ботът да отговори.
-
-**Защо е безплатна и не иска дублиране.** `buildRuntime` сплайсва core файловете в
-prelude-а на всеки node. Един споделен redactor (напр. `src/core/redact.ts`,
-сплайснат навсякъде) покрива и reply-пътя, и `slack_text`, от **един** източник — не
-второ копие в thread.ts.
-
-**Защо е отложена, а не невъзможна.** Докладът е и в `slack_blocks` (Block Kit), не
-само в `slack_text`. Затваряне значи да се редактира и структурата на блоковете, не
-само текстът — отделна работа, с внимание да не се счупи Block Kit форматът.
-
-**Цена:** $0. Пази срещу реален deploy leak; в прототипа фикстурите нямат тайни.
+**The order Grok recommends:** 1 → 2 on the existing baseline (no model), **before** buying anything at all. The diagnosis makes the paid run targeted.
 
 ---
 
-## Тухла · fallback provider за модела в агентите · иска решение първо
+## Brick · redaction of the report path too (the first Slack post) · free
 
-**Състояние:** ✅ ЗАВЪРШЕНА И ДОКАЗАНА НА ЖИВО (2026-09-13). Код + deploy + пълен жив тест. exec 414: routing доказан (Grok фирна, но 403 без кредити). Собственикът добави xAI кредити; exec 415: state CONCLUDED, CONTAINER_OOM верен, model_by_agent = и 4-те grok-4.3 — цялата верига заключи през Grok. Fallback-ът е доказан end-to-end (routing И отговор). grok-4.3 id потвърден на живо. Това е отвореният
-въпрос „Fallback на моделния provider" от 2026-09-05 (PROGRESS.md) — оставен като
-„нека остане", сега вдигнат за backlog.
+**State:** ✅ DONE 2026-09-14 (Grok review clear). A shared `src/core/redact.ts` guards both Slack posts (report + reply) from one source; the Report node redacts slack_text + Block Kit blocks; the listener Build reply redacts the answer. 1087 tests.
 
-**Какво е.** Агентът вика един модел (OpenAI, през credential в n8n). Падне ли или
-откаже, разследването спира. Тухлата: втори модел, на който да се мине.
+**What it is.** `redactSecrets` currently guards only the reply path (the bot's answers). The first
+Slack post — the incident report itself — is assembled from `slackReport` (thread.ts) and
+cites `finding.fact` and `message` lines. It **does not pass** through `redactSecrets`, so
+a secret that an agent cites in the report reaches Slack before the bot answers.
 
-**Честната уговорка — това Е нов provider.** Останалите backlog тухли са „без нов
-provider"; тази го нарушава нарочно, по искане на собственика. Значи втори credential,
-втори billing път, и — важното за eval loop-а — **два прогона на различни provider-и не
-са сравними** (както gpt-5 temperature default 1 вече прави прогоните несравними; втори
-модел добавя втора ос на разсейване).
+**Why it is free and does not require duplication.** `buildRuntime` splices the core files into the
+prelude of every node. One shared redactor (e.g. `src/core/redact.ts`,
+spliced everywhere) covers both the reply path and `slack_text`, from **one** source — not
+a second copy in thread.ts.
 
-**Решението, което трябва ПРЕДИ код (2026-09-05):** дали изобщо трябва втори модел, и
-ако да — **пада ли мълчаливо** на него, или **казва, че първият е отказал**. Второто е
-това, което проектът иска навсякъде: „не можах" не се слепва с „ето отговора". Мълчалив
-fallback крие отказа на първия модел — точно сигналът, който eval loop-ът мери.
+**Why it is deferred, not impossible.** The report is also in `slack_blocks` (Block Kit), not
+only in `slack_text`. Closing it means redacting the structure of the blocks too, not
+only the text — separate work, with care not to break the Block Kit format.
 
-**Решението, взето 2026-09-13 — цяло:**
-
-1. **Обявен отказ, не мълчалив.** Преминаването се записва като състояние („primary
-   отказа: <причина> → минато на secondary"), не се слива с нормален отговор.
-   Основанието е етосът на проекта, мерен многократно: сляпо преместване прави
-   послушен и непослушен модел неразличими.
-2. **Вторият provider е Grok** (`grok-4.6`) — решено от собственика. Grok е на
-   абонамент (SuperGrok Lite, фиксирана такса), значи не добавя credit-billing път
-   като OpenAI.
-
-**Отворените въпроси за строенето (не за решението):**
-
-* **Как n8n Cloud стига до Grok — проверено 2026-09-13, и опира в правило.** Grok на
-  тази машина е **SuperGrok Lite, логнат интерактивно през CLI** (`docs/grok-on-this-machine.md`),
-  и има записано решение от 2026-08-30: **„няма API ключ и никога не се създава."**
-  n8n Cloud (отдалечен) вика само xAI HTTP API, който иска точно такъв ключ. Тоест
-  Grok, който имаме, **не е достижим от n8n**. Три изхода, изборът е на собственика:
-  (а) пази правилото → Grok не е in-workflow fallback; (б) изключение → метериран xAI
-  ключ за n8n; (в) fallback **извън** n8n — локалният runner при провал на primary
-  пита CLI Grok (пази правилото, но само локалния път, не качения workflow).
-* **Сравнимост в eval loop-а.** Прогон, отговорен от Grok, не е сравним с gpt-5
-  baseline. Provenance-ът вече записва модела, който е отговорил (`model`, null ако
-  липсва); fallback-ът трябва да маркира прогона така, че keep-rule да не го сравнява
-  с primary-baseline.
-* **Seam-ът в кода.** model-call възлите нямат `onError`, тоест грешка на провайдъра
-  **сваля изпълнението** и се записва `unestablished` без причина. Обявеният отказ +
-  преминаването към Grok искат точно този error-branch, тестван на живо.
-
-**Какво е безплатно:** записът на решението ($0). Строенето иска credential (собственик)
-+ error-branch + жив тест — не е безплатно. Тухлата остава **отворена** с **готово
-решение**; кодът чака думата.
+**Cost:** $0. Guards against a real deploy leak; in the prototype the fixtures have no secrets.
 
 ---
 
-## Тухла · SPEC.md refresh · безплатна
+## Brick · fallback provider for the model in the agents · needs a decision first
 
-**Състояние:** ГОТОВО 2026-09-13. Записана 2026-09-13 (Grok README review).
+**State:** ✅ COMPLETED AND PROVEN LIVE (2026-09-13). Code + deploy + full live test. exec 414: routing proven (Grok fired, but 403 without credits). The owner added xAI credits; exec 415: state CONCLUDED, CONTAINER_OOM correct, model_by_agent = all 4 grok-4.3 — the whole chain concluded through Grok. The fallback is proven end-to-end (routing AND answer). grok-4.3 id confirmed live. This is the open
+question "Fallback of the model provider" from 2026-09-05 (PROGRESS.md) — left as
+"let it be", now raised for the backlog.
 
-**Какво е.** `SPEC.md` е от по-ранната фаза и вече противоречи на реалността на две
-места: §1 казва „fake Slack … there is no real Datadog, Kubernetes, or Slack", а от
-2026-09-12 Slack е **реален**; §2 държи седем сценария (`node-not-ready` …
-`certificate-expired`) като „built, not yet measured", а readiness ги брои **зелени**
-(измерени). Външен читател, пратен към SPEC, чете обратното на README.
+**What it is.** The agent calls one model (OpenAI, through a credential in n8n). If it falls or
+refuses, the investigation stops. The brick: a second model to fall over to.
 
-**Поправката.** §1 да отрази реалния Slack (симулирани остават cluster/logs/metrics/
-Datadog); §2 статусът на седемте да стане „измерени" с цитат към записите. Всяко
-твърдение да сочи артефакта, от който идва — етосът на SPEC.
+**The honest caveat — this IS a new provider.** The other backlog bricks are "no new
+provider"; this one breaks it deliberately, at the owner's request. So a second credential,
+a second billing path, and — the important thing for the eval loop — **two runs on different providers are
+not comparable** (as gpt-5 temperature default 1 already makes the runs incomparable; a second
+model adds a second axis of variance).
 
-**Цена:** $0. README вече квалифицира SPEC като по-ранна фаза, за да не подвежда
-дотогава.
+**The decision that must come BEFORE code (2026-09-05):** whether a second model is even needed, and
+if so — does it fall **silently** to it, or **say the first refused**. The second is
+what the project wants everywhere: "I couldn't" is not glued to "here is the answer". A silent
+fallback hides the first model's refusal — exactly the signal the eval loop measures.
+
+**The decision, taken 2026-09-13 — in full:**
+
+1. **Announced refusal, not silent.** The switch is recorded as a state ("primary
+   refused: <reason> → switched to secondary"), not merged with a normal answer.
+   The basis is the project's ethos, measured repeatedly: a blind switch makes
+   an obedient and a disobedient model indistinguishable.
+2. **The second provider is Grok** (`grok-4.6`) — decided by the owner. Grok is on a
+   subscription (SuperGrok Lite, fixed fee), so it does not add a credit-billing path
+   like OpenAI.
+
+**The open questions for the build (not for the decision):**
+
+* **How n8n Cloud reaches Grok — checked 2026-09-13, and it hits a rule.** Grok on
+  this machine is **SuperGrok Lite, logged in interactively through the CLI** (`docs/grok-on-this-machine.md`),
+  and there is a recorded decision from 2026-08-30: **"there is no API key and one is never created."**
+  n8n Cloud (remote) calls only the xAI HTTP API, which requires exactly such a key. That is,
+  the Grok we have is **not reachable from n8n**. Three exits, the choice is the owner's:
+  (a) keep the rule → Grok is not an in-workflow fallback; (b) an exception → a metered xAI
+  key for n8n; (c) a fallback **outside** n8n — the local runner, on a primary failure,
+  asks the CLI Grok (keeps the rule, but only the local path, not the uploaded workflow).
+* **Comparability in the eval loop.** A run answered by Grok is not comparable with the gpt-5
+  baseline. The provenance already records the model that answered (`model`, null if
+  missing); the fallback must mark the run so the keep-rule does not compare it
+  with the primary-baseline.
+* **The seam in the code.** The model-call nodes have no `onError`, so a provider error
+  **brings down the execution** and `unestablished` is recorded without a reason. The announced refusal +
+  the switch to Grok require exactly this error-branch, tested live.
+
+**What is free:** the record of the decision ($0). The build requires a credential (owner)
++ error-branch + live test — it is not free. The brick stays **open** with a **ready
+decision**; the code awaits the word.
+
+---
+
+## Brick · SPEC.md refresh · free
+
+**State:** DONE 2026-09-13. Recorded 2026-09-13 (Grok README review).
+
+**What it is.** `SPEC.md` is from the earlier phase and now contradicts reality in two
+places: §1 says "fake Slack … there is no real Datadog, Kubernetes, or Slack", but since
+2026-09-12 Slack is **real**; §2 holds seven scenarios (`node-not-ready` …
+`certificate-expired`) as "built, not yet measured", while readiness counts them **green**
+(measured). An external reader, sent to SPEC, reads the opposite of the README.
+
+**The fix.** §1 to reflect the real Slack (simulated remain cluster/logs/metrics/
+Datadog); §2 the status of the seven to become "measured" with a citation to the records. Every
+claim to point to the artifact it comes from — the ethos of SPEC.
+
+**Cost:** $0. The README already qualifies SPEC as an earlier phase, so it does not mislead
+until then.

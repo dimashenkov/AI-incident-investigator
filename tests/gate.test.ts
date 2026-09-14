@@ -225,7 +225,7 @@ describe("what the gate cannot decide, and what it merely has not written", () =
 });
 
 describe("reading which chunk is current", () => {
-  const TABLE = ["| Chunk | Кръг | Какво |", "|---|---|---|", "| план | 1 | нещо |", "| 0 | 2 | нещо |", ""].join("\n");
+  const TABLE = ["| Chunk | Round | What |", "|---|---|---|", "| plan | 1 | thing |", "| 0 | 2 | thing |", ""].join("\n");
 
   it("reads the highest chunk from the rounds table", () => {
     expect(readCurrentChunk(TABLE)).toBe(0);
@@ -235,7 +235,7 @@ describe("reading which chunk is current", () => {
     // Measured 2026-09-04: reading any numeric first cell returned 6 for a file
     // whose highest chunk is 0 — a numbered objections table looks identical to
     // a parser that was never told which table to read.
-    expect(readCurrentChunk(TABLE + "\n| # | Възражение |\n|---|---|\n| 6 | нещо |\n")).toBe(0);
+    expect(readCurrentChunk(TABLE + "\n| # | Objection |\n|---|---|\n| 6 | thing |\n")).toBe(0);
   });
 
   it("returns null, not 0, when there is no rounds table", () => {

@@ -111,7 +111,7 @@ What is NOT done on the two-way side:
 
 - **Deploy + go-live**: updating the live listener `oMRowrkAwtnjTVIC` to this
   reply version and activating it ARMS a model call per threaded question — so it
-  waits for the owner's word (`харчи`). Until then the live listener is the
+  waits for the owner's word (`harchi`). Until then the live listener is the
   receiving-only version (no model).
 - **One live round-trip** of an actual answer, once armed.
 

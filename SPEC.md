@@ -20,8 +20,8 @@ slice of a simulated incident; a Root Cause agent concludes; the result is poste
 to a **real** Slack thread, and a two-way bot answers questions in it. **Every
 other external system is deliberately simulated** — there is no real Datadog or
 Kubernetes, and the cluster/logs/metrics are fixtures (`CLAUDE.md` §13 decision of
-2026-09-05, "Прототип, и това е обхватът"). Slack became real on 2026-09-12
-(`CLAUDE.md` §13, "Реален Slack + Langfuse Cloud"; `docs/slack-setup.md`), which
+2026-09-05, "A prototype, and that is the scope"). Slack became real on 2026-09-12
+(`CLAUDE.md` §13, "Real Slack + Langfuse Cloud"; `docs/slack-setup.md`), which
 supersedes the earlier "there is no real Slack" — the app, channel, token and
 posted reports are live (`docs/runs/2026-09-12-volume-full.json`). The
 deterministic core (providers, scoring, correlation) lives in `src/`; the agent
@@ -75,8 +75,8 @@ lines 18–20, 77).
 
 ## 3. What it does NOT cover
 
-These are real Kubernetes failure modes. The table in PROGRESS.md ("Какво покрива
-и какво не · 2026-09-11") names them; the danger it records is not that they are
+These are real Kubernetes failure modes. The table in PROGRESS.md ("What it covers
+and what it does not · 2026-09-11") names them; the danger it records is not that they are
 absent but that an agent facing an unknown case may **press it into the nearest
 code**, which looks like an answer.
 
@@ -117,11 +117,11 @@ gaps waiting on work.
 
 | Boundary | What it means | Where it is decided |
 |---|---|---|
-| No real cluster | every provider is simulated; the project is a prototype | `CLAUDE.md` §13, 2026-09-05 ("Прототип, и това е обхватът"); `README.md` line 29 |
-| Read-only | agents recommend actions, never execute them; the schema **refuses `executed: true`** so the day something acts, it fails loudly | `CLAUDE.md` §13, 2026-09-04 ("MVP-то е read-only"); `schemas/remediation.schema.json` `executed` (`const: false`) |
-| One incident per execution | all isolation (`collection_id`, `requested_for`, one-to-one thread, namespace match) compares against a single request; two incidents in one process would have no unambiguous owner | PROGRESS.md, "Могат ли няколко инцидента наведнъж" (2026-09-11) — parallel *separate* executions are measured; multiple incidents in one execution is "не, и нарочно" |
-| Confidence is the model's own assertion | there is no calibrated scale behind the number; the schema caps a refusal at `maximum` 0.5 and the `conflicting-evidence` scenario caps its answer at `max_confidence` 0.6 — two ceilings on the same number (there is no floor, no `minimum`), both *chosen*, not measured | `CLAUDE.md` §13, "Праговете и границите на приемане"; `scenarios/conflicting-evidence/expected.json` |
-| No atomic thread lock on the live path | one Slack thread per incident is guaranteed only under the in-memory index (`MemoryStore`); the live path has **no compare-and-swap**, because n8n Data Table has no atomic insert-if-absent and n8n Cloud runs webhooks concurrently (measured 2026-09-12). Two **simultaneous** signals for one incident could open two threads. The demo fires one incident at a time; `DurableThreadIndex`/`AtomicStore` are the seam for a real CAS store (Upstash Redis) the day it is added | `CLAUDE.md` §13, 2026-09-12 ("Без Redis за прототипа"); Grok review |
+| No real cluster | every provider is simulated; the project is a prototype | `CLAUDE.md` §13, 2026-09-05 ("A prototype, and that is the scope"); `README.md` line 29 |
+| Read-only | agents recommend actions, never execute them; the schema **refuses `executed: true`** so the day something acts, it fails loudly | `CLAUDE.md` §13, 2026-09-04 ("The MVP is read-only"); `schemas/remediation.schema.json` `executed` (`const: false`) |
+| One incident per execution | all isolation (`collection_id`, `requested_for`, one-to-one thread, namespace match) compares against a single request; two incidents in one process would have no unambiguous owner | PROGRESS.md, "Can several incidents at once" (2026-09-11) — parallel *separate* executions are measured; multiple incidents in one execution is "no, and deliberately" |
+| Confidence is the model's own assertion | there is no calibrated scale behind the number; the schema caps a refusal at `maximum` 0.5 and the `conflicting-evidence` scenario caps its answer at `max_confidence` 0.6 — two ceilings on the same number (there is no floor, no `minimum`), both *chosen*, not measured | `CLAUDE.md` §13, "The thresholds and acceptance boundaries"; `scenarios/conflicting-evidence/expected.json` |
+| No atomic thread lock on the live path | one Slack thread per incident is guaranteed only under the in-memory index (`MemoryStore`); the live path has **no compare-and-swap**, because n8n Data Table has no atomic insert-if-absent and n8n Cloud runs webhooks concurrently (measured 2026-09-12). Two **simultaneous** signals for one incident could open two threads. The demo fires one incident at a time; `DurableThreadIndex`/`AtomicStore` are the seam for a real CAS store (Upstash Redis) the day it is added | `CLAUDE.md` §13, 2026-09-12 ("No Redis for the prototype"); Grok review |
 
 The review boundary follows from the prototype decision: the question asked of the
 code is "does it ever quietly claim something false about its own work", not "does
@@ -151,7 +151,7 @@ runs it could not price** as of 2026-09-10 (`docs/measurement-contract.md` lines
 Grok) are listed but never summed into the credit total (`docs/spend-counter.md`
 lines 70–99).
 
-**Model.** The decision of 2026-09-11 is `gpt-5` (`CLAUDE.md` §13, "Моделът е
+**Model.** The decision of 2026-09-11 is `gpt-5` (`CLAUDE.md` §13, "The model is
 `gpt-5`"). A recorded limitation travels with it: `gpt-5` refuses
 `temperature: 0`, so the default of 1 applies and **two runs of this model are not
 strictly comparable** — a difference between them may be sampling alone. Under load
@@ -165,7 +165,7 @@ execution record rather than awaited in the HTTP response
 ## 6. How coverage grows
 
 One code at a time, each entering **whole**. `NODE_NOT_READY` was the first to go
-through the full process (PROGRESS.md, "Първият нов случай: NODE_NOT_READY ·
+through the full process (PROGRESS.md, "The first new case: NODE_NOT_READY ·
 2026-09-11"):
 
 1. the code added to `schemas/common.schema.json` `causeCode`;
@@ -181,11 +181,11 @@ through the full process (PROGRESS.md, "Първият нов случай: NODE
 6. a mutation, so the new test fails the gate if the guarantee regresses;
 7. the acceptance gate (`node scripts/acceptance-gate.mjs`) passing;
 8. a release / deploy, with drift detection comparing the deployed workflow to the
-   generated one (`CLAUDE.md` §13, 2026-09-04 "Drift detection, не доверие").
+   generated one (`CLAUDE.md` §13, 2026-09-04 "Drift detection, not trust").
 
 A new code is not coverage until it has **also been measured with a model**
-(`docs/measurement-contract.md`). Adding a code without a scenario is "по-дълго
-меню, не по-широк обхват" — a longer menu, not a wider scope (PROGRESS.md). All
+(`docs/measurement-contract.md`). Adding a code without a scenario is "a longer
+menu, not a wider scope" — a longer menu, not a wider scope (PROGRESS.md). All
 thirteen codes and the two behavioural scenarios have now been measured `correct`
 at least once (§2; readiness counts fifteen scenarios green) — but a single scored
 run per scenario is **coverage, not reliability**; the k=3 protocol
@@ -200,7 +200,7 @@ scenarios so far, not fifteen.
 The decision is recorded: TypeScript, not Python, because JavaScript is the Code
 node's native runtime and the repo is already on Node; Python is reachable in the
 Code node but imports through a two-name allowlist only, so the core cannot be
-carried in that way (`CLAUDE.md` §13, 2026-09-04, "TypeScript, не Python"). The
+carried in that way (`CLAUDE.md` §13, 2026-09-04, "TypeScript, not Python"). The
 Code node has no filesystem and no `require` outside that allowlist, which is why
 `scripts/workflow-runtime.mjs` assembles everything — the standalone validators
 built from `schemas/`, `src/core/merge.ts` transpiled in-process, and the four
@@ -252,7 +252,7 @@ n8n execution record (see `collect-execution.mjs` below).
 | `scripts/mutation-fanout.mjs` | runs the mutation gate in parallel across worker copies (the full mutation set — 325 as of this writing, read from `scripts/mutations.mjs`, not a fixed number — across worker copies; measured 540 s sequential → 68 s at 305 mutations, `docs/async-shape.md`) |
 
 **The review tools.** The external review is **Astra** — `gpt-6-astra`, run through
-`codex exec -m gpt-6-astra` (`CLAUDE.md` §13, "прегледът е Астра", 2026-09-11).
+`codex exec -m gpt-6-astra` (`CLAUDE.md` §13, "the review is Astra", 2026-09-11).
 **Grok** is reachable when the owner asks for it (`docs/grok-on-this-machine.md`).
 Both are on a **subscription**, a flat monthly fee — one more run does not move a
 bill — so they are listed in the spend report but never summed into the metered
@@ -264,24 +264,24 @@ total (`docs/spend-counter.md` lines 70–99; `CLAUDE.md` §13 cost table).
 
 **Money.** The only thing that spends is an **n8n execution that calls a model**;
 its credits are billed to the key in n8n Credentials (`CLAUDE.md` §13 cost table;
-§3 "Какво иска думата"). Creating, updating, uploading, or reading a workflow does
-**not** spend — "качване не е изпълнение" (`CLAUDE.md` §3). Grok, Astra, and Codex
+§3 "What asks for the word"). Creating, updating, uploading, or reading a workflow does
+**not** spend — "uploading is not execution" (`CLAUDE.md` §3). Grok, Astra, and Codex
 are subscription, not metered (same table).
 
-The single authorization is the **literal word `харчи` from the owner**. Not "ок",
-not "да", not the tool's name, not a permission from a previous message — only that
-word, and **one `харчи` authorizes one run**; a retry after a timeout is a new run
-and needs the word again (`CLAUDE.md` §3, "Разрешението е думата `харчи`"). Before
+The single authorization is the **literal word `harchi` from the owner**. Not "ok",
+not "yes", not the tool's name, not a permission from a previous message — only that
+word, and **one `harchi` authorizes one run**; a retry after a timeout is a new run
+and needs the word again (`CLAUDE.md` §3, "The authorization is the word `harchi`"). Before
 asking, five lines are shown: the cycle, what exactly will run, the cost, the
 question it answers, and what happens if it is not run (`CLAUDE.md` §3). What stops
-a paid run is judged per finding, and "не е ясно" stops it (`CLAUDE.md` §3, "Какво
-спира платено пускане").
+a paid run is judged per finding, and "not clear" stops it (`CLAUDE.md` §3, "What
+stops a paid run").
 
 **`AI_SRE_LIVE=1` on the command line.** `scripts/run-scenarios.mjs` may call an
 address off this machine **only** when `AI_SRE_LIVE=1` is in the invocation's
 environment, and it is **refused if it arrives from the `.env` file** — that file
 is read by every invocation, including tests, so a value set there is rejected by
-name (`run-scenarios.mjs` lines 85–117). This is the code form of the `харчи` rule:
+name (`run-scenarios.mjs` lines 85–117). This is the code form of the `harchi` rule:
 a paid call must be an explicit act, and no test can reach a paid instance.
 
 **Read-only MVP.** The remediation schema's `executed` field is `const: false`,
@@ -294,12 +294,12 @@ in the schema (`remediation.schema.json` `allOf`).
 **No subagent and no review ever spends.** This is written into every review and
 subagent prompt, with the forbidden commands named verbatim — `do not run npm
 install, do not run npx, do not run grok, do not run codex, do not call any paid
-API, do not run any network command` (`CLAUDE.md` §13, "Кои команди харчат пари";
-§7, "Никой субагент не харчи пари").
+API, do not run any network command` (`CLAUDE.md` §13, "Which commands spend money";
+§7, "No subagent spends money").
 
 **Every change goes through external review before commit, and the review is
 adversarial** — the mandate is "assume there is a defect and find it", not a reply
-to the author's own questions (`CLAUDE.md` §6; WORKING-RULES "Прегледът е враждебен").
+to the author's own questions (`CLAUDE.md` §6; WORKING-RULES "The review is adversarial").
 Nothing is committed that the review did not see.
 
 **The three hooks** (registered in `~/.claude/settings.json`, so they apply in every

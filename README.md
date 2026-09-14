@@ -1,179 +1,183 @@
-# AI SRE — многоагентен разследвач на Kubernetes инциденти (прототип)
+# AI SRE — multi-agent Kubernetes incident investigator (prototype)
 
-Система от няколко LLM агента, която разследва Kubernetes инцидент и обяснява
-причината. Работи като **генериран n8n Cloud workflow**: фалшива Datadog аларма
-влиза, три специализирани агента четат по един срез от инцидента, четвърти агент
-(Root Cause) заключава, и резултатът се публикува в **истински Slack** канал.
+A system of several LLM agents that investigates a Kubernetes incident and explains
+the cause. It runs as a **generated n8n Cloud workflow**: a fake Datadog alert
+comes in, three specialized agents each read one slice of the incident, a fourth agent
+(Root Cause) concludes, and the result is published to a **real Slack** channel.
 
-Всичко външно — Kubernetes клъстер, логове, метрики, Datadog — е **нарочно
-симулирано** с fixture данни. Реален е само Slack: жив app публикува доклада, а
-двупосочен бот отговаря на въпроси в нишката. Това е **прототип, и това е
-обхватът** (решение от 2026-09-05); границата не е пропуск, който чака поправка.
+Everything external — the Kubernetes cluster, logs, metrics, Datadog — is **deliberately
+simulated** with fixture data. Only Slack is real: a live app publishes the report, and
+a two-way bot answers questions in the thread. This is a **prototype, and that is the
+scope** (decision from 2026-09-05); the boundary is not a gap awaiting a fix.
 
-Над-целта е **eval loop** — цикъл, който подобрява агента във времето:
-`collect → score → read/диагноза → improve (подкана) → measure`, като нова
-подкана се задържа само ако измерването я оправдае.
+The over-goal is an **eval loop** — a cycle that improves the agent over time:
+`collect → score → read/diagnose → improve (prompt) → measure`, where a new
+prompt is kept only if the measurement justifies it.
 
-Числата в този файл идват от измерване, не от преценка. Живата готовност се чете с
-`node scripts/readiness.mjs --short`, разходът с `node scripts/spend.mjs --short`.
-Пълната, evidence-grounded спецификация е в `SPEC.md` — всяко твърдение сочи файла,
-от който идва. (Обновена 2026-09-13: реален Slack, всичките 15 сценария измерени.)
+The numbers in this file come from measurement, not judgment. The live readiness is read with
+`node scripts/readiness.mjs --short`, the spend with `node scripts/spend.mjs --short`.
+The full, evidence-grounded specification is in `SPEC.md` — every claim points to the file
+it comes from. (Updated 2026-09-14: real Slack, all 15 scenarios measured, fallback provider proven live, both Slack posts redacted.)
 
 ---
 
-## Какво работи сега
+## What works now
 
 ```
-node scripts/readiness.mjs --short   # готовност, от артефакти на диска
-node scripts/spend.mjs --short       # разход, floor от записани пускания
+node scripts/readiness.mjs --short   # readiness, from artifacts on disk
+node scripts/spend.mjs --short       # spend, floor from recorded runs
 ```
 
-Към момента на писане (2026-09-13):
+At the time of writing (2026-09-14):
 
 ```
 readiness 92% — 24 of 26 checks green, 0 red, 2 unestablished — 2 on work not yet done
-spend $0.0455 — floor, 44 run(s) could not be priced
+spend $0.0455 — floor, 82 run(s) could not be priced
 ```
 
-Готовността има **три състояния**, не две — зелено, червено и **неустановено** —
-защото да броиш неустановеното за провал прави проект, който още не е питан, да
-изглежда счупен, а да го изхвърлиш прави проект, който не може да отговори, да
-изглежда завършен. Двете неустановени днес са `dod-6` (без cross-incident данни в
-подканите — чака начин да се каже чия е немаркирана данна) и `gate` (записаният
-резултат на gate-а предхожда `tests/eval.test.ts`, значи не е за това дърво).
+Readiness has **three states**, not two — green, red, and **unestablished** —
+because counting the unestablished as a failure makes a project that has not been asked yet
+look broken, while throwing it out makes a project that cannot answer look
+finished. The two unestablished today are `dod-6` (no cross-incident data in the
+prompts — awaiting a way to say whose data is unlabeled) and `gate` (the recorded
+result of the gate predates `tests/eval.test.ts`, so it is not for this tree).
 
-Разходът е **floor**: `gpt-5` пусканията не носят usage в webhook отговора, значи
-не могат да се остойностят и се броят за `unknown` с **никакво число**, не за нула.
-Абонаментите (Astra/Codex, Grok) са фиксирана месечна такса и не се сумират с
-кредитите на n8n.
+The spend is a **floor**: the `gpt-5` runs carry no usage in the webhook response, so
+they cannot be priced and count as `unknown` with **no number**, not as zero.
+The subscriptions (Astra/Codex, Grok) are a fixed monthly fee and are not summed with
+the n8n credits.
 
-Какво е доказано, всяко от записан артефакт:
+What is proven, each from a recorded artifact:
 
-| Нещо | Състояние |
+| Thing | State |
 |---|---|
-| **Веригата от край до край** | минавала е през **разположения** workflow; записите са в `docs/runs/` |
-| **15-те сценария** | и 15-те са измерени с модел и отговорени **вярно** (readiness ги брои зелени) |
-| **Жив Slack доклад** | реален incident доклад, постнат в реалния `#incidents` канал (ts `1789225759.977389`) — `docs/runs/2026-09-12-volume-full.json`, n8n execution 383 |
-| **Двупосочен бот** | чува въпрос в нишката и отговаря; anti-loop хваща собствения си отговор — `docs/runs/2026-09-12-slack-reply.json`, execution 374 |
-| **Симулиран Datadog** | fake Datadog регистрация, тествана на живо |
-| **Trace viewer** | локален, read-only web изглед на пусканията, node-by-node |
-| **Eval baseline** | `k=3` на четири сценария, всичките зелени под един набор подкани |
+| **The chain end to end** | has run through a **deployed** workflow; the records are in `docs/runs/` |
+| **The 15 scenarios** | all 15 are measured with a model and answered **correctly** (readiness counts them green) |
+| **Live Slack report** | a real incident report, posted to the real `#incidents` channel (ts `1789225759.977389`) — `docs/runs/2026-09-12-volume-full.json`, n8n execution 383 |
+| **Two-way bot** | hears a question in the thread and answers; anti-loop catches its own answer — `docs/runs/2026-09-12-slack-reply.json`, execution 374 |
+| **Simulated Datadog** | fake Datadog registration, tested live |
+| **Trace viewer** | local, read-only web view of the runs, node-by-node |
+| **Eval baseline** | `k=3` on **all 15 scenarios**, 0 sticky problems, under one prompt set (`2c121d3550c3`) — `docs/answers/2026-09-14-baseline-extend.json` |
+| **Fallback model (Grok)** | on an OpenAI failure all 4 agents fall to Grok; **proven live** — n8n execution 415, the whole chain concluded on `grok-4.3` |
+| **Output redaction** | a narrow `redactSecrets` (`src/core/redact.ts`) guards **both** Slack posts — the report and the reply — from one source |
 
 ---
 
-## Архитектура накратко
+## Architecture in brief
 
-**Четирите агента** (подканите са в `prompts/`, version-controlled):
+**The four agents** (the prompts are in `prompts/`, version-controlled):
 
-| Агент | Подкана | Роля |
+| Agent | Prompt | Role |
 |---|---|---|
-| Kubernetes | `prompts/kubernetes-agent.md` | чете среза със състоянието на клъстера |
-| Logs | `prompts/logs-agent.md` | чете среза с логовете |
-| Metrics | `prompts/metrics-agent.md` | чете среза с метриките |
-| Root Cause | `prompts/root-cause-agent.md` | заключава от трите доклада |
+| Kubernetes | `prompts/kubernetes-agent.md` | reads the slice with the cluster state |
+| Logs | `prompts/logs-agent.md` | reads the slice with the logs |
+| Metrics | `prompts/metrics-agent.md` | reads the slice with the metrics |
+| Root Cause | `prompts/root-cause-agent.md` | concludes from the three reports |
 
-Първите три **извличат** (четат един срез, докладват какво има в него); преценката
-е на заключаващия агент. Моделите са два (от 2026-09-11): `gpt-5` **заключава**,
-`gpt-5-mini` **събира** — разцепването е измерено, не козметично.
+The first three **extract** (read one slice, report what is in it); the judgment
+is the concluding agent's. There are two models (since 2026-09-11): `gpt-5` **concludes**,
+`gpt-5-mini` **gathers** — the split is measured, not cosmetic.
 
-**Как се строи workflow-ът.** Code node на n8n няма файлова система и няма `require`
-извън тесен allowlist. Затова `scripts/generate-workflow.mjs` (плюс
-`scripts/workflow-runtime.mjs`) сплайсва всичко — самостоятелните валидатори от
-`schemas/`, транспилирани `src/core/*` файлове, и четирите подкани дословно — в
-вграден JavaScript. Разположеният export е `workflows/incident.json`. Двупосочният
-бот е **отделен** workflow, генериран от `scripts/generate-listener.mjs`
+**How the workflow is built.** The n8n Code node has no filesystem and no `require`
+outside a narrow allowlist. So `scripts/generate-workflow.mjs` (plus
+`scripts/workflow-runtime.mjs`) splices everything — the standalone validators from
+`schemas/`, transpiled `src/core/*` files, and the four prompts verbatim — into
+embedded JavaScript. The deployed export is `workflows/incident.json`. The two-way
+bot is a **separate** workflow, generated by `scripts/generate-listener.mjs`
 (`workflows/slack-listener.json`).
 
-**15-те сценария като eval набор.** Всеки сценарий е папка `scenarios/<име>/` с
-fixture данни (`alert/kubernetes/logs/metrics/expected.json`) и номер в
-`scenarios/registry.json` (append-only; номерата не се преизползват). Покрива се
-затворен списък от 13 cause кода плюс две поведенчески проверки — отказ при слаби
-данни (`insufficient-evidence`) и сдържаност при противоречиви данни
-(`conflicting-evidence`, таван на увереността 0.6).
+**The 15 scenarios as an eval set.** Each scenario is a folder `scenarios/<name>/` with
+fixture data (`alert/kubernetes/logs/metrics/expected.json`) and a number in
+`scenarios/registry.json` (append-only; numbers are not reused). It covers a
+closed list of 13 cause codes plus two behavioral checks — refusal on weak
+data (`insufficient-evidence`) and restraint on conflicting data
+(`conflicting-evidence`, confidence ceiling 0.6).
 
-**Gate + мутационно тестване.** `scripts/acceptance-gate.mjs` проверява дали
-**обещаното** е построено (различен въпрос от „работи ли кодът"). Мутационната
-проверка връща записан дефект — по един — и иска именуваният за него тест да падне;
-не падне ли, тестът е украшение и gate-ът го казва. Файлът се възстановява с
-обратна редакция, никога с `git restore`. `scripts/mutation-fanout.mjs` пуска
-целия набор паралелно.
+**Gate + mutation testing.** `scripts/acceptance-gate.mjs` checks whether the
+**promised** thing is built (a different question from "does the code work"). The mutation
+check reintroduces a recorded defect — one at a time — and requires the test named for it to fail;
+if it does not, the test is decoration and the gate says so. The file is restored with a
+reverse edit, never with `git restore`. `scripts/mutation-fanout.mjs` runs the
+whole set in parallel.
 
-**Provenance и eval read.** Всяко пускане **от 2026-09-13 насам** носи
-`prompt_versions` (кой набор подкани го е произвел); по-старите записи нямат полето
-и `eval.mjs` ги държи в отделна група `(no provenance)`, не ги смесва с версиите. `scripts/eval.mjs` / `src/core/eval.ts` държат keep-rule-а —
-нова подкана се задържа само ако не влошава baseline-а. Четенето вече и
-**диагностицира**: под всеки не-зелен сценарий печата **оста** на провала — грешен
-код (`got→want` с брой), пропуснати `must_cite` пътища, и осите unqualified /
-unresolved с причините им — така следващата редакция на подканата има цел, не
-догадка. Диагнозата е **детайл**, не присъда: не пипа keep-rule-а. Остатъкът е в
-`docs/backlog.md`: оценка на **кой агент** е сгрешил (специалистът, не само крайният
-код), тест срещу етикета-пряк път, `--plan`, и k=3 за другите 11 сценария.
+**Provenance and eval read.** Every run **from 2026-09-13 onward** carries
+`prompt_versions` (which prompt set produced it); older records lack the field
+and `eval.mjs` keeps them in a separate group `(no provenance)`, does not mix them with the versions. `scripts/eval.mjs` / `src/core/eval.ts` hold the keep-rule —
+a new prompt is kept only if it does not worsen the baseline. The read now also
+**diagnoses**: under each non-green scenario it prints the **axis** of the failure —
+wrong code (`got→want` with a count), missed `must_cite` paths, and the axes unqualified /
+unresolved with their reasons — so the next prompt edit has a target, not
+a guess. The diagnosis is a **detail**, not a verdict: it does not touch the keep-rule. It also
+**attributes** a missed citation to the owning agent (kubernetes/logs/metrics) and
+says which prompt to edit; `--plan` prints the cost of an edit before you
+write it. **The baseline now covers all 15 scenarios at k=3, 0 sticky** — that is,
+the agent passes everything under the current prompts, and every future edit will be kept
+only if it is measurably better against the full set.
 
 ---
 
-## Как се работи с него
+## How to work with it
 
-Всяка команда чете от диска и **не харчи**, освен изрично отбелязаното.
+Every command reads from disk and **does not spend**, except where explicitly noted.
 
-| Команда | На кой въпрос отговаря | Харчи ли |
+| Command | Which question it answers | Does it spend |
 |---|---|---|
-| `node scripts/readiness.mjs` | колко е готов проектът (лента + процент, от артефакти) | не |
-| `node scripts/spend.mjs` | колко е струвал (floor, от записани пускания) | не |
-| `node scripts/acceptance-gate.mjs` | направено ли е обещаното (+ мутационна проверка) | не |
-| `npx vitest run` | работи ли кодът | не |
-| `npx tsc --noEmit` | стягат ли типовете | не |
-| `node scripts/eval.mjs` | как се държи агентът срещу eval набора (keep-rule) | не |
-| `node scripts/trace-viewer.mjs` | локален изглед на пусканията (`http://127.0.0.1:7333`) | не |
-| `node scripts/run-scenarios.mjs` | **платеният runner** — POST-ва аларма към webhook-а | **да** |
+| `node scripts/readiness.mjs` | how ready the project is (bar + percent, from artifacts) | no |
+| `node scripts/spend.mjs` | how much it has cost (floor, from recorded runs) | no |
+| `node scripts/acceptance-gate.mjs` | is the promised thing built (+ mutation check) | no |
+| `npx vitest run` | does the code work | no |
+| `npx tsc --noEmit` | do the types check | no |
+| `node scripts/eval.mjs` | how the agent behaves against the eval set (keep-rule) | no |
+| `node scripts/trace-viewer.mjs` | local view of the runs (`http://127.0.0.1:7333`) | no |
+| `node scripts/run-scenarios.mjs` | **the paid runner** — POSTs an alert to the webhook | **yes** |
 
-`vitest` и gate-ът отговарят на различни въпроси: тестовете казват дали кодът
-работи, gate-ът — дали обещаното е построено. Тест, който никой не е написал, не
-пада; просто го няма, и всичко изглежда зелено.
+`vitest` and the gate answer different questions: the tests say whether the code
+works, the gate whether the promised thing is built. A test that no one has written does not
+fail; it is simply not there, and everything looks green.
 
-Единственото, което тегли пари, е **изпълнение на workflow с модел в него** —
-кредитите се таксуват от ключа в n8n Credentials. Създаване, качване и четене на
-workflow **не харчи**. Живо пускане иска изричната дума `харчи` от собственика, и
-става само с `AI_SRE_LIVE=1` на командния ред (отказва се, ако дойде от `.env`).
-Правилата за работа са в `CLAUDE.md`; номерът на текущия кръг се чете от
-`PROGRESS.md`, не се помни.
-
----
-
-## Решения и честни ограничения
-
-Обхватът е решение на собственика; етосът на проекта е да **не твърди повече от
-доказаното**.
-
-| Граница | Какво значи |
-|---|---|
-| **Симулиран клъстер, реален Slack** (2026-09-12) | всеки provider е fixture; само Slack е жив навън — app, канал, токен, двупосочен бот. Публичен облак, за да е взаимно достижим (n8n Cloud не чете `localhost`) |
-| **Read-only MVP** | агентите препоръчват действия, не ги изпълняват; схемата отказва `executed: true`, за да падне шумно в деня, в който нещо действа |
-| **Без Redis / без атомна ключалка** (2026-09-12) | една Slack нишка на инцидент е гарантирана само под `MemoryStore`; живият път няма compare-and-swap, а n8n Cloud пуска webhook-ите паралелно. Два **едновременни** сигнала за един инцидент могат да отворят две нишки. Демото пали по един инцидент; `DurableThreadIndex`/`AtomicStore` са шевът за истински CAS store |
-| **Ботът отговаря от доклада** | reply-ът се сглобява от подготвения доклад, не от суровите наблюдения — „не можах" не се слепва с „ето отговора" |
-| **Първият Slack пост още не е redacted** | `redactSecrets` пази само reply-пътя; самият incident доклад (`slackReport` в `thread.ts`) не минава през него. В прототипа fixture-ите нямат тайни; тухлата да се затвори е в `docs/backlog.md` |
-| **Увереността е твърдение на модела** | няма калибрирана скала зад числото; двата тавана (0.5 отказ, 0.6 при противоречие) са **избрани**, не измерени |
-| **`gpt-5` отказва `temperature: 0`** | важи default 1, значи **два прогона не са строго сравними** — разлика може да е самото семплиране |
-| **Един инцидент на изпълнение** | цялата изолация сравнява срещу една заявка; няколко инцидента в едно изпълнение — нарочно не |
-
-Измерените сценарии са **единични пускания** на сценарий: те установяват
-**покритие, не надеждност**. Никакво твърдение за разсейване не се прави от тях.
+The only thing that draws money is **executing a workflow with a model in it** —
+the credits are billed from the key in n8n Credentials. Creating, uploading, and reading a
+workflow **does not spend**. A live run requires the explicit word `harchi` (spend) from the owner, and
+happens only with `AI_SRE_LIVE=1` on the command line (it is refused if it comes from `.env`).
+The working rules are in `CLAUDE.md`; the number of the current round is read from
+`PROGRESS.md`, not remembered.
 
 ---
 
-## За повече дълбочина
+## Decisions and honest limitations
 
-| Файл | Какво |
+The scope is the owner's decision; the ethos of the project is to **not claim more than what is
+proven**.
+
+| Boundary | What it means |
 |---|---|
-| `SPEC.md` | пълната спецификация — всяко твърдение сочи файла, от който идва (обновена 2026-09-13: реален Slack, 15/15 измерени) |
-| `PROGRESS.md` | хронологичният дневник; номерът на кръга се чете оттам |
-| `CLAUDE.md` | правилата на проекта, решенията, командите, машинните капани |
-| `docs/backlog.md` | отворените тухли (оценка на специалистите, redaction на report-пътя, fallback provider) |
-| `docs/slack-setup.md`, `docs/trace-viewer.md` | реалният Slack и trace viewer-ът |
-| `docs/spend-counter.md`, `docs/readiness-counter.md` | как се броят разходът и готовността |
-| `docs/measurement-contract.md`, `docs/async-shape.md` | как се мери и защо отговорът се чете от execution записа |
+| **Simulated cluster, real Slack** (2026-09-12) | every provider is a fixture; only Slack is live externally — app, channel, token, two-way bot. A public cloud so it is mutually reachable (n8n Cloud does not read `localhost`) |
+| **Read-only MVP** | the agents recommend actions, do not execute them; the schema refuses `executed: true`, so it fails loudly the day something acts |
+| **No Redis / no atomic lock** (2026-09-12) | one Slack thread per incident is guaranteed only under `MemoryStore`; the live path has no compare-and-swap, while n8n Cloud runs the webhooks in parallel. Two **concurrent** signals for one incident can open two threads. The demo fires one incident at a time; `DurableThreadIndex`/`AtomicStore` are the seam for a real CAS store |
+| **The bot answers from the report** | the reply is assembled from the prepared report, not from the raw observations — "I couldn't" is not glued to "here is the answer" |
+| **Confidence is the model's claim** | there is no calibrated scale behind the number; the two ceilings (0.5 refusal, 0.6 on conflict) are **chosen**, not measured |
+| **`gpt-5` refuses `temperature: 0`** | default 1 applies, so **two runs are not strictly comparable** — a difference could be the sampling itself |
+| **One incident per execution** | the whole isolation compares against one request; several incidents in one execution — deliberately not |
 
-## Тайни
+The measured scenarios are **single runs** per scenario: they establish
+**coverage, not reliability**. No claim about variance is made from them.
 
-Нищо тайно не влиза в repo-то. n8n ключът и Slack токенът стоят в
-`~/.config/ai-sre/n8n.env` (права `600`, извън дървото). Ключът на модела стои в
+---
+
+## For more depth
+
+| File | What |
+|---|---|
+| `SPEC.md` | the full specification — every claim points to the file it comes from (updated 2026-09-14: real Slack, 15/15 measured) |
+| `PROGRESS.md` | the chronological log; the round number is read from there |
+| `CLAUDE.md` | the project rules, decisions, commands, machine traps |
+| `docs/backlog.md` | the bricks and their state — all closed as of 2026-09-14 (specialist scoring, report-path redaction, fallback provider all done; more scenarios rejected) |
+| `docs/slack-setup.md`, `docs/trace-viewer.md` | the real Slack and the trace viewer |
+| `docs/spend-counter.md`, `docs/readiness-counter.md` | how spend and readiness are counted |
+| `docs/measurement-contract.md`, `docs/async-shape.md` | how it is measured and why the answer is read from the execution record |
+
+## Secrets
+
+Nothing secret goes into the repo. The n8n key and the Slack token stay in
+`~/.config/ai-sre/n8n.env` (permissions `600`, outside the tree). The model key stays in
 n8n Credentials.

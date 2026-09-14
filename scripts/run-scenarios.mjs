@@ -89,7 +89,7 @@ function loadDotEnvOnce(env = process.env) {
  * reasons, and the third is the one that was measured:
  *
  * 1. A paid call should be an explicit act, which is what the owner's rule
- *    about the word `харчи` says in prose. This is the same thing in code.
+ *    about the word `harchi` says in prose. This is the same thing in code.
  * 2. A test never sets it, so no test can reach a paid instance — whatever
  *    happens to its address, its ledger, or its mutations.
  * 3. The earlier floor keyed on a temporary claims ledger, which guards the
