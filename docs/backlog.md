@@ -336,3 +336,32 @@ they cannot drift apart again in either direction.
 What a paid run would establish: that a Slack 500 no longer kills the stores, that an
 `ok:false` is no longer counted as answered, and that the usage row is actually written.
 That needs the owner's `harchi`; it was not asked for here.
+
+## Brick · the smoke run found a column the live table does not have · 2026-09-15
+
+The one paid smoke execution (exec 525) ran the WHOLE chain — four agents, Conclude,
+Report, **Slack post**, Slack took, Slack ok, Slack record — and then failed at
+`Record incident data` with:
+
+```
+Validation error with data table request: unknown column name 'usage'
+```
+
+The generator was changed to write `usage` / `models` / `execution_id` into the incident
+data table (finding #1), but **those columns do not exist in the live table** — it has only
+`incident_id` and `data`. Nothing in the repo could have caught this: the deterministic
+tests read the generated JSON, and the JSON is correct; only the live table knows its own
+schema. Grok blocked the column wiring three times, each time rightly, and neither of us
+asked the question that mattered — whether the columns exist at all. Absence is not consent.
+
+**What the run DID establish, and it is not nothing:** the six rewiring changes did not
+break the working path. Slack post ran, `Slack took` and `Slack ok` ran after it, and
+`Slack record` ran — so the `fullResponse` / `body.ok` change did not silently kill the
+delivery. That was the biggest risk of the change and it is now measured.
+
+**To close it:** add three string columns — `usage`, `models`, `execution_id` — to the
+`incident_data` table (id `rKZEwVRRLB3Xb6LR`). The n8n public API cannot add columns to an
+existing table; it needs the n8n UI (Data Tables → incident_data) or an Instance-level MCP
+token (Settings → Instance-level MCP → Enabled), which this instance does not have enabled.
+Until then `Record usage` and `Record incident data` will both fail on every live run —
+which is loud, not silent, and that is the right failure mode.
