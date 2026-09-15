@@ -491,9 +491,28 @@ export function buildWorkflow(runtime, { name = "AI SRE — incident investigati
     // Ask output 0 is success -> Collect; output 1 is the ERROR output (onError:
     // continueErrorOutput) -> Grok fallback, which then joins the SAME Collect.
     connections[ask] = { main: [[{ node: collect, type: "main", index: 0 }], [{ node: grok, type: "main", index: 0 }]] };
-    // Grok's success (0) AND its error (1) both go to Collect: a Grok that also fails
-    // must land as an unreadable reply (unestablished), not kill the run after paying.
-    connections[grok] = { main: [[{ node: collect, type: "main", index: 0 }], [{ node: collect, type: "main", index: 0 }]] };
+    /*
+     * Grok's success (0) goes straight to Collect. Its ERROR (1) goes through a marker
+     * node first, then to the SAME Collect.
+     *
+     * Both outputs used to wire directly to Collect: correct behaviour (a Grok that
+     * also fails lands as an unreadable reply rather than killing a run already paid
+     * for) but "Grok answered" and "Grok failed" were indistinguishable at the wire
+     * level, so no trace could ever say which happened (prd-agent-n8n, 2026-09-15).
+     * The marker makes the failure observable without a second Collect — Grok refused
+     * the split, because two Collect nodes would duplicate the defensive unwrap that
+     * is the one thing that must not drift into two copies.
+     */
+    const grokFailed = `${grok} failed`;
+    nodes.push({
+      id: `grok-failed-${agent}`, name: grokFailed, type: "n8n-nodes-base.set", typeVersion: 3.4,
+      position: [x + 270, 300],
+      parameters: { mode: "raw",
+        jsonOutput: "={{ JSON.stringify(Object.assign({}, $json, { grok_error: true, grok_error_at: " + JSON.stringify(agent) + " })) }}",
+        options: {} },
+    });
+    connections[grok] = { main: [[{ node: collect, type: "main", index: 0 }], [{ node: grokFailed, type: "main", index: 0 }]] };
+    connections[grokFailed] = { main: [[{ node: collect, type: "main", index: 0 }]] };
     connections[collect] = { main: [[{ node: record, type: "main", index: 0 }]] };
 
     // False goes to this agent's Record node, not past it.
@@ -523,7 +542,70 @@ export function buildWorkflow(runtime, { name = "AI SRE — incident investigati
    * deterministic: it reads the incident and asks no model.
    */
   nodes.push(code("report", "Report", reportNodeCode(), [x + 740, 0]));
-  connections["Conclude"] = { main: [[{ node: "Report", type: "main", index: 0 }]] };
+
+  /*
+   * Record usage — the token counts, made durable (prd-agent-n8n, 2026-09-15).
+   *
+   * The Collect nodes compute `usage_by_agent` and every Record node carries it
+   * faithfully — and then nothing stored it: the numbers survived only inside the n8n
+   * execution record, which n8n PRUNES. That breaks this repo's own rule (every paid
+   * call records an artifact at the time of the call), and the honest answer to "what
+   * did last month cost" would simply vanish with the retention window.
+   *
+   * PARALLEL off Conclude, deliberately — an earlier version put it SERIALLY between
+   * Conclude and Report and Grok blocked it (2026-09-15): an n8n dataTable node can
+   * REPLACE the item with the written row, this repo already knows it (the listener's
+   * `Fetch thread` reads `$('Handle')`, and `Slack took` reads `$('Report')`, for exactly
+   * that reason), and `Report` refuses anything whose `state` is not "concluded". So a
+   * store on the line could have swallowed the whole report — four paid calls spent and
+   * nothing posted, which is far worse than the lost token counts it fixes. Off to the
+   * side it cannot touch what Report receives.
+   *
+   * Grok refused a NEW table: it upserts into the SAME incident table keyed by
+   * incident_id, and `Record incident data` was given the same columns so its later
+   * upsert of that row carries them forward instead of wiping them. This is n8n-side
+   * evidence, not a spend.mjs artifact: spend.mjs still reads only disk
+   * (docs/spend-counter.md), and nothing here makes it touch the network.
+   */
+  const usageTable = { __rl: true, mode: "id", value: INCIDENT_DATA_TABLE };
+  nodes.push({
+    id: "store-usage", name: "Record usage", type: "n8n-nodes-base.dataTable", typeVersion: 1.1,
+    position: [x + 740, 220],
+    parameters: { resource: "row", operation: "upsert", dataTableId: usageTable,
+      filters: { conditions: [{ keyName: "incident_id", condition: "eq",
+        keyValue: "={{ $json.incident.incident_id }}" }] },
+      columns: { mappingMode: "defineBelow",
+        /*
+         * Carries `data` too, symmetrically (Grok, 2026-09-15, third round).
+         *
+         * This node and `Record incident data` now upsert the SAME row in PARALLEL, and
+         * a defineBelow upsert blanks the columns it does not name. Naming only the usage
+         * columns here would wipe the observations whenever this one happens to write
+         * last — the mirror image of the defect the carried columns down there fix. Both
+         * writers now name every column, so whichever lands last writes the same values.
+         */
+        value: {
+          incident_id: "={{ $json.incident.incident_id }}",
+          data: "={{ JSON.stringify($json.incident.observations || {}) }}",
+          usage: "={{ JSON.stringify($json.usage_by_agent || {}) }}",
+          models: "={{ JSON.stringify($json.model_by_agent || {}) }}",
+          execution_id: "={{ String($execution.id) }}",
+        },
+        matchingColumns: ["incident_id"], schema: [
+          { id: "incident_id", displayName: "incident_id", type: "string", canBeUsedToMatch: true, required: false, display: true, defaultMatch: false },
+          { id: "data", displayName: "data", type: "string", canBeUsedToMatch: false, required: false, display: true, defaultMatch: false },
+          { id: "usage", displayName: "usage", type: "string", canBeUsedToMatch: false, required: false, display: true, defaultMatch: false },
+          { id: "models", displayName: "models", type: "string", canBeUsedToMatch: false, required: false, display: true, defaultMatch: false },
+          { id: "execution_id", displayName: "execution_id", type: "string", canBeUsedToMatch: false, required: false, display: true, defaultMatch: false },
+        ] } },
+    // Storing the usage must never cost the run: a data-table failure here would
+    // otherwise throw away an investigation that is already paid for and concluded.
+    onError: "continueRegularOutput",
+  });
+  connections["Conclude"] = { main: [[
+    { node: "Report", type: "main", index: 0 },
+    { node: "Record usage", type: "main", index: 0 },
+  ]] };
 
   /*
    * And then the real Slack post — the visible end of the prototype (decision B).
@@ -575,12 +657,25 @@ export function buildWorkflow(runtime, { name = "AI SRE — incident investigati
     parameters: { resource: "row", operation: "upsert", dataTableId: idTable,
       filters: { conditions: [{ keyName: "incident_id", condition: "eq",
         keyValue: "={{ $json.incident.incident_id }}" }] },
+      /*
+       * Carries the usage columns forward (Grok, 2026-09-15). This upserts the SAME row
+       * `Record usage` just wrote, keyed by incident_id — a defineBelow upsert that named
+       * only incident_id/data would blank `usage`, `models` and `execution_id`, so the
+       * durable-token fix would delete itself one node later. They are re-read from the
+       * Report item, which carries them through from Conclude.
+       */
       columns: { mappingMode: "defineBelow",
         value: { incident_id: "={{ $json.incident.incident_id }}",
-          data: "={{ JSON.stringify($json.incident.observations || {}) }}" },
+          data: "={{ JSON.stringify($json.incident.observations || {}) }}",
+          usage: "={{ JSON.stringify($json.usage_by_agent || {}) }}",
+          models: "={{ JSON.stringify($json.model_by_agent || {}) }}",
+          execution_id: "={{ String($execution.id) }}" },
         matchingColumns: ["incident_id"], schema: [
           { id: "incident_id", displayName: "incident_id", type: "string", canBeUsedToMatch: true, required: false, display: true, defaultMatch: false },
           { id: "data", displayName: "data", type: "string", canBeUsedToMatch: false, required: false, display: true, defaultMatch: false },
+          { id: "usage", displayName: "usage", type: "string", canBeUsedToMatch: false, required: false, display: true, defaultMatch: false },
+          { id: "models", displayName: "models", type: "string", canBeUsedToMatch: false, required: false, display: true, defaultMatch: false },
+          { id: "execution_id", displayName: "execution_id", type: "string", canBeUsedToMatch: false, required: false, display: true, defaultMatch: false },
         ] } },
   });
   // A third independent branch: the SIMULATED Datadog registration (owner asked;
@@ -642,7 +737,22 @@ export function buildWorkflow(runtime, { name = "AI SRE — incident investigati
       sendHeaders: true, headerParameters: { parameters: [{ name: "Content-Type", value: "application/json; charset=utf-8" }] },
       sendBody: true, specifyBody: "json",
       jsonBody: `={{ JSON.stringify({ channel: "${SLACK_CHANNEL}", blocks: ($json.slack_blocks || []), text: ($json.slack_text || ($json.thread || []).join("\\n\\n")) }) }}`,
-      options: {} },
+      /*
+       * A Slack outage must not destroy an investigation that was already paid for.
+       *
+       * Without these the node THROWS on HTTP 500: the execution dies at the Slack
+       * branch, and because `Record incident data` / `Record Datadog` sit on parallel
+       * branches off Reported, whether they ran at all depends on execution order —
+       * four model calls paid for, the result neither posted nor reliably stored
+       * (prd-agent-n8n, 2026-09-15; Grok ranked it first). `neverError` keeps a
+       * non-2xx as data, `fullResponse` puts Slack's JSON under `body` (which is why
+       * `Slack took` below reads `$json.body.ok`), and `onError` lets the run continue
+       * so the storing branches finish. Retries are on the node, and only here and on
+       * the other Slack calls — NEVER on a model call, where a retry is a second bill.
+       */
+      options: { response: { response: { neverError: true, fullResponse: true } } } },
+    onError: "continueRegularOutput",
+    retryOnFail: true, maxTries: 3, waitBetweenTries: 1000,
   });
   connections["Slack lookup"] = { main: [[{ node: "Slack post", type: "main", index: 0 }]] };
 
@@ -650,7 +760,14 @@ export function buildWorkflow(runtime, { name = "AI SRE — incident investigati
     id: "slack-took", name: "Slack took", type: "n8n-nodes-base.set", typeVersion: 3.4,
     position: [sx + 2960, 0],
     parameters: { mode: "raw",
-      jsonOutput: `={{ JSON.stringify({ incident_id: $('Report').item.json.incident.incident_id, ts: ($json && $json.ok === true && typeof $json.ts === 'string' && $json.ts) ? $json.ts : "" }) }}`,
+      /*
+       * Reads `body`, because `Slack post` now sets `fullResponse` (the fix above):
+       * the Slack JSON moved from the top level into `$json.body`. The `|| $json`
+       * fallback keeps a plain (non-fullResponse) shape working, so this node is not
+       * silently coupled to that one option — and `ok === true` is still the test, not
+       * the HTTP status: chat.postMessage answers 200 with {"ok":false} when it refuses.
+       */
+      jsonOutput: `={{ JSON.stringify({ incident_id: $('Report').item.json.incident.incident_id, ts: (() => { const b = ($json && $json.body) || $json; return (b && b.ok === true && typeof b.ts === 'string' && b.ts) ? b.ts : ""; })() }) }}`,
       options: {} },
   });
   connections["Slack post"] = { main: [[{ node: "Slack took", type: "main", index: 0 }]] };

@@ -280,3 +280,59 @@ input.
 - Latent footgun: the incident report post has an un-redacted raw fallback
   `text: slack_text || thread.join(...)` (`generate-workflow.mjs:644`), safe today only
   because `redactSecrets` never empties non-empty content.
+
+## Brick · the 8 defects prd-agent-n8n filed · adjudicated and fixed 2026-09-15
+
+Another project (prd-agent-n8n) read our LIVE workflows while mining them for reuse and
+filed 8 defects (`DEFECTS-FOUND-BY-PRD-AGENT.md`). All 8 were verified true against the
+code. Grok adjudicated which belong in a prototype — the principle it set: **fix what
+LIES or LOSES something already paid for**; do not fix a race that needs Redis.
+
+**Fixed (6):**
+- **#2** `Slack post` had no neverError/fullResponse/onError: a Slack 500 threw and an
+  already-paid investigation was neither posted nor reliably stored (the Record nodes are
+  on parallel branches). Now it keeps a non-2xx as data and the run continues; `Slack took`
+  reads `body.ok`.
+- **#3** the listener's `Post reply` never checked Slack's `ok` — chat.postMessage answers
+  200 with `{"ok":false,"error":"not_in_channel"}`, so the bot went silent while the
+  workflow reported success. Now `Reply took` → `Trace turn`, the same ok-shape the
+  incident workflow already used.
+- **#6** zero retries anywhere. Now `retryOnFail: 3` on the SLACK calls only (`Slack post`,
+  `Fetch thread`, `Post reply`) — NEVER on a model call, where a retry is a second bill.
+  A test asserts no `Ask *` / `Grok *` node retries.
+- **#1** `usage_by_agent` was computed and then dropped — it survived only in the n8n
+  execution record, which n8n prunes, breaking this repo's own "record every paid call as
+  an artifact" rule. New `Record usage` node upserts it into the incident table.
+- **#8** the listener had no tracing at all: any failure after the ACK was silence. Now
+  every turn writes `ok` / `error` / `reply_ts` / `execution_id` onto its `event_id` row,
+  including the turn where nothing was posted.
+- **#7** `Grok <agent>` wired success and failure to the same Collect, so no trace could
+  say which happened. A marker node (`Grok <agent> failed`, `grok_error: true`) on the
+  error output makes it observable — not a second Collect, which would duplicate the
+  defensive unwrap.
+
+**Refused (#4)** — prd-agent proposed moving `Mark seen` after `Post reply`, or an error
+workflow that deletes the row. Grok refused both: on a Slack retry the first trades a lost
+answer for a SECOND PAID gpt-5 call, and the second races the retry. `Mark seen` stays
+before `Ask model`; the cost (a crashed turn consumes its event_id, and the user asks
+again with a new one) is the accepted one.
+
+**Skipped (#5)** — the dedupe is not atomic and cannot be with n8n data tables. Already a
+recorded limitation (2026-09-12); unchanged.
+
+**Grok blocked the implementation THREE times, each time rightly**, and each is a lesson
+worth keeping: (1) `Record usage` was first placed SERIALLY between Conclude and Report —
+an n8n dataTable can REPLACE the item with the written row (which is why the listener reads
+`$('Handle')` after its insert), and `Report` refuses anything not `concluded`, so the store
+could have swallowed the whole report: four paid calls spent, nothing posted. It is a
+parallel LEAF now. (2) The local harness had been relaxed to "walk through an on-line
+dataTable, carrying the item unchanged" — a claim that would have HIDDEN exactly that
+defect. Reverted. (3) The two writers of the incident row then blanked each other: an n8n
+defineBelow upsert wipes the columns it does not name, so whichever landed last deleted the
+other's. Both now name all five columns, and a test asserts their column sets are EQUAL so
+they cannot drift apart again in either direction.
+
+**Not verified live:** the workflows are deactivated and these fixes are deployed nowhere.
+What a paid run would establish: that a Slack 500 no longer kills the stores, that an
+`ok:false` is no longer counted as answered, and that the usage row is actually written.
+That needs the owner's `harchi`; it was not asked for here.

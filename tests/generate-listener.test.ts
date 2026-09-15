@@ -136,8 +136,69 @@ describe("the Slack listener is generated, not hand-typed in n8n", () => {
     expect(post.parameters.authentication).toBe("genericCredentialType");
     expect(post.parameters.jsonBody, "must post into the thread").toContain("thread_ts");
     expect(post.credentials.httpHeaderAuth).toEqual({ id: SLACK_CREDENTIAL.id, name: SLACK_CREDENTIAL.name });
-    expect(WF.connections["Has answer"].main[1], "no answer → post nothing").toEqual([]);
+    // No answer still posts NOTHING to Slack — but since 2026-09-15 it no longer
+    // vanishes: the false branch goes to Reply took → Trace turn, so the turn is
+    // recorded with its reason instead of being silence (prd-agent-n8n finding #8).
+    expect(WF.connections["Has answer"].main[1][0].node, "no answer → record, never post").toBe("Reply took");
+    expect(WF.connections["Has answer"].main[1].some((c: { node: string }) => c.node === "Post reply"),
+      "nothing is posted to Slack when the model gave no answer").toBe(false);
     const text = JSON.stringify(WF);
     expect(text, "no xoxb token anywhere").not.toMatch(/xoxb-/);
+  });
+});
+
+/*
+ * The defects prd-agent-n8n filed on 2026-09-15 after reading the live workflows, and
+ * Grok adjudicated the same day: fix what LIES or LOSES something already paid for.
+ * These tests fail against the shapes that were there before the fixes.
+ */
+describe("the listener does not report success when Slack refused, and records the turn", () => {
+  const byName = (n: string) => WF.nodes.find((x: any) => x.name === n);
+
+  it("checks Slack's ok — Post reply is no longer the last word", () => {
+    // chat.postMessage answers HTTP 200 with {"ok":false,"error":"not_in_channel"}.
+    // Post reply used to be the LAST node: nothing read that, the user saw nothing, and
+    // the turn counted as answered. Now it flows into the same ok-shape the incident
+    // workflow uses.
+    const post = byName("Post reply") as any;
+    expect(post.parameters.options?.response?.response?.fullResponse,
+      "fullResponse puts Slack's JSON under body, which the check reads").toBe(true);
+    expect(post.parameters.options?.response?.response?.neverError,
+      "a non-2xx must arrive as data, not as a thrown execution").toBe(true);
+    expect(WF.connections["Post reply"].main[0][0].node).toBe("Reply took");
+    const took = byName("Reply took") as any;
+    expect(took.parameters.jsonOutput, "ok is the test, not the HTTP status").toMatch(/b\.ok === true/);
+  });
+
+  it("records EVERY turn — including the one where nothing was posted", () => {
+    // The listener had no trace of any kind: a failure after the ACK was silence with
+    // no record anywhere. Both branches of Has answer must end in the trace row.
+    expect(WF.connections["Has answer"].main[0][0].node).toBe("Post reply");
+    expect(WF.connections["Has answer"].main[1][0].node,
+      "no answer is a turn too, and it is exactly the one that used to vanish").toBe("Reply took");
+    expect(WF.connections["Reply took"].main[0][0].node).toBe("Trace turn");
+    const trace = byName("Trace turn") as any;
+    expect(trace.type).toBe("n8n-nodes-base.dataTable");
+    expect(Object.keys(trace.parameters.columns.value)).toEqual(
+      expect.arrayContaining(["event_id", "ok", "error", "execution_id"]));
+    expect(trace.onError, "tracing must not break the turn it traces").toBe("continueRegularOutput");
+  });
+
+  it("retries the SLACK calls and NEVER the model call — a model retry is a second bill", () => {
+    expect((byName("Post reply") as any).retryOnFail).toBe(true);
+    expect((byName("Fetch thread") as any).retryOnFail).toBe(true);
+    const ask = byName("Ask model") as any;
+    expect(ask.retryOnFail ?? false, "retrying Ask model would pay twice for one question").toBe(false);
+    expect(ask.onError, "but a model failure after the ACK must still reach the trace").toBe("continueRegularOutput");
+  });
+
+  it("keeps Mark seen BEFORE the model call — the refused fix would double-spend", () => {
+    // prd-agent proposed moving Mark seen after Post reply (at-least-once). Grok refused:
+    // on a Slack retry that trades a lost answer for a SECOND paid gpt-5 call. The order
+    // stays, and the cost — a crashed turn consumes its event_id — is the recorded one.
+    const order: string[] = [];
+    let cur = "Mark seen";
+    for (let i = 0; i < 8 && cur; i++) { order.push(cur); cur = WF.connections[cur]?.main?.[0]?.[0]?.node; }
+    expect(order.indexOf("Mark seen")).toBeLessThan(order.indexOf("Ask model"));
   });
 });

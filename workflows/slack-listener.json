@@ -227,7 +227,10 @@
           ]
         },
         "options": {}
-      }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
     },
     {
       "id": "find-incident",
@@ -358,7 +361,8 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ model: \"gpt-5\", messages: $json.messages }) }}",
         "options": {}
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "id": "build-reply",
@@ -438,8 +442,123 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ channel: $json.channel, thread_ts: $json.thread_ts, text: $json.text }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "id": "took",
+      "name": "Reply took",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3840,
+        0
+      ],
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify((() => { const b = ($json && $json.body) || $json || {}; const h = $('Handle').first().json; return { event_id: h.event_id, thread_ts: h.thread_ts, ok: b.ok === true, error: (b.ok === true ? '' : String(b.error || 'no answer posted')), ts: (b.ok === true && typeof b.ts === 'string') ? b.ts : '' }; })()) }}",
         "options": {}
       }
+    },
+    {
+      "id": "trace",
+      "name": "Trace turn",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        4080,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "uBZvrUFgQcderwqF"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "event_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.event_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "event_id": "={{ $json.event_id }}",
+            "ok": "={{ String($json.ok) }}",
+            "error": "={{ $json.error }}",
+            "reply_ts": "={{ $json.ts }}",
+            "execution_id": "={{ String($execution.id) }}"
+          },
+          "matchingColumns": [
+            "event_id"
+          ],
+          "schema": [
+            {
+              "id": "event_id",
+              "displayName": "event_id",
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "id": "ok",
+              "displayName": "ok",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "id": "error",
+              "displayName": "error",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "id": "reply_ts",
+              "displayName": "reply_ts",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            },
+            {
+              "id": "execution_id",
+              "displayName": "execution_id",
+              "type": "string",
+              "canBeUsedToMatch": false,
+              "required": false,
+              "display": true,
+              "defaultMatch": false
+            }
+          ]
+        }
+      },
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -616,7 +735,35 @@
             "index": 0
           }
         ],
-        []
+        [
+          {
+            "node": "Reply took",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post reply": {
+      "main": [
+        [
+          {
+            "node": "Reply took",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply took": {
+      "main": [
+        [
+          {
+            "node": "Trace turn",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },

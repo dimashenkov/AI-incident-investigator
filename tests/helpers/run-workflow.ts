@@ -296,6 +296,18 @@ export async function runScenario(
       if (name.startsWith("Slack ")) return true;
       const n = byName[name];
       if (n === undefined) return false;
+      /*
+       * A dataTable is a side-effect: terminal, always.
+       *
+       * A version of `Record usage` sat serially between Conclude and Report, and this
+       * was relaxed to "terminal only if nothing continues past it" so the walk could
+       * pass through it. Grok blocked that whole shape on 2026-09-15: an n8n dataTable
+       * can REPLACE the item with the written row (which is why the listener reads
+       * `$('Handle')` rather than `$json` after its insert), so a store on the line
+       * could swallow the report — and this harness, by carrying the item unchanged,
+       * would have hidden exactly that. `Record usage` is a parallel leaf now, and the
+       * harness makes no claim about what a dataTable passes on.
+       */
       if (n.type === "n8n-nodes-base.dataTable") return true;
       const ask = n.type === "n8n-nodes-base.httpRequest" && name.startsWith("Ask ");
       return n.type === "n8n-nodes-base.httpRequest" && !ask;

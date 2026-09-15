@@ -1101,7 +1101,13 @@ export const MUTATIONS = [
     // every caveat the reporter writes exists only in tests.
     id: "deployed-chain-produces-no-thread",
     file: "scripts/generate-workflow.mjs",
-    from: '  connections["Conclude"] = { main: [[{ node: "Report", type: "main", index: 0 }]] };',
+    // The edge is a fan-out since 2026-09-15 (Conclude feeds Report AND the parallel
+    // Record usage store), so the anchor cuts the whole assignment: without it the
+    // report is stranded, which is exactly what the named test catches.
+    from: `  connections["Conclude"] = { main: [[
+    { node: "Report", type: "main", index: 0 },
+    { node: "Record usage", type: "main", index: 0 },
+  ]] };`,
     to: "",
     mustFail: "produces the thread a person reads, from the chain and not from a test",
   },
@@ -3007,8 +3013,11 @@ export const MUTATIONS = [
     // whatever came back, including on a 200 that is {ok:false}.
     id: "slack-records-ts-without-checking-ok",
     file: "scripts/generate-workflow.mjs",
-    from: "ts: ($json && $json.ok === true && typeof $json.ts === 'string' && $json.ts) ? $json.ts : \"\"",
-    to: "ts: (typeof $json.ts === 'string' && $json.ts) ? $json.ts : \"\"",
+    // Rewritten on 2026-09-15 with the expression it mutates: `Slack post` now sets
+    // fullResponse, so the check reads `body` (prd-agent-n8n finding #2). Same defect —
+    // record a ts without asking whether Slack actually said ok.
+    from: "return (b && b.ok === true && typeof b.ts === 'string' && b.ts) ? b.ts : \"\";",
+    to: "return (b && typeof b.ts === 'string' && b.ts) ? b.ts : \"\";",
     mustFail: "wires the real Slack delivery: dedup by rowNotExists, post the thread only, record only on ok",
   },
   {

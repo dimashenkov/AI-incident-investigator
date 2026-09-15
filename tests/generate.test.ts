@@ -233,7 +233,10 @@ describe("the shape of the deployed chain", () => {
 
     // The ts is taken only when ok is true; an empty ts is never recorded.
     const took = node("Slack took") as { parameters: { jsonOutput: string } };
-    expect(took.parameters.jsonOutput, "ts only when Slack said ok").toContain("$json.ok === true");
+    // Reads `body` since Slack post got fullResponse (prd-agent-n8n finding #2); `ok`
+    // is still the test, because chat.postMessage answers 200 when it refuses.
+    expect(took.parameters.jsonOutput, "ts only when Slack said ok").toContain("b.ok === true");
+    expect(took.parameters.jsonOutput, "and it reads the body fullResponse produces").toContain("$json.body");
 
     // Record runs only on the ok branch: main[0] -> record, main[1] -> nothing.
     const okOut = WF.connections["Slack ok"].main;
@@ -494,7 +497,12 @@ describe("the Grok fallback — every agent falls over to Grok on a provider err
       expect(g.parameters.jsonBody, "not the fragile .item on the error branch").not.toContain(`$('Ask ${agent}?').item.json`);
       const gc = WF.connections[`Grok ${agent}`].main;
       expect(gc[0][0].node, "Grok success rejoins Collect").toBe(`Collect ${agent}`);
-      expect(gc[1]?.[0]?.node, "Grok's OWN error also lands in Collect (unestablished, not death)").toBe(`Collect ${agent}`);
+      // Since 2026-09-15 the error passes through a marker first, so a failed Grok is
+      // distinguishable from an answering one — and still reaches the same Collect, so a
+      // Grok that also fails is unestablished rather than a killed, already-paid run.
+      expect(gc[1]?.[0]?.node, "Grok's OWN error is marked first").toBe(`Grok ${agent} failed`);
+      expect(WF.connections[`Grok ${agent} failed`].main[0][0].node,
+        "and still lands in Collect (unestablished, not death)").toBe(`Collect ${agent}`);
     }
   });
 
@@ -517,5 +525,100 @@ describe("the first Slack post is redacted too — the report path (Grok 2026-09
     expect(rc, "plain-text fallback redacted").toContain("redactSecrets(slack.text)");
     expect(rc, "Block Kit blocks redacted").toContain("redactBlocks(slack.blocks)");
     expect(rc, "the report node no longer emits the raw slack text").not.toMatch(/slack_text:\s*slack\.text\b/);
+  });
+});
+
+/*
+ * The defects prd-agent-n8n filed on 2026-09-15, adjudicated by Grok the same day.
+ * The principle: a prototype fixes what LIES or LOSES something already paid for.
+ */
+describe("a paid investigation is not lost to a Slack outage, and its cost is durable", () => {
+  const wf = WF;
+  const byName = (n: string) => wf.nodes.find((x: any) => x.name === n) as any;
+
+  it("Slack post cannot kill a run that four model calls were already paid for", () => {
+    // It had no neverError / fullResponse / onError: an HTTP 500 threw, and because the
+    // two Record nodes sit on parallel branches off Reported, whether anything was
+    // stored depended on execution order. Investigated, paid for, neither posted nor kept.
+    const post = byName("Slack post");
+    expect(post.parameters.options?.response?.response?.neverError).toBe(true);
+    expect(post.parameters.options?.response?.response?.fullResponse).toBe(true);
+    expect(post.onError, "the storing branches must still finish").toBe("continueRegularOutput");
+    expect(post.retryOnFail, "a Slack call is safe to retry — it spends nothing").toBe(true);
+  });
+
+  it("Slack took reads ok from the body, so fullResponse did not silently break the check", () => {
+    // fullResponse moves Slack's JSON under `body`. Reading $json.ok afterwards would
+    // always be undefined — the ok-check would pass nothing and record no ts, silently.
+    expect(byName("Slack took").parameters.jsonOutput).toMatch(/\$json\.body/);
+  });
+
+  it("stores usage_by_agent durably instead of letting n8n prune it", () => {
+    // The Collect nodes compute the token counts and every Record node carries them —
+    // and nothing stored them. They lived only in the execution record, which n8n prunes,
+    // so "what did last month cost" became unanswerable with no line saying so.
+    const usage = byName("Record usage");
+    expect(usage, "the node must exist").toBeTruthy();
+    expect(usage.type).toBe("n8n-nodes-base.dataTable");
+    expect(Object.keys(usage.parameters.columns.value)).toEqual(
+      expect.arrayContaining(["incident_id", "usage", "models", "execution_id"]));
+    /*
+     * PARALLEL off Conclude, and that is the point (Grok blocked the serial version,
+     * 2026-09-15): an n8n dataTable can replace the item with the written row, and
+     * `Report` refuses anything whose state is not "concluded" — so a store ON the line
+     * could have swallowed the report, four paid calls spent and nothing posted. Off to
+     * the side it cannot touch what Report receives.
+     */
+    const outs = wf.connections["Conclude"].main[0].map((c: { node: string }) => c.node);
+    expect(outs, "Report is still fed directly by Conclude").toContain("Report");
+    expect(outs, "and the store hangs beside it").toContain("Record usage");
+    expect(wf.connections["Record usage"], "a leaf: nothing downstream can be harmed by it").toBeUndefined();
+  });
+
+  it("both writers of the incident row name EVERY column, so neither blanks the other", () => {
+    /*
+     * The two dataTable nodes upsert the SAME row (keyed by incident_id) on PARALLEL
+     * branches, and an n8n defineBelow upsert blanks the columns it does not name. So
+     * whichever lands last wins — and if the two name different column sets, the winner
+     * deletes the loser's data. Grok caught this twice, once in each direction
+     * (2026-09-15): Record incident data would have wiped usage/models, and then
+     * Record usage would have wiped the observations. Both must name all of them.
+     */
+    const cols = (n: string) => Object.keys(byName(n).parameters.columns.value).sort();
+    expect(cols("Record usage"), "the two writers must agree column for column")
+      .toEqual(cols("Record incident data"));
+    expect(cols("Record usage")).toEqual(["data", "execution_id", "incident_id", "models", "usage"]);
+  });
+
+  it("the later Record incident data carries the usage columns instead of blanking them", () => {
+    // Both upsert the SAME row by incident_id. A defineBelow upsert naming only
+    // incident_id/data would wipe usage/models/execution_id — the fix deleting itself
+    // one node later (Grok, 2026-09-15).
+    const keys = Object.keys(byName("Record incident data").parameters.columns.value);
+    expect(keys).toEqual(expect.arrayContaining(["usage", "models", "execution_id"]));
+  });
+
+  it("makes a Grok fallback FAILURE distinguishable from a Grok answer", () => {
+    // Both of Grok's outputs went to the same Collect: correct behaviour, but no trace
+    // could ever say which happened. A marker node on the error output, not a second
+    // Collect — Grok refused the split (two Collects would duplicate the defensive unwrap).
+    for (const agent of ["kubernetes", "logs", "metrics", "root-cause"]) {
+      const outs = wf.connections[`Grok ${agent}`].main;
+      expect(outs[0][0].node, "success goes straight to Collect").toBe(`Collect ${agent}`);
+      expect(outs[1][0].node, "failure is marked first").toBe(`Grok ${agent} failed`);
+      const marker = byName(`Grok ${agent} failed`);
+      expect(marker.parameters.jsonOutput).toMatch(/grok_error/);
+      expect(wf.connections[`Grok ${agent} failed`].main[0][0].node,
+        "and still reaches the same Collect — a failed Grok must not kill a paid run")
+        .toBe(`Collect ${agent}`);
+    }
+  });
+
+  it("retries Slack and NEVER a model call", () => {
+    const retrying = wf.nodes.filter((n: any) => n.retryOnFail).map((n: any) => n.name);
+    expect(retrying, "Slack post is safe to retry").toContain("Slack post");
+    for (const n of retrying) {
+      expect(n, "a retried model call is a second bill").not.toMatch(/^(Ask|Grok) /);
+    }
   });
 });

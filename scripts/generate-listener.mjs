@@ -197,6 +197,9 @@ return [{ json: Object.assign({}, c, { reply: shouldReply(c) }) }];`
         { name: "ts", value: "={{ $('Handle').first().json.thread_ts }}" },
         { name: "limit", value: "1" },
       ] }, options: {} },
+    // A Slack GET is safe to retry — it spends nothing and a 429/5xx here otherwise
+    // loses a turn the user is waiting on (prd-agent-n8n, 2026-09-15). Slack calls only.
+    retryOnFail: true, maxTries: 3, waitBetweenTries: 1000,
   });
   connections["Mark seen"] = { main: [[{ node: "Fetch thread", type: "main", index: 0 }]] };
 
@@ -267,6 +270,15 @@ return [{ json: { ok: true, channel: h.channel, thread_ts: h.thread_ts,
       sendBody: true, specifyBody: "json",
       jsonBody: "={{ JSON.stringify({ model: " + JSON.stringify(MODEL) + ", messages: $json.messages }) }}",
       options: {} },
+    /*
+     * NO retry here — a retried model call is a SECOND BILL (Grok, 2026-09-15; the
+     * retries in this file are on Slack calls only). But onError, so an OpenAI 500
+     * after the ACK is not total silence: the item continues to Build reply, which
+     * finds no answer, and `Trace turn` records the turn with its reason. The event
+     * stays marked seen — moving `Mark seen` later would trade a lost answer for a
+     * possible double paid call on a Slack retry, which Grok refused as the worse deal.
+     */
+    onError: "continueRegularOutput",
   });
   // Has report: true → ask, false → nothing.
   connections["Has report"] = { main: [[{ node: "Ask model", type: "main", index: 0 }], []] };
@@ -306,10 +318,67 @@ return [{ json: { ok: true, channel: ba.channel, thread_ts: ba.thread_ts, text: 
       sendHeaders: true, headerParameters: { parameters: [{ name: "Content-Type", value: "application/json; charset=utf-8" }] },
       sendBody: true, specifyBody: "json",
       jsonBody: "={{ JSON.stringify({ channel: $json.channel, thread_ts: $json.thread_ts, text: $json.text }) }}",
+      /*
+       * chat.postMessage answers HTTP 200 when it REFUSES — {"ok":false,"error":
+       * "not_in_channel"}. Post reply used to be the last node in the graph, so nothing
+       * ever read that: the bot stayed silent, the user saw nothing, and the workflow
+       * reported success (prd-agent-n8n, 2026-09-15). `fullResponse` puts Slack's JSON
+       * under `body` for the check below; `neverError` + `onError` keep a 5xx from
+       * killing the turn before it can be recorded; the retries are Slack-only — never
+       * on `Ask model`, where a retry is a second bill.
+       */
+      options: { response: { response: { neverError: true, fullResponse: true } } } },
+    onError: "continueRegularOutput",
+    retryOnFail: true, maxTries: 3, waitBetweenTries: 1000,
+  });
+  // Has answer: true → post, false → record the turn as unanswered (no model text).
+  connections["Has answer"] = { main: [[{ node: "Post reply", type: "main", index: 0 }], [{ node: "Reply took", type: "main", index: 0 }]] };
+
+  /*
+   * 10. Reply took / Replied — the same ok-shape the incident workflow already uses
+   *     (`Slack took` / `Slack ok`). `ok` is the test, not the HTTP status.
+   */
+  nodes.push({
+    id: "took", name: "Reply took", type: "n8n-nodes-base.set", typeVersion: 3.4,
+    position: pos(),
+    parameters: { mode: "raw",
+      jsonOutput: "={{ JSON.stringify((() => { const b = ($json && $json.body) || $json || {};"
+        + " const h = $('Handle').first().json;"
+        + " return { event_id: h.event_id, thread_ts: h.thread_ts,"
+        + " ok: b.ok === true, error: (b.ok === true ? '' : String(b.error || 'no answer posted')),"
+        + " ts: (b.ok === true && typeof b.ts === 'string') ? b.ts : '' }; })()) }}",
       options: {} },
   });
-  // Has answer: true → post, false → nothing.
-  connections["Has answer"] = { main: [[{ node: "Post reply", type: "main", index: 0 }], []] };
+  connections["Post reply"] = { main: [[{ node: "Reply took", type: "main", index: 0 }]] };
+
+  /*
+   * 11. Trace the turn — the listener had NO record of any kind: a failure after the
+   *     acknowledgement was total silence (prd-agent-n8n, 2026-09-15). One row per turn,
+   *     upserted onto the event_id that `Mark seen` already wrote, so the outcome sits
+   *     beside the dedup key rather than in a second table. It records BOTH outcomes,
+   *     which is the point: `ok:false` with Slack's reason is exactly what was invisible.
+   */
+  nodes.push({
+    id: "trace", name: "Trace turn", type: "n8n-nodes-base.dataTable", typeVersion: 1.1,
+    position: pos(),
+    parameters: { resource: "row", operation: "upsert", dataTableId: dtSeen,
+      filters: { conditions: [{ keyName: "event_id", condition: "eq",
+        keyValue: "={{ $json.event_id }}" }] },
+      columns: { mappingMode: "defineBelow",
+        value: { event_id: "={{ $json.event_id }}", ok: "={{ String($json.ok) }}",
+          error: "={{ $json.error }}", reply_ts: "={{ $json.ts }}",
+          execution_id: "={{ String($execution.id) }}" },
+        matchingColumns: ["event_id"], schema: [
+          { id: "event_id", displayName: "event_id", type: "string", canBeUsedToMatch: true, required: false, display: true, defaultMatch: false },
+          { id: "ok", displayName: "ok", type: "string", canBeUsedToMatch: false, required: false, display: true, defaultMatch: false },
+          { id: "error", displayName: "error", type: "string", canBeUsedToMatch: false, required: false, display: true, defaultMatch: false },
+          { id: "reply_ts", displayName: "reply_ts", type: "string", canBeUsedToMatch: false, required: false, display: true, defaultMatch: false },
+          { id: "execution_id", displayName: "execution_id", type: "string", canBeUsedToMatch: false, required: false, display: true, defaultMatch: false },
+        ] } },
+    // Tracing must never be the thing that breaks the turn it is tracing.
+    onError: "continueRegularOutput",
+  });
+  connections["Reply took"] = { main: [[{ node: "Trace turn", type: "main", index: 0 }]] };
 
   return { name, nodes, connections, settings: { executionOrder: "v1" } };
 }
