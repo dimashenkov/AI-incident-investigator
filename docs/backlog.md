@@ -359,9 +359,15 @@ break the working path. Slack post ran, `Slack took` and `Slack ok` ran after it
 `Slack record` ran — so the `fullResponse` / `body.ok` change did not silently kill the
 delivery. That was the biggest risk of the change and it is now measured.
 
-**To close it:** add three string columns — `usage`, `models`, `execution_id` — to the
-`incident_data` table (id `rKZEwVRRLB3Xb6LR`). The n8n public API cannot add columns to an
-existing table; it needs the n8n UI (Data Tables → incident_data) or an Instance-level MCP
-token (Settings → Instance-level MCP → Enabled), which this instance does not have enabled.
-Until then `Record usage` and `Record incident data` will both fail on every live run —
-which is loud, not silent, and that is the right failure mode.
+**Closed the same hour:** the columns were added. The n8n PUBLIC API does accept them —
+`POST /data-tables/{id}/columns` with `{name, type}` returns 201; only the MCP tool wrapper
+claimed it could not (it routes column actions through the instance-level MCP server, which
+this instance has disabled). `incident_data` (`rKZEwVRRLB3Xb6LR`) now has
+`incident_id, data, usage, models, execution_id`; the listener's seen table
+(`uBZvrUFgQcderwqF`) got `ok, error, reply_ts, execution_id` for `Trace turn`.
+
+**Still UNVERIFIED, honestly:** that `Record usage` actually writes the row. The two runs
+after the columns were added (`container-oom#52`, `#53`) were ACCEPTED by the webhook — a
+200 with a submission token — and created NO execution, the documented stale-webhook shape,
+so they cost nothing and proved nothing. Deactivate+activate did not restore it; only a
+bare probe POST started a workflow. One execution on a healthy webhook would close it.
